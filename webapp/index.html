@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Возможности отдела</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --ink:#1a1a1a; --sub:#6b6b6f; --border:#ececec; --page:#f4f4f5; --card:#fff;
+}
+*{box-sizing:border-box}
+body{
+  font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+  margin:0;background:var(--tg-theme-bg-color,var(--page));
+  color:var(--tg-theme-text-color,var(--ink));
+  padding:16px 12px 28px;
+}
+h1{font-size:1.1rem;margin:0 0 4px;letter-spacing:-.01em}
+.sub{font-size:.82rem;color:var(--tg-theme-hint-color,var(--sub));margin:0 0 16px}
+.grid{display:flex;flex-direction:column;gap:10px}
+.card{
+  background:var(--tg-theme-secondary-bg-color,var(--card));
+  border:1px solid var(--border);border-radius:14px;
+  padding:14px 16px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.card:active{opacity:.7}
+.card h3{font-size:.95rem;margin:0 0 4px;letter-spacing:-.005em}
+.card p{font-size:.8rem;line-height:1.4;color:var(--tg-theme-hint-color,var(--sub));margin:0 0 8px}
+.eta{
+  display:inline-block;font-size:.72rem;font-weight:600;
+  background:rgba(127,127,127,.12);padding:3px 9px;border-radius:999px;
+}
+@media (prefers-color-scheme: dark){
+  :root{--ink:#f2f2f3;--sub:#9d9da1;--border:#2c2c2e;--page:#0d0d0e;--card:#1a1a1c}
+}
+</style>
+</head>
+<body>
+
+<h1>Форма здания сложная? Вот когда звать нас</h1>
+<p class="sub">Нажмите на кейс, похожий на вашу задачу, — и опишите её в чате.</p>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const CASES = [
+  {key:"unique", title:"Много уникальных элементов",
+   hint:"Панели, ламели или МАФы не повторяются один в один — руками это дни рутины.", eta:"2–3 дня"},
+  {key:"reference", title:"Есть задумка, но неясно как собрать",
+   hint:"Референс со сложной формой или паттерном, где рисунок меняется по правилу.", eta:"2–3 дня"},
+  {key:"curved", title:"Форма здания криволинейная",
+   hint:"Объём или фасад не плоский: кривизна целиком или локально.", eta:"2–3 дня"},
+  {key:"revit", title:"Геометрию нужно передать в Revit",
+   hint:"Форма из Rhino/Grasshopper должна жить в Revit — семействами, с чистой топологией.", eta:"1–2 дня"},
+  {key:"repeat", title:"Действие повторяется по всему проекту",
+   hint:"Расстановка, разбивка, подрезка — в десятках мест, при правках всё заново.", eta:"1 день"},
+  {key:"variants", title:"Нужно перебрать много вариантов",
+   hint:"Десятки вариантов паттерна, массинга или панелизации, решение нужно быстро.", eta:"1–2 дня"},
+  {key:"physics", title:"Нужно просчитать физику проекта",
+   hint:"Инсоляция, ветер, пешеходные потоки, шум — осознанно, а не на глаз.", eta:"1–2 дня"},
+  {key:"custom", title:"Нетиповая или разовая задача",
+   hint:"Не попадает в пункты выше: чистка геометрии, скан, графика на 3D-форму, новое.", eta:"по договорённости"},
+];
+
+const tg = window.Telegram?.WebApp;
+tg?.ready();
+tg?.expand();
+
+const grid = document.getElementById("grid");
+for (const c of CASES) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `<h3>${c.title}</h3><p>${c.hint}</p><span class="eta">⏱ ${c.eta}</span>`;
+  el.addEventListener("click", () => {
+    if (tg) tg.sendData(JSON.stringify({case: c.key}));
+  });
+  grid.appendChild(el);
+}
+</script>
+
+</body>
+</html>
