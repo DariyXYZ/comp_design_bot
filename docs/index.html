@@ -111,7 +111,7 @@ footer{padding:12px 22px 2px;display:flex;align-items:center;justify-content:spa
 </div>
 
 <footer>
-  <div class="hint">Листайте карточки свайпом.<br>Нашли свой случай — жмите «Это моя задача».</div>
+  <div class="hint">Листайте карточки свайпом.<br>Нашли свою задачу — жмите на карточку.</div>
   <div class="dots" id="dots"></div>
 </footer>
 
@@ -210,11 +210,12 @@ function swipe(dir){
 }
 
 function attachDrag(el){
-  let startX = 0, startY = 0, dx = 0, active = false;
+  let startX = 0, startY = 0, dx = 0, dy = 0, moved = false, active = false;
 
   const onDown = e => {
     if (el !== deck.lastElementChild) return;
     active = true;
+    moved = false;
     startX = (e.touches ? e.touches[0] : e).clientX;
     startY = (e.touches ? e.touches[0] : e).clientY;
     el.classList.add("dragging");
@@ -223,7 +224,8 @@ function attachDrag(el){
     if (!active) return;
     const p = e.touches ? e.touches[0] : e;
     dx = p.clientX - startX;
-    const dy = p.clientY - startY;
+    dy = p.clientY - startY;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
     el.style.transform = `translate(${dx}px, ${dy * .25}px) rotate(${dx * .05}deg)`;
   };
   const onUp = () => {
@@ -234,8 +236,10 @@ function attachDrag(el){
       swipe(Math.sign(dx));
     } else {
       layout(); // вернуть на место
+      // короткий тап без движения = выбор задачи
+      if (!moved) pick(CASES[el.dataset.idx].key);
     }
-    dx = 0;
+    dx = 0; dy = 0;
   };
 
   el.addEventListener("touchstart", onDown, {passive:true});

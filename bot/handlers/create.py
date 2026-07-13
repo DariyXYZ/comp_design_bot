@@ -79,7 +79,7 @@ async def start_request(message: Message, state: FSMContext, case_key: str) -> N
 @router.message(F.text == BTN_CREATE, F.chat.type == "private")
 async def choose_case(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer("Выберите кейс, похожий на вашу задачу:", reply_markup=case_picker())
+    await message.answer("Выберите тип задачи:", reply_markup=case_picker())
 
 
 @router.message(F.web_app_data)
@@ -98,7 +98,7 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
 async def case_chosen(callback: CallbackQuery, state: FSMContext) -> None:
     case_key = callback.data.split(":", 1)[1]
     if case_key not in CASES:
-        await callback.answer("Неизвестный кейс")
+        await callback.answer("Неизвестная задача")
         return
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
