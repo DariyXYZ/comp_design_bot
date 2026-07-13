@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from aiogram import F, Bot, Router
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message
@@ -74,6 +75,7 @@ async def start_request(message: Message, state: FSMContext, case_key: str) -> N
     )
 
 
+@router.message(Command("new"), F.chat.type == "private")
 @router.message(F.text == BTN_CREATE, F.chat.type == "private")
 async def choose_case(message: Message, state: FSMContext) -> None:
     await state.clear()

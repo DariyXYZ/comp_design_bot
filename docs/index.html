@@ -2,82 +2,259 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Возможности отдела</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#1a1a1a; --sub:#6b6b6f; --border:#ececec; --page:#f4f4f5; --card:#fff;
-}
-*{box-sizing:border-box}
-body{
-  font-family:-apple-system,Segoe UI,Roboto,sans-serif;
-  margin:0;background:var(--tg-theme-bg-color,var(--page));
-  color:var(--tg-theme-text-color,var(--ink));
-  padding:16px 12px 28px;
-}
-h1{font-size:1.1rem;margin:0 0 4px;letter-spacing:-.01em}
-.sub{font-size:.82rem;color:var(--tg-theme-hint-color,var(--sub));margin:0 0 16px}
-.grid{display:flex;flex-direction:column;gap:10px}
-.card{
-  background:var(--tg-theme-secondary-bg-color,var(--card));
-  border:1px solid var(--border);border-radius:14px;
-  padding:14px 16px;cursor:pointer;
-  -webkit-tap-highlight-color:transparent;
-}
-.card:active{opacity:.7}
-.card h3{font-size:.95rem;margin:0 0 4px;letter-spacing:-.005em}
-.card p{font-size:.8rem;line-height:1.4;color:var(--tg-theme-hint-color,var(--sub));margin:0 0 8px}
-.eta{
-  display:inline-block;font-size:.72rem;font-weight:600;
-  background:rgba(127,127,127,.12);padding:3px 9px;border-radius:999px;
+  --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
+  --line:#e4e4e1; --pill:#efefec; --accent:#141416;
 }
 @media (prefers-color-scheme: dark){
-  :root{--ink:#f2f2f3;--sub:#9d9da1;--border:#2c2c2e;--page:#0d0d0e;--card:#1a1a1c}
+  :root{--ink:#f0f0ee; --sub:#94949a; --page:#101012; --card:#1b1b1e;
+        --line:#2a2a2e; --pill:#26262a; --accent:#f0f0ee}
+}
+*{box-sizing:border-box;margin:0;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;max-width:100vw;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:"Golos Text",-apple-system,sans-serif;
+  background:var(--tg-theme-bg-color,var(--page));
+  color:var(--tg-theme-text-color,var(--ink));
+  display:flex;flex-direction:column;
+  padding:max(14px,env(safe-area-inset-top)) 0 max(14px,env(safe-area-inset-bottom));
+  user-select:none;-webkit-user-select:none;touch-action:none;
+}
+
+header{padding:4px 22px 12px;text-align:left}
+header .brand{
+  font-family:"Unbounded",sans-serif;font-size:.62rem;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--sub);
+}
+header h1{
+  font-family:"Unbounded",sans-serif;font-size:1.02rem;font-weight:700;
+  line-height:1.3;letter-spacing:-.01em;margin-top:6px;
+}
+
+.deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:center;justify-content:center}
+.deck{position:relative;width:min(88vw,400px);height:100%;max-height:560px}
+
+.swipe-card{
+  position:absolute;inset:0;
+  background:var(--card);border:1px solid var(--line);border-radius:22px;
+  overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 18px 44px -18px rgba(0,0,0,.22);
+  cursor:grab;will-change:transform;
+  transition:transform .38s cubic-bezier(.2,.9,.3,1.15), opacity .3s ease;
+}
+.swipe-card.dragging{transition:none;cursor:grabbing}
+.swipe-card.gone{transition:transform .32s ease-in, opacity .28s ease-in;opacity:0}
+
+.media{flex:0 0 46%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
+@media (prefers-color-scheme: dark){.media{background:#26262a}}
+.media img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.num{
+  position:absolute;top:12px;left:14px;
+  font-family:"Unbounded",sans-serif;font-size:.6rem;font-weight:700;
+  letter-spacing:.1em;color:#141416;background:rgba(255,255,255,.82);
+  backdrop-filter:blur(6px);padding:5px 10px;border-radius:999px;
+}
+.body{flex:1;min-height:0;padding:18px 20px 16px;display:flex;flex-direction:column;gap:8px}
+.body h3{font-size:1.04rem;font-weight:600;line-height:1.3;letter-spacing:-.01em}
+.body p{font-size:.84rem;line-height:1.5;color:var(--sub);flex:1}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.eta{
+  font-size:.72rem;font-weight:600;color:var(--ink);
+  background:var(--pill);padding:5px 11px;border-radius:999px;white-space:nowrap;
+}
+.go{
+  font-size:.8rem;font-weight:600;color:var(--card);
+  background:var(--accent);padding:9px 16px;border-radius:999px;
+  border:none;font-family:inherit;cursor:pointer;
+}
+
+footer{padding:12px 22px 2px;display:flex;align-items:center;justify-content:space-between}
+.hint{font-size:.72rem;color:var(--sub);line-height:1.4}
+.dots{display:flex;gap:5px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
+.dots i.on{background:var(--accent);width:14px;border-radius:999px}
+
+.arrow{
+  position:absolute;top:50%;transform:translateY(-50%);z-index:30;
+  width:38px;height:38px;border-radius:50%;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:1rem;cursor:pointer;
+  display:none;align-items:center;justify-content:center;
+}
+.arrow:hover{background:var(--pill)}
+.arrow.left{left:calc(50% - min(44vw,200px) - 58px)}
+.arrow.right{right:calc(50% - min(44vw,200px) - 58px)}
+@media (hover:hover) and (min-width:640px){.arrow{display:flex}}
+
+@media (prefers-reduced-motion: reduce){
+  .swipe-card{transition:none}
 }
 </style>
 </head>
 <body>
 
-<h1>Форма здания сложная? Вот когда звать нас</h1>
-<p class="sub">Нажмите на кейс, похожий на вашу задачу, — и опишите её в чате.</p>
+<header>
+  <div class="brand">Отдел вычислительного проектирования</div>
+  <h1>Когда звать нас</h1>
+</header>
 
-<div class="grid" id="grid"></div>
+<div class="deck-wrap">
+  <button class="arrow left" aria-label="Предыдущая">←</button>
+  <div class="deck" id="deck"></div>
+  <button class="arrow right" aria-label="Следующая">→</button>
+</div>
+
+<footer>
+  <div class="hint">Листайте карточки свайпом.<br>Нашли свой случай — жмите «Это моя задача».</div>
+  <div class="dots" id="dots"></div>
+</footer>
 
 <script>
 const CASES = [
   {key:"unique", title:"Много уникальных элементов",
-   hint:"Панели, ламели или МАФы не повторяются один в один — руками это дни рутины.", eta:"2–3 дня"},
+   hint:"Панели, ламели или МАФы не повторяются один в один — руками это дни рутины. Скрипт сам генерирует всю партию по правилам.", eta:"⏱ 2–3 дня"},
   {key:"reference", title:"Есть задумка, но неясно как собрать",
-   hint:"Референс со сложной формой или паттерном, где рисунок меняется по правилу.", eta:"2–3 дня"},
+   hint:"Референс — скульптура, паттерн, сложная форма, где рисунок меняется по правилу. Разберём на алгоритм и соберём прототип.", eta:"⏱ 2–3 дня"},
   {key:"curved", title:"Форма здания криволинейная",
-   hint:"Объём или фасад не плоский: кривизна целиком или локально.", eta:"2–3 дня"},
+   hint:"Объём или фасад не плоский: кривизна целиком или локально. Построим параметрически и разобьём на панели под сборку.", eta:"⏱ 2–3 дня"},
   {key:"revit", title:"Геометрию нужно передать в Revit",
-   hint:"Форма из Rhino/Grasshopper должна жить в Revit — семействами, с чистой топологией.", eta:"1–2 дня"},
+   hint:"Форма из Rhino/Grasshopper должна жить в Revit — семействами, с чистой топологией, без мусорной сетки.", eta:"⏱ 1–2 дня"},
   {key:"repeat", title:"Действие повторяется по всему проекту",
-   hint:"Расстановка, разбивка, подрезка — в десятках мест, при правках всё заново.", eta:"1 день"},
+   hint:"Расстановка, разбивка, подрезка — в десятках мест, при правках всё заново. Сделаем инструмент, который пересчитывает за секунды.", eta:"⏱ 1 день"},
   {key:"variants", title:"Нужно перебрать много вариантов",
-   hint:"Десятки вариантов паттерна, массинга или панелизации, решение нужно быстро.", eta:"1–2 дня"},
+   hint:"Десятки вариантов паттерна, массинга или панелизации, решение нужно уже сегодня-завтра. Меняете параметр — сразу видите результат.", eta:"⏱ 1–2 дня"},
   {key:"physics", title:"Нужно просчитать физику проекта",
-   hint:"Инсоляция, ветер, пешеходные потоки, шум — осознанно, а не на глаз.", eta:"1–2 дня"},
+   hint:"Инсоляция, ветер, пешеходные потоки, шум. Считаем сценарии и визуализируем — форма подстраивается осознанно, а не на глаз.", eta:"⏱ 1–2 дня"},
   {key:"custom", title:"Нетиповая или разовая задача",
-   hint:"Не попадает в пункты выше: чистка геометрии, скан, графика на 3D-форму, новое.", eta:"по договорённости"},
+   hint:"Не попадает в пункты выше: чистка геометрии, скан, графика на 3D-форму или что-то совсем новое. Разберём и решим по ситуации.", eta:"⏱ обсудим"},
 ];
 
 const tg = window.Telegram?.WebApp;
-tg?.ready();
-tg?.expand();
+tg?.ready(); tg?.expand();
 
-const grid = document.getElementById("grid");
-for (const c of CASES) {
-  const el = document.createElement("div");
-  el.className = "card";
-  el.innerHTML = `<h3>${c.title}</h3><p>${c.hint}</p><span class="eta">⏱ ${c.eta}</span>`;
-  el.addEventListener("click", () => {
-    if (tg) tg.sendData(JSON.stringify({case: c.key}));
-  });
-  grid.appendChild(el);
+const deck = document.getElementById("deck");
+const dots = document.getElementById("dots");
+let current = 0;
+
+CASES.forEach((_, i) => {
+  const d = document.createElement("i");
+  if (i === 0) d.className = "on";
+  dots.appendChild(d);
+});
+
+function pick(key){
+  if (tg?.sendData) tg.sendData(JSON.stringify({case:key}));
 }
+
+function makeCard(idx){
+  const c = CASES[idx % CASES.length];
+  const el = document.createElement("div");
+  el.className = "swipe-card";
+  el.dataset.idx = idx % CASES.length;
+  el.innerHTML = `
+    <div class="media">
+      <span class="num">${String(idx % CASES.length + 1).padStart(2,"0")} / ${String(CASES.length).padStart(2,"0")}</span>
+      <img src="img/${c.key}.jpg" alt="" draggable="false" loading="lazy">
+    </div>
+    <div class="body">
+      <h3>${c.title}</h3>
+      <p>${c.hint}</p>
+      <div class="meta">
+        <span class="eta">${c.eta}</span>
+        <button class="go">Это моя задача →</button>
+      </div>
+    </div>`;
+  el.querySelector(".go").addEventListener("click", e => {
+    e.stopPropagation();
+    pick(c.key);
+  });
+  attachDrag(el);
+  return el;
+}
+
+// стопка из трёх: текущая + две за ней
+function layout(){
+  const cards = [...deck.children];
+  cards.forEach((el, i) => {
+    const depth = cards.length - 1 - i;   // 0 = верхняя (последний ребёнок)
+    el.style.zIndex = 10 - depth;
+    if (!el.classList.contains("dragging")) {
+      el.style.transform = `translateY(${depth * 12}px) scale(${1 - depth * .045})`;
+      el.style.opacity = depth > 2 ? 0 : 1;
+    }
+  });
+  [...dots.children].forEach((d, i) => d.className = i === current ? "on" : "");
+}
+
+function fill(){
+  while (deck.children.length < 3) {
+    const nextIdx = (current + deck.children.length) % CASES.length;
+    deck.insertBefore(makeCard(nextIdx), deck.firstChild);
+  }
+  layout();
+}
+
+function swipe(dir){
+  const top = deck.lastElementChild;
+  if (!top) return;
+  top.classList.add("gone");
+  top.style.transform = `translateX(${dir * 130}%) rotate(${dir * 14}deg)`;
+  current = (current + 1) % CASES.length;
+  setTimeout(() => { top.remove(); fill(); }, 300);
+}
+
+function attachDrag(el){
+  let startX = 0, startY = 0, dx = 0, active = false;
+
+  const onDown = e => {
+    if (el !== deck.lastElementChild) return;
+    active = true;
+    startX = (e.touches ? e.touches[0] : e).clientX;
+    startY = (e.touches ? e.touches[0] : e).clientY;
+    el.classList.add("dragging");
+  };
+  const onMove = e => {
+    if (!active) return;
+    const p = e.touches ? e.touches[0] : e;
+    dx = p.clientX - startX;
+    const dy = p.clientY - startY;
+    el.style.transform = `translate(${dx}px, ${dy * .25}px) rotate(${dx * .05}deg)`;
+  };
+  const onUp = () => {
+    if (!active) return;
+    active = false;
+    el.classList.remove("dragging");
+    if (Math.abs(dx) > 90) {
+      swipe(Math.sign(dx));
+    } else {
+      layout(); // вернуть на место
+    }
+    dx = 0;
+  };
+
+  el.addEventListener("touchstart", onDown, {passive:true});
+  el.addEventListener("touchmove", onMove, {passive:true});
+  el.addEventListener("touchend", onUp);
+  el.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
+document.querySelector(".arrow.right").addEventListener("click", () => swipe(1));
+document.querySelector(".arrow.left").addEventListener("click", () => swipe(-1));
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") swipe(1);
+  if (e.key === "ArrowLeft") swipe(-1);
+  if (e.key === "Enter") pick(CASES[current].key);
+});
+
+fill();
 </script>
 
 </body>
