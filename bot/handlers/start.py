@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from .. import db
@@ -13,7 +14,8 @@ router = Router()
 
 
 @router.message(CommandStart(), F.chat.type == "private")
-async def cmd_start(message: Message) -> None:
+async def cmd_start(message: Message, state: FSMContext) -> None:
+    await state.clear()  # /start посреди заявки сбрасывает черновик, а не молча ест текст
     await message.answer(WELCOME, reply_markup=main_menu())
 
 

@@ -30,8 +30,20 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _connect() -> aiosqlite.Connection:
+    # WAL: конкурентные записи не блокируют друг друга насмерть;
+    # busy_timeout: при занятом локе ждём, а не падаем с 'database is locked'.
+    return aiosqlite.connect(config.db_path, timeout=10)
+
+
+async def _setup(db: aiosqlite.Connection) -> None:
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=10000")
+
+
 async def init_db() -> None:
-    async with aiosqlite.connect(config.db_path) as db:
+    async with _connect() as db:
+        await _setup(db)
         await db.executescript(_SCHEMA)
         await db.commit()
 
@@ -46,7 +58,8 @@ async def create_request(
     source_path: str | None,
 ) -> int:
     now = _now()
-    async with aiosqlite.connect(config.db_path) as db:
+    async with _connect() as db:
+        await _setup(db)
         cur = await db.execute(
             "INSERT INTO requests (user_id, username, full_name, case_key, description,"
             " photo_file_ids, source_path, status, created_at, updated_at)"
@@ -68,7 +81,8 @@ async def create_request(
 
 
 async def set_dept_message_id(req_id: int, message_id: int) -> None:
-    async with aiosqlite.connect(config.db_path) as db:
+    async with _connect() as db:
+        await _setup(db)
         await db.execute(
             "UPDATE requests SET dept_message_id = ?, updated_at = ? WHERE id = ?",
             (message_id, _now(), req_id),
@@ -78,7 +92,8 @@ async def set_dept_message_id(req_id: int, message_id: int) -> None:
 
 async def set_status(req_id: int, status: str) -> dict | None:
     """Меняет статус, возвращает обновлённую заявку (или None, если нет такой)."""
-    async with aiosqlite.connect(config.db_path) as db:
+    async with _connect() as db:
+        await _setup(db)
         db.row_factory = aiosqlite.Row
         await db.execute(
             "UPDATE requests SET status = ?, updated_at = ? WHERE id = ?",
@@ -91,7 +106,8 @@ async def set_status(req_id: int, status: str) -> dict | None:
 
 
 async def get_request(req_id: int) -> dict | None:
-    async with aiosqlite.connect(config.db_path) as db:
+    async with _connect() as db:
+        await _setup(db)
         db.row_factory = aiosqlite.Row
         cur = await db.execute("SELECT * FROM requests WHERE id = ?", (req_id,))
         row = await cur.fetchone()
@@ -99,7 +115,8 @@ async def get_request(req_id: int) -> dict | None:
 
 
 async def list_user_requests(user_id: int, limit: int = 20) -> list[dict]:
-    async with aiosqlite.connect(config.db_path) as db:
+    async with _connect() as db:
+        await _setup(db)
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM requests WHERE user_id = ? ORDER BY id DESC LIMIT ?",

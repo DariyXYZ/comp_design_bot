@@ -137,6 +137,7 @@ const CASES = [
 
 const tg = window.Telegram?.WebApp;
 tg?.ready(); tg?.expand();
+tg?.disableVerticalSwipes?.(); // вертикальный драг карточки не должен закрывать Mini App
 
 const deck = document.getElementById("deck");
 const dots = document.getElementById("dots");
@@ -148,8 +149,17 @@ CASES.forEach((_, i) => {
   dots.appendChild(d);
 });
 
+let picked = false; // sendData закрывает Mini App; дубль до закрытия глушим
 function pick(key){
-  if (tg?.sendData) tg.sendData(JSON.stringify({case:key}));
+  if (picked) return;
+  if (tg?.sendData) {
+    picked = true;
+    tg.sendData(JSON.stringify({case:key}));
+  } else {
+    // Открыто не из кнопки бота (прямая ссылка/браузер) — sendData недоступен.
+    const hint = document.querySelector(".hint");
+    hint.textContent = "Выбор работает только внутри Telegram — откройте бота @comp_design_bot и нажмите «Возможности отдела».";
+  }
 }
 
 function makeCard(idx){
@@ -174,7 +184,6 @@ function makeCard(idx){
     e.stopPropagation();
     pick(c.key);
   });
-  attachDrag(el);
   return el;
 }
 
@@ -200,62 +209,83 @@ function fill(){
   layout();
 }
 
+let animating = false; // guard: быстрый второй свайп не трогает ту же карточку
+
 function swipe(dir){
   const top = deck.lastElementChild;
-  if (!top) return;
+  if (!top || animating) return;
+  animating = true;
   top.classList.add("gone");
   top.style.transform = `translateX(${dir * 130}%) rotate(${dir * 14}deg)`;
   current = (current + 1) % CASES.length;
-  setTimeout(() => { top.remove(); fill(); }, 300);
+  setTimeout(() => { top.remove(); fill(); animating = false; }, 300);
 }
 
-function attachDrag(el){
-  let startX = 0, startY = 0, dx = 0, dy = 0, moved = false, active = false;
-
-  const onDown = e => {
-    if (el !== deck.lastElementChild) return;
-    active = true;
-    moved = false;
-    startX = (e.touches ? e.touches[0] : e).clientX;
-    startY = (e.touches ? e.touches[0] : e).clientY;
-    el.classList.add("dragging");
-  };
-  const onMove = e => {
-    if (!active) return;
-    const p = e.touches ? e.touches[0] : e;
-    dx = p.clientX - startX;
-    dy = p.clientY - startY;
-    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
-    el.style.transform = `translate(${dx}px, ${dy * .25}px) rotate(${dx * .05}deg)`;
-  };
-  const onUp = () => {
-    if (!active) return;
-    active = false;
-    el.classList.remove("dragging");
-    if (Math.abs(dx) > 90) {
-      swipe(Math.sign(dx));
-    } else {
-      layout(); // вернуть на место
-      // короткий тап без движения = выбор задачи
-      if (!moved) pick(CASES[el.dataset.idx].key);
-    }
-    dx = 0; dy = 0;
-  };
-
-  el.addEventListener("touchstart", onDown, {passive:true});
-  el.addEventListener("touchmove", onMove, {passive:true});
-  el.addEventListener("touchend", onUp);
-  el.addEventListener("mousedown", onDown);
-  window.addEventListener("mousemove", onMove);
-  window.addEventListener("mouseup", onUp);
+function prev(){
+  if (animating) return;
+  current = (current - 1 + CASES.length) % CASES.length;
+  deck.replaceChildren();
+  fill();
 }
+
+// Драг: одни слушатели на window + активная карточка в переменной,
+// иначе на каждую созданную карточку копился бы новый window-хендлер.
+const drag = {el: null, startX: 0, startY: 0, dx: 0, moved: false, fromButton: false};
+
+function onDown(e){
+  const top = deck.lastElementChild;
+  if (!top || animating) return;
+  const target = e.target;
+  if (!top.contains(target)) return;
+  drag.el = top;
+  drag.moved = false;
+  drag.dx = 0;
+  drag.fromButton = !!target.closest(".go");
+  const p = e.touches ? e.touches[0] : e;
+  drag.startX = p.clientX;
+  drag.startY = p.clientY;
+  top.classList.add("dragging");
+}
+
+function onMove(e){
+  if (!drag.el) return;
+  const p = e.touches ? e.touches[0] : e;
+  drag.dx = p.clientX - drag.startX;
+  const dy = p.clientY - drag.startY;
+  if (Math.abs(drag.dx) > 8 || Math.abs(dy) > 8) drag.moved = true;
+  drag.el.style.transform = `translate(${drag.dx}px, ${dy * .25}px) rotate(${drag.dx * .05}deg)`;
+}
+
+function onUp(){
+  if (!drag.el) return;
+  const el = drag.el;
+  drag.el = null;
+  el.classList.remove("dragging");
+  if (Math.abs(drag.dx) > 90) {
+    swipe(Math.sign(drag.dx));
+  } else {
+    layout();
+    // Тап без движения = выбор; тап по кнопке обработает её собственный click.
+    if (!drag.moved && !drag.fromButton) pick(CASES[el.dataset.idx].key);
+  }
+}
+
+window.addEventListener("touchstart", onDown, {passive:true});
+window.addEventListener("touchmove", onMove, {passive:true});
+window.addEventListener("touchend", onUp);
+window.addEventListener("mousedown", onDown);
+window.addEventListener("mousemove", onMove);
+window.addEventListener("mouseup", onUp);
 
 document.querySelector(".arrow.right").addEventListener("click", () => swipe(1));
-document.querySelector(".arrow.left").addEventListener("click", () => swipe(-1));
+document.querySelector(".arrow.left").addEventListener("click", prev);
 window.addEventListener("keydown", e => {
   if (e.key === "ArrowRight") swipe(1);
-  if (e.key === "ArrowLeft") swipe(-1);
-  if (e.key === "Enter") pick(CASES[current].key);
+  if (e.key === "ArrowLeft") prev();
+  if (e.key === "Enter") {
+    const top = deck.lastElementChild;
+    if (top) pick(CASES[top.dataset.idx].key); // из DOM, не из current — не рассинхронится
+  }
 });
 
 fill();

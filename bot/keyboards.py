@@ -46,6 +46,10 @@ def case_picker() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def _cancel_row() -> list[InlineKeyboardButton]:
+    return [InlineKeyboardButton(text="Отменить заявку", callback_data="req:cancel")]
+
+
 def photos_step() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -53,7 +57,7 @@ def photos_step() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Дальше ➡️", callback_data="photos:done"),
                 InlineKeyboardButton(text="Пропустить", callback_data="photos:skip"),
             ],
-            [InlineKeyboardButton(text="Отменить заявку", callback_data="req:cancel")],
+            _cancel_row(),
         ]
     )
 
@@ -62,7 +66,7 @@ def source_step() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Пропустить", callback_data="source:skip")],
-            [InlineKeyboardButton(text="Отменить заявку", callback_data="req:cancel")],
+            _cancel_row(),
         ]
     )
 
@@ -71,7 +75,7 @@ def preview_step() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🚀 Отправить в отдел", callback_data="req:send")],
-            [InlineKeyboardButton(text="Отменить заявку", callback_data="req:cancel")],
+            _cancel_row(),
         ]
     )
 

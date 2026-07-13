@@ -1,18 +1,22 @@
-"""FSM создания заявки: кейс → описание → фото → исходники → превью → отправка."""
+"""FSM создания заявки: задача → описание → фото → исходники → превью → отправка."""
 from __future__ import annotations
 
+import asyncio
+import html
 import json
+import logging
 
 from aiogram import F, Bot, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import CallbackQuery, InputMediaPhoto, Message, User
 
 from .. import db
 from ..config import config
 from ..keyboards import (
+    BTN_CAPABILITIES,
     BTN_CREATE,
     case_picker,
     dept_status_buttons,
@@ -27,12 +31,24 @@ from ..texts import (
     CANCELED,
     CASES,
     PREVIEW_HEADER,
+    SENT_DEPT_FAILED,
     SENT_NO_DEPT,
     SENT_OK,
     STATUSES,
 )
 
 router = Router()
+log = logging.getLogger(__name__)
+
+MAX_DESCRIPTION = 3000
+MAX_SOURCE = 500
+
+# Один лок на пользователя: защищает FSM от гонок (альбом фото, дабл-клики).
+_user_locks: dict[int, asyncio.Lock] = {}
+
+
+def _lock(user_id: int) -> asyncio.Lock:
+    return _user_locks.setdefault(user_id, asyncio.Lock())
 
 
 class NewRequest(StatesGroup):
@@ -40,6 +56,11 @@ class NewRequest(StatesGroup):
     photos = State()
     source = State()
     preview = State()
+
+
+def author_line(user: User) -> str:
+    name = user.full_name or "—"
+    return name + (f" (@{user.username})" if user.username else "")
 
 
 def request_card(
@@ -50,17 +71,18 @@ def request_card(
     author: str,
     status: str = "new",
 ) -> str:
+    """Единственный рендерер карточки. Весь пользовательский текст экранируется."""
     case = CASES.get(case_key, {"title": case_key, "eta": "—"})
     header = f"Заявка №{req_id}" if req_id else "Новая заявка"
     lines = [
         f"<b>{header} · {case['title']}</b>",
         f"Ориентир по срокам: {case['eta']}",
-        f"От: {author}",
+        f"От: {html.escape(author)}",
         "",
-        description,
+        html.escape(description),
     ]
     if source_path:
-        lines += ["", f"📁 Исходники: <code>{source_path}</code>"]
+        lines += ["", f"📁 Исходники: <code>{html.escape(source_path)}</code>"]
     lines += ["", STATUSES.get(status, status)]
     return "\n".join(lines)
 
@@ -77,20 +99,30 @@ async def start_request(message: Message, state: FSMContext, case_key: str) -> N
 
 @router.message(Command("new"), F.chat.type == "private")
 @router.message(F.text == BTN_CREATE, F.chat.type == "private")
+@router.message(F.text == BTN_CAPABILITIES, F.chat.type == "private")
 async def choose_case(message: Message, state: FSMContext) -> None:
+    # BTN_CAPABILITIES приходит текстом только когда WEBAPP_URL не настроен —
+    # тогда показываем выбор задач кнопками, чтобы кнопка не была мёртвой.
     await state.clear()
     await message.answer("Выберите тип задачи:", reply_markup=case_picker())
 
 
-@router.message(F.web_app_data)
+@router.message(F.web_app_data, F.chat.type == "private")
 async def from_webapp(message: Message, state: FSMContext) -> None:
     """Клик по карточке в Mini App: sendData -> {'case': key}."""
     try:
         data = json.loads(message.web_app_data.data)
         case_key = data["case"]
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, KeyError, TypeError):
         return
-    if case_key in CASES:
+    if case_key not in CASES:
+        return
+    async with _lock(message.from_user.id):
+        current = await state.get_state()
+        current_data = await state.get_data()
+        # Дубль sendData от двойного тапа в Mini App: тот же кейс уже запущен.
+        if current == NewRequest.description.state and current_data.get("case_key") == case_key:
+            return
         await start_request(message, state, case_key)
 
 
@@ -101,28 +133,58 @@ async def case_chosen(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("Неизвестная задача")
         return
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        pass  # двойной тап или старое сообщение — не критично
     await start_request(callback.message, state, case_key)
 
 
 @router.message(NewRequest.description, F.text)
 async def got_description(message: Message, state: FSMContext) -> None:
-    await state.update_data(description=message.text.strip())
+    text = message.text.strip()
+    if not text:
+        await message.answer("Описание пустое — напишите пару предложений о задаче.")
+        return
+    if len(text) > MAX_DESCRIPTION:
+        await message.answer(
+            f"Описание слишком длинное ({len(text)} символов, максимум {MAX_DESCRIPTION}). "
+            "Сократите, а детали можно будет добавить в чате с отделом."
+        )
+        return
+    await state.update_data(description=text)
     await state.set_state(NewRequest.photos)
     await message.answer(ASK_PHOTOS, reply_markup=photos_step())
 
 
+@router.message(NewRequest.description)
+async def description_wrong_type(message: Message) -> None:
+    await message.answer(
+        "Сначала опишите задачу текстом — картинки будут следующим шагом."
+    )
+
+
 @router.message(NewRequest.photos, F.photo)
 async def got_photo(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    photos: list[str] = data.get("photos", [])
-    photos.append(message.photo[-1].file_id)
-    await state.update_data(photos=photos)
-    # Альбом приходит серией сообщений — отвечаем только на первое, чтобы не спамить.
-    if len(photos) == 1:
+    # Альбом приходит серией почти одновременных сообщений — без лока
+    # конкурентные get/update теряют часть фото.
+    async with _lock(message.from_user.id):
+        data = await state.get_data()
+        photos: list[str] = data.get("photos", [])
+        photos.append(message.photo[-1].file_id)
+        await state.update_data(photos=photos)
+        first = len(photos) == 1
+    if first:
         await message.answer(
             "Картинка принята. Ещё — или жмите «Дальше».", reply_markup=photos_step()
         )
+
+
+@router.message(NewRequest.photos)
+async def photos_wrong_type(message: Message) -> None:
+    await message.answer(
+        "Пришлите картинку (фото), или жмите «Дальше» / «Пропустить» под сообщением выше."
+    )
 
 
 @router.callback_query(NewRequest.photos, F.data.in_({"photos:done", "photos:skip"}))
@@ -136,23 +198,34 @@ async def photos_done(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(NewRequest.source, F.text)
 async def got_source(message: Message, state: FSMContext) -> None:
-    await state.update_data(source_path=message.text.strip())
-    await show_preview(message, state)
+    text = message.text.strip()[:MAX_SOURCE]
+    await state.update_data(source_path=text or None)
+    await show_preview(message, state, message.from_user)
+
+
+@router.message(NewRequest.source)
+async def source_wrong_type(message: Message) -> None:
+    await message.answer(
+        "Пришлите путь текстом, или жмите «Пропустить» под сообщением выше."
+    )
 
 
 @router.callback_query(NewRequest.source, F.data == "source:skip")
 async def source_skipped(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.update_data(source_path=None)
-    await show_preview(callback.message, state)
+    await show_preview(callback.message, state, callback.from_user)
 
 
-async def show_preview(message: Message, state: FSMContext) -> None:
+async def show_preview(message: Message, state: FSMContext, user: User) -> None:
     data = await state.get_data()
     await state.set_state(NewRequest.preview)
-    author = message.chat.full_name or "—"
     card = request_card(
-        None, data["case_key"], data["description"], data.get("source_path"), author
+        None,
+        data["case_key"],
+        data["description"],
+        data.get("source_path"),
+        author_line(user),
     )
     photos: list[str] = data.get("photos", [])
     note = f"\n\n🖼 Картинок: {len(photos)}" if photos else ""
@@ -165,19 +238,32 @@ async def show_preview(message: Message, state: FSMContext) -> None:
 async def cancel_request(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        pass
     await callback.message.answer(CANCELED)
 
 
 @router.callback_query(NewRequest.preview, F.data == "req:send")
 async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    data = await state.get_data()
-    await state.clear()
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-
     user = callback.from_user
-    author = user.full_name + (f" (@{user.username})" if user.username else "")
+    # Лок + очистка состояния внутри лока: двойной тап по «Отправить»
+    # не создаст дубль — второй колбэк увидит пустые данные.
+    async with _lock(user.id):
+        data = await state.get_data()
+        if not data.get("case_key"):
+            await callback.answer("Заявка уже отправлена")
+            return
+        await state.clear()
+
+    await callback.answer()
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        pass
+
+    author = author_line(user)
     req_id = await db.create_request(
         user_id=user.id,
         username=user.username,
@@ -196,22 +282,31 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         req_id, data["case_key"], data["description"], data.get("source_path"), author
     )
     thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
-    dept_msg = await bot.send_message(
-        config.dept_chat_id,
-        card,
-        reply_markup=dept_status_buttons(req_id, "new"),
-        **thread,
-    )
-    await db.set_dept_message_id(req_id, dept_msg.message_id)
+    try:
+        dept_msg = await bot.send_message(
+            config.dept_chat_id,
+            card,
+            reply_markup=dept_status_buttons(req_id, "new"),
+            **thread,
+        )
+        await db.set_dept_message_id(req_id, dept_msg.message_id)
+    except Exception:
+        # Заявка уже в БД (req_id) — не теряем её молча, а честно говорим пользователю.
+        log.exception("Заявка №%s сохранена, но не доставлена в чат отдела", req_id)
+        await callback.message.answer(SENT_DEPT_FAILED.format(req_id=req_id))
+        return
 
     photos: list[str] = data.get("photos", [])
     if photos:
         media = [InputMediaPhoto(media=fid) for fid in photos[:10]]
-        await bot.send_media_group(
-            config.dept_chat_id,
-            media,
-            reply_to_message_id=dept_msg.message_id,
-            **thread,
-        )
+        try:
+            await bot.send_media_group(
+                config.dept_chat_id,
+                media,
+                reply_to_message_id=dept_msg.message_id,
+                **thread,
+            )
+        except Exception:
+            log.exception("Заявка №%s: карточка отправлена, но альбом фото не дошёл", req_id)
 
     await callback.message.answer(SENT_OK.format(req_id=req_id))
