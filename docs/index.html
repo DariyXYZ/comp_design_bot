@@ -28,17 +28,15 @@ body{
   user-select:none;-webkit-user-select:none;touch-action:none;
 }
 
-header{padding:4px 22px 12px;text-align:left}
-header .brand{
-  font-family:"Unbounded",sans-serif;font-size:.62rem;font-weight:700;
-  letter-spacing:.14em;text-transform:uppercase;color:var(--sub);
-}
+header{padding:4px 22px 12px;text-align:center}
 header h1{
   font-family:"Unbounded",sans-serif;font-size:1.02rem;font-weight:700;
-  line-height:1.3;letter-spacing:-.01em;margin-top:6px;
+  line-height:1.3;letter-spacing:-.01em;
 }
-
-.dots-top{display:flex;justify-content:center;gap:5px;padding:0 0 12px}
+header .brand{
+  font-family:"Golos Text",-apple-system,sans-serif;font-size:.72rem;font-weight:400;
+  color:var(--sub);margin-top:4px;
+}
 
 .deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:center;justify-content:center}
 .deck{position:relative;width:min(88vw,400px);height:100%;max-height:560px}
@@ -76,17 +74,19 @@ header h1{
 .body h3{font-size:1.04rem;font-weight:600;line-height:1.3;letter-spacing:-.01em}
 .body p{font-size:.84rem;line-height:1.5;color:var(--sub);flex:1}
 
-.eta{
-  position:absolute;left:20px;bottom:16px;
-  font-size:.72rem;font-weight:600;color:var(--ink);
-  background:var(--pill);padding:5px 11px;border-radius:999px;white-space:nowrap;
-  display:inline-flex;align-items:center;gap:4px;
+/* Радиус карточки 22px; бейджи вписаны с отступом 12px от края —
+   22 - 12 = 10px радиуса, углы визуально концентричны углу карточки. */
+.eta, .num{
+  position:absolute;bottom:12px;
+  width:92px;height:30px;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  border-radius:10px;background:var(--pill);color:var(--ink);
+  font-size:.72rem;font-weight:600;white-space:nowrap;
 }
+.eta{left:12px}
 .num{
-  position:absolute;right:14px;bottom:16px;
-  font-family:"Unbounded",sans-serif;font-size:.6rem;font-weight:700;
-  letter-spacing:.1em;color:var(--ink);background:var(--pill);
-  padding:5px 10px;border-radius:999px;
+  right:12px;
+  font-family:"Unbounded",sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;
 }
 
 .back-placeholder{
@@ -95,22 +95,26 @@ header h1{
   color:var(--sub);font-size:.78rem;line-height:1.4;padding:16px;
 }
 
-footer{padding:14px 22px 2px;display:flex;justify-content:center;text-align:center}
-.hint{font-size:.72rem;color:var(--sub);line-height:1.4}
+.dots-row{display:flex;justify-content:center;gap:5px;padding:10px 0 0}
 .dots{display:flex;gap:5px}
 .dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .dots i.on{background:var(--accent);width:14px;border-radius:999px}
 
 .cta{
-  position:fixed;left:16px;right:16px;
-  bottom:max(16px,env(safe-area-inset-bottom));
-  height:52px;border-radius:16px;z-index:40;
+  position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:min(88vw,400px);height:56px;border-radius:16px;z-index:40;
   background:var(--accent);color:var(--card);
   font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:6px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
   box-shadow:0 14px 30px -12px rgba(0,0,0,.4);
 }
-.cta:active{transform:scale(.98)}
+.cta:active{transform:translateX(-50%) scale(.98)}
+.cta-arrow{
+  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(255,255,255,.14);color:#9a9a9e;
+}
 
 .arrow{
   position:absolute;top:50%;transform:translateY(-50%);z-index:30;
@@ -131,11 +135,9 @@ footer{padding:14px 22px 2px;display:flex;justify-content:center;text-align:cent
 <body>
 
 <header>
-  <div class="brand">Отдел вычислительного проектирования</div>
   <h1>Когда звать нас</h1>
+  <div class="brand">Отдел вычислительного проектирования</div>
 </header>
-
-<div class="dots-top dots" id="dots"></div>
 
 <div class="deck-wrap">
   <button class="arrow left" aria-label="Предыдущая">←</button>
@@ -143,11 +145,16 @@ footer{padding:14px 22px 2px;display:flex;justify-content:center;text-align:cent
   <button class="arrow right" aria-label="Следующая">→</button>
 </div>
 
-<footer>
-  <div class="hint">Листайте карточку свайпом</div>
-</footer>
+<div class="dots-row dots" id="dots"></div>
 
-<button class="cta" id="cta">Это моя задача →</button>
+<button class="cta" id="cta">
+  <span>Это моя задача</span>
+  <span class="cta-arrow" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M5 12h13.5M13 6l6.5 6-6.5 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+</button>
 
 <script>
 const CASES = [
@@ -191,8 +198,7 @@ function pick(key){
     tg.sendData(JSON.stringify({case:key}));
   } else {
     // Открыто не из кнопки бота (прямая ссылка/браузер) — sendData недоступен.
-    const hint = document.querySelector(".hint");
-    hint.textContent = "Выбор работает только внутри Telegram — откройте бота @comp_design_bot и нажмите «Возможности отдела».";
+    alert("Выбор работает только внутри Telegram — откройте бота @comp_design_bot и нажмите «Возможности отдела».");
   }
 }
 
@@ -264,36 +270,38 @@ function prev(){
 
 // Драг: одни слушатели на window + активная карточка в переменной,
 // иначе на каждую созданную карточку копился бы новый window-хендлер.
+// Pointer Events, а не отдельно touch+mouse: на тач-устройствах браузер
+// синтезирует mousedown/mouseup ПОСЛЕ touchend — с раздельными хендлерами
+// один тап дважды переключал .flipped (флип→сразу обратно), отсюда
+// нестабильность «иногда работает». Один событийный поток эту гонку убирает.
 const drag = {el: null, startX: 0, startY: 0, dx: 0, moved: false};
 
 function onDown(e){
   const top = deck.lastElementChild;
   if (!top || animating) return;
-  const target = e.target;
-  if (!top.contains(target)) return;
+  if (!top.contains(e.target)) return;
   drag.el = top;
   drag.moved = false;
   drag.dx = 0;
-  const p = e.touches ? e.touches[0] : e;
-  drag.startX = p.clientX;
-  drag.startY = p.clientY;
+  drag.startX = e.clientX;
+  drag.startY = e.clientY;
   top.classList.add("dragging");
 }
 
 function onMove(e){
   if (!drag.el) return;
-  const p = e.touches ? e.touches[0] : e;
-  drag.dx = p.clientX - drag.startX;
-  const dy = p.clientY - drag.startY;
+  drag.dx = e.clientX - drag.startX;
+  const dy = e.clientY - drag.startY;
   if (Math.abs(drag.dx) > 8 || Math.abs(dy) > 8) drag.moved = true;
   drag.el.style.transform = `translate(${drag.dx}px, ${dy * .25}px) rotate(${drag.dx * .05}deg)`;
 }
 
-function onUp(){
+function onUp(e){
   if (!drag.el) return;
   const el = drag.el;
   drag.el = null;
   el.classList.remove("dragging");
+  if (e && e.type === "pointercancel") { layout(); return; } // прервано системой — не считаем тапом
   if (Math.abs(drag.dx) > 90) {
     swipe(Math.sign(drag.dx));
   } else {
@@ -315,12 +323,10 @@ function chooseCurrent(){
   setTimeout(() => pick(key), 320);
 }
 
-window.addEventListener("touchstart", onDown, {passive:true});
-window.addEventListener("touchmove", onMove, {passive:true});
-window.addEventListener("touchend", onUp);
-window.addEventListener("mousedown", onDown);
-window.addEventListener("mousemove", onMove);
-window.addEventListener("mouseup", onUp);
+window.addEventListener("pointerdown", onDown);
+window.addEventListener("pointermove", onMove);
+window.addEventListener("pointerup", onUp);
+window.addEventListener("pointercancel", onUp);
 
 document.querySelector(".arrow.right").addEventListener("click", () => swipe(1));
 document.querySelector(".arrow.left").addEventListener("click", prev);
