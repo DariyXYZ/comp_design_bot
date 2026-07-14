@@ -30,13 +30,15 @@ async def cmd_id(message: Message) -> None:
 
 @router.message(Command("info"), F.chat.type == "private")
 @router.message(F.text == BTN_INFO, F.chat.type == "private")
-async def show_info(message: Message) -> None:
+async def show_info(message: Message, state: FSMContext) -> None:
+    await state.clear()  # любая кнопка меню посреди заявки сбрасывает черновик
     await message.answer(INFO)
 
 
 @router.message(Command("my"), F.chat.type == "private")
 @router.message(F.text == BTN_MY, F.chat.type == "private")
-async def my_requests(message: Message) -> None:
+async def my_requests(message: Message, state: FSMContext) -> None:
+    await state.clear()  # любая кнопка меню посреди заявки сбрасывает черновик
     requests = await db.list_user_requests(message.from_user.id)
     if not requests:
         await message.answer(NO_REQUESTS)

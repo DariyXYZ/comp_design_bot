@@ -50,7 +50,14 @@ header .brand{
 }
 .swipe-card.dragging{transition:none;cursor:grabbing}
 .swipe-card.gone{transition:transform .32s ease-in, opacity .28s ease-in;opacity:0}
-.swipe-card.flying{transition:transform .34s cubic-bezier(.3,.8,.4,1), opacity .3s ease .06s;opacity:0}
+.swipe-card.flying{transition:transform .8s cubic-bezier(.22,.7,.32,1), opacity .6s ease .25s;opacity:0}
+
+.whiteout{
+  position:fixed;inset:0;background:var(--page);
+  opacity:0;pointer-events:none;z-index:45;
+  transition:opacity .75s ease;
+}
+.whiteout.on{opacity:1}
 
 .card-inner{
   position:relative;width:100%;height:100%;
@@ -64,7 +71,7 @@ header .brand{
   display:flex;flex-direction:column;
   background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden;
 }
-.card-back{transform:rotateY(180deg);padding:16px}
+.card-back{transform:rotateY(180deg);padding:12px}
 
 .media{flex:0 0 46%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
 @media (prefers-color-scheme: dark){.media{background:#26262a}}
@@ -89,8 +96,10 @@ header .brand{
   font-family:"Unbounded",sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;
 }
 
+/* Тот же принцип, что у .eta/.num: отступ 12px + радиус 10px = 22px
+   радиуса карточки — угол плейсхолдера концентричен углу карточки. */
 .back-placeholder{
-  flex:1;border-radius:16px;border:1.5px dashed var(--line);background:var(--pill);
+  flex:1;border-radius:10px;border:1.5px dashed var(--line);background:var(--pill);
   display:flex;align-items:center;justify-content:center;text-align:center;
   color:var(--sub);font-size:.78rem;line-height:1.4;padding:16px;
 }
@@ -128,7 +137,11 @@ header .brand{
 @media (hover:hover) and (min-width:640px){.arrow{display:flex}}
 
 @media (prefers-reduced-motion: reduce){
-  .swipe-card, .card-inner{transition:none}
+  /* .card-inner (флип) исключён нарочно: без анимации тап по карточке не
+     даёт вообще никакой видимой реакции — это хуже для доступности, чем
+     короткий поворот. Свайпы/перелёт (крупное перемещение по экрану,
+     собственно то, ради чего эта настройка существует) по-прежнему гасим. */
+  .swipe-card{transition:none}
 }
 </style>
 </head>
@@ -155,6 +168,8 @@ header .brand{
     </svg>
   </span>
 </button>
+
+<div class="whiteout" id="whiteout"></div>
 
 <script>
 const CASES = [
@@ -320,7 +335,10 @@ function chooseCurrent(){
   animating = true;
   top.classList.add("flying");
   top.style.transform = "translateY(-140%) scale(.94)";
-  setTimeout(() => pick(key), 320);
+  // Экран одновременно белеет — иначе последний кадр перед закрытием
+  // миниаппа — это нижняя карточка стопки, а не осмысленный переход.
+  document.getElementById("whiteout").classList.add("on");
+  setTimeout(() => pick(key), 820);
 }
 
 window.addEventListener("pointerdown", onDown);
