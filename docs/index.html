@@ -41,13 +41,13 @@ header .brand{
   color:var(--sub);margin-top:6px;
 }
 
-.deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:stretch;justify-content:center}
-.deck-col{display:flex;flex-direction:column;align-items:center;min-height:0}
-/* Без max-height: карточка (flex:1) забирает ровно всё свободное место в
-   .deck-col, точкам достаётся только их собственная высота — иначе после
-   упора в потолок высоты остаток пространства некому забрать, и разрыв
-   «точки → CTA» плывёт вместо честных 2X (это и было причиной бага). */
-.deck{position:relative;width:min(88vw,400px);flex:1;min-height:0}
+.deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:flex-start;justify-content:center}
+/* margin-top:24px = 2X, тот же отступ что и над заголовком и перед CTA.
+   Карточка — фиксированная высота (не тянется на всё свободное место в
+   .deck-wrap), точки садятся сразу под ней; что остаётся ниже — просто
+   запас перед зоной CTA, не сжимается ни один из явных отступов. */
+.deck-col{display:flex;flex-direction:column;align-items:center;margin-top:24px}
+.deck{position:relative;width:min(88vw,400px);height:min(60vh,560px)}
 
 .swipe-card{
   position:absolute;inset:0;perspective:1200px;
@@ -59,8 +59,8 @@ header .brand{
 .swipe-card.dragging{transition:none;cursor:grabbing}
 .swipe-card.gone{transition:transform .5s cubic-bezier(.25,.46,.45,.94), opacity .4s ease-in;opacity:0}
 /* Замах: короткий сброс вниз перед стартом полёта — см. chooseCurrent(). */
-.swipe-card.anticipate{transition:transform .18s cubic-bezier(.4,0,.6,1)}
-.swipe-card.flying{transition:transform 1s cubic-bezier(.16,.84,.32,1), opacity .5s ease .35s;opacity:0}
+.swipe-card.anticipate{transition:transform .13s cubic-bezier(.4,0,.6,1)}
+.swipe-card.flying{transition:transform .48s cubic-bezier(.16,.84,.32,1), opacity .32s ease .1s;opacity:0}
 
 .card-inner{
   position:relative;width:100%;height:100%;
@@ -338,16 +338,17 @@ function chooseCurrent(){
   // карточке — класс с opacity в стилевом листе такой инлайн не перебьёт.
   [...deck.children].filter(el => el !== top).forEach(el => { el.style.transition = "none"; el.style.opacity = "0"; });
 
-  // Замах: короткий сброс вниз, потом уверенный мягкий полёт вверх.
+  // Замах: короткий сброс вниз, потом полёт вверх — короче, чем раньше,
+  // чтобы чат открывался почти сразу следом, а не после долгой паузы.
   top.classList.add("anticipate");
-  top.style.transform = "translateY(16px) scale(.99)";
+  top.style.transform = "translateY(14px) scale(.99)";
   setTimeout(() => {
     top.classList.remove("anticipate");
     top.classList.add("flying");
     top.style.transform = "translateY(-150%) scale(.94)";
-  }, 170);
+  }, 120);
 
-  setTimeout(() => pick(key), 170 + 1000);
+  setTimeout(() => pick(key), 120 + 460);
 }
 
 window.addEventListener("pointerdown", onDown);
