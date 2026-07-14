@@ -63,6 +63,9 @@ def author_line(user: User) -> str:
     return name + (f" (@{user.username})" if user.username else "")
 
 
+CAPTION_LIMIT = 1024  # жёсткий лимит Telegram на подпись к фото/альбому
+
+
 def request_card(
     req_id: int | None,
     case_key: str,
@@ -70,21 +73,35 @@ def request_card(
     source_path: str | None,
     author: str,
     status: str = "new",
+    max_len: int | None = None,
 ) -> str:
-    """Единственный рендерер карточки. Весь пользовательский текст экранируется."""
+    """Единственный рендерер карточки. Весь пользовательский текст экранируется.
+
+    max_len — если задан (для caption к фото/альбому), обрезается только
+    описание, чтобы не разрезать HTML-теги в шапке/хвосте карточки.
+    """
     case = CASES.get(case_key, {"title": case_key, "eta": "—"})
     header = f"Заявка №{req_id}" if req_id else "Новая заявка"
-    lines = [
+    head_lines = [
         f"<b>{header} · {case['title']}</b>",
         f"Ориентир по срокам: {case['eta']}",
         f"От: {html.escape(author)}",
         "",
-        html.escape(description),
     ]
+    tail_lines = []
     if source_path:
-        lines += ["", f"📁 Исходники: <code>{html.escape(source_path)}</code>"]
-    lines += ["", STATUSES.get(status, status)]
-    return "\n".join(lines)
+        tail_lines += ["", f"📁 Исходники: <code>{html.escape(source_path)}</code>"]
+    tail_lines += ["", STATUSES.get(status, status)]
+
+    desc = html.escape(description)
+    if max_len is not None:
+        # +2 — переносы строки между head/desc и между desc/tail (сама сборка ниже).
+        fixed_len = len("\n".join(head_lines)) + len("\n".join(tail_lines)) + 2
+        budget = max(max_len - fixed_len, 10)
+        if len(desc) > budget:
+            desc = desc[: budget - 1].rstrip() + "…"
+
+    return "\n".join(head_lines + [desc] + tail_lines)
 
 
 async def start_request(message: Message, state: FSMContext, case_key: str) -> None:
@@ -278,35 +295,50 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))
         return
 
-    card = request_card(
-        req_id, data["case_key"], data["description"], data.get("source_path"), author
-    )
+    photos: list[str] = data.get("photos", [])
+    case_key = data["case_key"]
+    description = data["description"]
+    source_path = data.get("source_path")
+    buttons = dept_status_buttons(req_id, "new")
     thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
+
     try:
-        dept_msg = await bot.send_message(
-            config.dept_chat_id,
-            card,
-            reply_markup=dept_status_buttons(req_id, "new"),
-            **thread,
-        )
+        if not photos:
+            # 0 фото: текст + кнопки в одном сообщении — как и раньше.
+            card = request_card(req_id, case_key, description, source_path, author)
+            dept_msg = await bot.send_message(config.dept_chat_id, card, reply_markup=buttons, **thread)
+        elif len(photos) == 1:
+            # 1 фото: подпись к фото = вся карточка + кнопки — тоже одно сообщение.
+            caption = request_card(
+                req_id, case_key, description, source_path, author, max_len=CAPTION_LIMIT
+            )
+            dept_msg = await bot.send_photo(
+                config.dept_chat_id, photo=photos[0], caption=caption, reply_markup=buttons, **thread
+            )
+        else:
+            # 2+ фото: Telegram не разрешает кнопки на альбоме. Текст — подписью
+            # к первому фото альбома (визуально один блок), кнопки — короткой
+            # строкой статуса следом, без дублирования всего текста заявки.
+            caption = request_card(
+                req_id, case_key, description, source_path, author, max_len=CAPTION_LIMIT
+            )
+            media = [InputMediaPhoto(media=photos[0], caption=caption)] + [
+                InputMediaPhoto(media=fid) for fid in photos[1:10]
+            ]
+            album_msgs = await bot.send_media_group(config.dept_chat_id, media, **thread)
+            short = f"Заявка №{req_id} · {CASES[case_key]['title']}\n{STATUSES['new']}"
+            dept_msg = await bot.send_message(
+                config.dept_chat_id,
+                short,
+                reply_markup=buttons,
+                reply_to_message_id=album_msgs[0].message_id,
+                **thread,
+            )
         await db.set_dept_message_id(req_id, dept_msg.message_id)
     except Exception:
         # Заявка уже в БД (req_id) — не теряем её молча, а честно говорим пользователю.
         log.exception("Заявка №%s сохранена, но не доставлена в чат отдела", req_id)
         await callback.message.answer(SENT_DEPT_FAILED.format(req_id=req_id))
         return
-
-    photos: list[str] = data.get("photos", [])
-    if photos:
-        media = [InputMediaPhoto(media=fid) for fid in photos[:10]]
-        try:
-            await bot.send_media_group(
-                config.dept_chat_id,
-                media,
-                reply_to_message_id=dept_msg.message_id,
-                **thread,
-            )
-        except Exception:
-            log.exception("Заявка №%s: карточка отправлена, но альбом фото не дошёл", req_id)
 
     await callback.message.answer(SENT_OK.format(req_id=req_id))

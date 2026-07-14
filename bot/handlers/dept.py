@@ -1,6 +1,7 @@
 """Кнопки статусов под заявкой в чате отдела."""
 from __future__ import annotations
 
+import json
 import logging
 
 from aiogram import F, Bot, Router
@@ -41,18 +42,32 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
     req = await db.set_status(req_id, new_status)
     await callback.answer(f"Статус: {STATUSES[new_status]}")
 
-    # Перерисовываем карточку целиком из БД тем же рендерером, что и при создании —
-    # никакой строковой хирургии по последней строке.
-    from .create import request_card  # локальный импорт против цикла
+    # Перерисовываем тем же рендерером, что и при создании — никакой строковой
+    # хирургии. Способ редактирования зависит от того, каким сообщением
+    # была отправлена заявка (см. create.send_request): текст / подпись к
+    # фото / короткая строка статуса под альбомом (кнопки на альбом нельзя).
+    from .create import CAPTION_LIMIT, request_card  # локальный импорт против цикла
 
     author = req["full_name"] + (f" (@{req['username']})" if req["username"] else "")
-    new_text = request_card(
-        req_id, req["case_key"], req["description"], req["source_path"], author, new_status
-    )
+    photos = json.loads(req["photo_file_ids"] or "[]")
+    new_markup = dept_status_buttons(req_id, new_status)
+
     try:
-        await callback.message.edit_text(
-            new_text, reply_markup=dept_status_buttons(req_id, new_status)
-        )
+        if len(photos) >= 2:
+            case_title = CASES.get(req["case_key"], {}).get("title", req["case_key"])
+            short = f"Заявка №{req_id} · {case_title}\n{STATUSES[new_status]}"
+            await callback.message.edit_text(short, reply_markup=new_markup)
+        elif len(photos) == 1:
+            caption = request_card(
+                req_id, req["case_key"], req["description"], req["source_path"],
+                author, new_status, max_len=CAPTION_LIMIT,
+            )
+            await callback.message.edit_caption(caption=caption, reply_markup=new_markup)
+        else:
+            new_text = request_card(
+                req_id, req["case_key"], req["description"], req["source_path"], author, new_status
+            )
+            await callback.message.edit_text(new_text, reply_markup=new_markup)
     except TelegramBadRequest as e:
         # Гонка двух кликов или карточка старше 48ч: статус в БД уже сменён,
         # автора всё равно уведомим ниже.

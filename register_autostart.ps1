@@ -2,12 +2,17 @@
 # Запустить один раз: .\register_autostart.ps1
 $taskName = "comp_design_bot"
 $script = Join-Path $PSScriptRoot "run_bot.ps1"
-$action = "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
 
-schtasks /Create /F /TN $taskName /SC ONLOGON /TR $action /RL LIMITED
-if ($LASTEXITCODE -eq 0) {
+$actionArgs = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+try {
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force -ErrorAction Stop | Out-Null
     Write-Host "Задача '$taskName' создана. Бот будет стартовать при входе в систему."
-    Write-Host "Запустить прямо сейчас: schtasks /Run /TN $taskName"
-} else {
-    Write-Host "Не удалось создать задачу через schtasks. Запасной вариант - ярлык в shell:startup."
+    Write-Host "Запустить прямо сейчас: Start-ScheduledTask -TaskName '$taskName'"
+} catch {
+    Write-Host "Не удалось создать задачу: $($_.Exception.Message)"
+    Write-Host "Запасной вариант - ярлык в shell:startup."
 }
