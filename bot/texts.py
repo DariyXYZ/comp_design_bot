@@ -44,11 +44,11 @@ CASES: dict[str, dict[str, str]] = {
 }
 
 STATUSES: dict[str, str] = {
-    "new": "🆕 Новая",
-    "accepted": "👀 Принята",
-    "in_progress": "⚙️ В работе",
-    "done": "✅ Готово",
-    "rejected": "❌ Отклонена",
+    "new": "○ Новая",
+    "accepted": "◔ Принята",
+    "in_progress": "◑ В работе",
+    "done": "● Готово",
+    "rejected": "× Отклонена",
 }
 
 WELCOME = (

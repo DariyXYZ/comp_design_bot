@@ -12,10 +12,10 @@ from aiogram.types import (
 from .config import config
 from .texts import CASES, STATUSES
 
-BTN_CAPABILITIES = "🧩 Возможности отдела"
-BTN_MY = "📋 Мои заявки"
-BTN_CREATE = "✏️ Создать заявку"
-BTN_INFO = "ℹ️ Инфо"
+BTN_CAPABILITIES = "◆ Возможности отдела"
+BTN_MY = "▤ Мои заявки"
+BTN_CREATE = "+ Создать заявку"
+BTN_INFO = "ⓘ Инфо"
 
 
 def main_menu() -> ReplyKeyboardMarkup:
@@ -54,7 +54,7 @@ def photos_step() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Дальше ➡️", callback_data="photos:done"),
+                InlineKeyboardButton(text="Дальше →", callback_data="photos:done"),
                 InlineKeyboardButton(text="Пропустить", callback_data="photos:skip"),
             ],
             _cancel_row(),
@@ -74,7 +74,7 @@ def source_step() -> InlineKeyboardMarkup:
 def preview_step() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Отправить в отдел", callback_data="req:send")],
+            [InlineKeyboardButton(text="→ Отправить в отдел", callback_data="req:send")],
             _cancel_row(),
         ]
     )
