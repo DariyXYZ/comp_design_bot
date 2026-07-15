@@ -79,7 +79,7 @@ header .brand{
 }
 .card-back{transform:rotateY(180deg);padding:12px}
 
-.media{flex:0 0 46%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
+.media{flex:0 0 50%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
 @media (prefers-color-scheme: dark){.media{background:#26262a}}
 .media img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 
@@ -108,6 +108,7 @@ header .brand{
 }
 
 .dots-row{display:flex;justify-content:center;gap:5px;padding:22px 0 0}
+.swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:14px}
 .dots{display:flex;gap:5px}
 .dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .dots i.on{background:var(--accent);width:14px;border-radius:999px}
@@ -162,6 +163,8 @@ header .brand{
   </div>
   <button class="arrow right" aria-label="Следующая">→</button>
 </div>
+
+<p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
 
 <button class="cta" id="cta">
   <span>Это моя задача</span>
