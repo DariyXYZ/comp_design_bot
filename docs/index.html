@@ -47,7 +47,10 @@ header .brand{
    .deck-wrap), точки садятся сразу под ней; что остаётся ниже — просто
    запас перед зоной CTA, не сжимается ни один из явных отступов. */
 .deck-col{display:flex;flex-direction:column;align-items:center;margin-top:24px}
-.deck{position:relative;width:min(88vw,400px);height:min(60vh,560px)}
+/* Пропорции игральной карты (5:7) вместо независимых width/height —
+   иначе высота от vh почти всегда даёт коротковатую, не карточную форму.
+   max-height — подстраховка на случай совсем невысокого экрана. */
+.deck{position:relative;width:min(88vw,400px);aspect-ratio:5/7;max-height:min(62vh,560px)}
 
 .swipe-card{
   position:absolute;inset:0;perspective:1200px;
@@ -104,7 +107,7 @@ header .brand{
   color:var(--sub);font-size:.78rem;line-height:1.4;padding:16px;
 }
 
-.dots-row{display:flex;justify-content:center;gap:5px;padding:12px 0 0}
+.dots-row{display:flex;justify-content:center;gap:5px;padding:22px 0 0}
 .dots{display:flex;gap:5px}
 .dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .dots i.on{background:var(--accent);width:14px;border-radius:999px}
