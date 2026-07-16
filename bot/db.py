@@ -29,22 +29,6 @@ CREATE TABLE IF NOT EXISTS actor_contacts (
     user_id INTEGER PRIMARY KEY,
     contact TEXT NOT NULL
 );
-
--- Реплай на конкретное сообщение-просьбу контакта исполнителя (единственный
--- оставшийся кейс — причина отклонения и комментарий фидбека переехали на
--- обычный FSM-текст, реплай в личке/чате отдела оказался неочевидным жестом).
--- Ключ (chat_id, ask_message_id) — message_id уникален только В ПРЕДЕЛАХ
--- чата, эти же номера легко повторятся в другом чате. Переживает рестарт
--- бота — важно, тут завязан хэндовер исполнителя.
-CREATE TABLE IF NOT EXISTS pending_replies (
-    chat_id INTEGER NOT NULL,
-    ask_message_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    kind TEXT NOT NULL,
-    req_id INTEGER NOT NULL,
-    prefix TEXT,
-    PRIMARY KEY (chat_id, ask_message_id)
-);
 """
 
 
@@ -94,33 +78,11 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
             await db.execute(f"ALTER TABLE requests ADD COLUMN {name} {coltype}")
 
 
-async def _migrate_old_pending_contacts(db: aiosqlite.Connection) -> None:
-    """pending_contacts — таблица из прошлой ревизии этой фичи (жила пару дней),
-    вытеснена общей pending_replies. Переносим то, что не успели разобрать,
-    и больше эту таблицу не трогаем."""
-    cur = await db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='pending_contacts'"
-    )
-    if await cur.fetchone() is None:
-        return
-    cur = await db.execute("SELECT ask_message_id, user_id, req_id, prefix FROM pending_contacts")
-    rows = await cur.fetchall()
-    for ask_message_id, user_id, req_id, prefix in rows:
-        await db.execute(
-            "INSERT OR IGNORE INTO pending_replies (chat_id, ask_message_id, user_id, kind, req_id, prefix)"
-            " VALUES (?, ?, ?, 'contact', ?, ?)",
-            (config.dept_chat_id, ask_message_id, user_id, req_id, prefix),
-        )
-    if rows:
-        await db.execute("DELETE FROM pending_contacts")
-
-
 async def init_db() -> None:
     async with _connect() as db:
         await _setup(db)
         await db.executescript(_SCHEMA)
         await _ensure_columns(db)
-        await _migrate_old_pending_contacts(db)
         await db.commit()
 
 
@@ -226,48 +188,6 @@ async def set_known_contact(user_id: int, contact: str) -> None:
             "INSERT INTO actor_contacts (user_id, contact) VALUES (?, ?)"
             " ON CONFLICT(user_id) DO UPDATE SET contact = excluded.contact",
             (user_id, contact),
-        )
-        await db.commit()
-
-
-_REPLY_KINDS = {"contact"}
-
-
-async def add_pending_reply(
-    chat_id: int, ask_message_id: int, user_id: int, kind: str, req_id: int, prefix: str | None = None
-) -> None:
-    if kind not in _REPLY_KINDS:
-        raise ValueError(f"неизвестный kind: {kind!r}")
-    async with _connect() as db:
-        await _setup(db)
-        await db.execute(
-            "INSERT OR REPLACE INTO pending_replies (chat_id, ask_message_id, user_id, kind, req_id, prefix)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (chat_id, ask_message_id, user_id, kind, req_id, prefix),
-        )
-        await db.commit()
-
-
-async def get_pending_reply(chat_id: int, ask_message_id: int) -> dict | None:
-    """Не удаляет запись — вызывающий сам решает, дошёл ли ответ до валидного результата."""
-    async with _connect() as db:
-        await _setup(db)
-        db.row_factory = aiosqlite.Row
-        cur = await db.execute(
-            "SELECT user_id, kind, req_id, prefix FROM pending_replies"
-            " WHERE chat_id = ? AND ask_message_id = ?",
-            (chat_id, ask_message_id),
-        )
-        row = await cur.fetchone()
-        return dict(row) if row else None
-
-
-async def clear_pending_reply(chat_id: int, ask_message_id: int) -> None:
-    async with _connect() as db:
-        await _setup(db)
-        await db.execute(
-            "DELETE FROM pending_replies WHERE chat_id = ? AND ask_message_id = ?",
-            (chat_id, ask_message_id),
         )
         await db.commit()
 

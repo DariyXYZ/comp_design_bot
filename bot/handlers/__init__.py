@@ -9,9 +9,10 @@ def register_all(dp: Dispatcher) -> None:
     # (create.got_description/got_source и feedback.capture_feedback_comment матчат
     # ЛЮБОЙ текст в своём состоянии — без этого порядка нажатие кнопки меню
     # посреди заявки/отзыва уходило туда как описание/комментарий).
-    # dept ловит чужие реплаи через SkipHandler, если это не его случай —
-    # порядок между ним и остальными роутерами для этого уже не критичен, но
-    # держим его последним для читаемости (хендлер — узкоспециальная ловушка).
+    # dept — свои FSM-состояния (DeptReply.contact/reason) ключуются по
+    # dept_chat_id, который ни с одним приватным чатом не пересечётся, так что
+    # порядок относительно него для корректности не важен; держим последним
+    # для читаемости.
     dp.include_router(start.router)
     dp.include_router(create.router)
     dp.include_router(feedback.router)

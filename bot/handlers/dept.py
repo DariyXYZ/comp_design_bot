@@ -5,7 +5,6 @@ import json
 import logging
 
 from aiogram import F, Bot, Router
-from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -33,11 +32,15 @@ router = Router()
 log = logging.getLogger(__name__)
 
 
-class RejectionReason(StatesGroup):
-    # Обычный текст, как в мастере заявки — не реплай: реплай в чате отдела
-    # для контакта исполнителя оправдан (нужно пережить рестарт и отличить
-    # адресата), а для причины отклонения оказался просто неочевидным жестом.
-    text = State()
+class DeptReply(StatesGroup):
+    # Обычный текст, как в мастере заявки — не реплай (реплай оказался
+    # неочевидным жестом что для контакта исполнителя, что для причины
+    # отклонения). FSM-состояние ключуется по (chat_id, user_id) — даже в
+    # групповом чате отдела ловит именно того, кого спросили, остальных не
+    # трогает. Расплата за отказ от реплая — не переживает рестарт бота
+    # (MemoryStorage), это осознанный компромисс в пользу понятного UX.
+    contact = State()
+    reason = State()
 
 
 def _actor_display(req: dict, prefix: str) -> str | None:
@@ -49,9 +52,9 @@ def _actor_display(req: dict, prefix: str) -> str | None:
     return req.get(f"{prefix}_name") or None
 
 
-async def _capture_actor(callback: CallbackQuery, req_id: int, prefix: str) -> None:
+async def _capture_actor(callback: CallbackQuery, req_id: int, prefix: str, state: FSMContext) -> None:
     """Фиксирует, кто нажал кнопку (accepted_by/finished_by), и если у него нет
-    @username — просит прислать контакт РЕПЛАЕМ на вопрос (один раз на
+    @username — просит прислать контакт обычным текстом (один раз на
     человека, дальше берём из БД actor_contacts)."""
     actor: User = callback.from_user
     await db.set_actor(req_id, prefix, actor.id, actor.username, actor.full_name)
@@ -60,19 +63,15 @@ async def _capture_actor(callback: CallbackQuery, req_id: int, prefix: str) -> N
         if cached:
             await db.set_actor_contact(req_id, prefix, cached)
         else:
-            ask_msg = await callback.message.answer(
-                ASK_ACTOR_CONTACT.format(name=actor.full_name, req_id=req_id)
-            )
-            await db.add_pending_reply(
-                callback.message.chat.id, ask_msg.message_id, actor.id, "contact", req_id, prefix
-            )
+            await state.set_state(DeptReply.contact)
+            await state.update_data(req_id=req_id, prefix=prefix)
+            await callback.message.answer(ASK_ACTOR_CONTACT.format(name=actor.full_name, req_id=req_id))
 
 
 async def _capture_rejection_reason(callback: CallbackQuery, req_id: int, state: FSMContext) -> None:
     """Отклонение без причины заявителю ничего не объясняет — просим коротко
-    пояснить обычным текстом (FSM-состояние ключуется по chat+user, так что
-    чужие сообщения в этом же чате отдела эту ловушку не задевают)."""
-    await state.set_state(RejectionReason.text)
+    пояснить обычным текстом."""
+    await state.set_state(DeptReply.reason)
     await state.update_data(req_id=req_id)
     await callback.message.answer(ASK_REJECTION_REASON.format(req_id=req_id))
 
@@ -105,9 +104,9 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
     # "Готово" — фиксирует, у кого забирать готовое решение. Это не всегда
     # один и тот же человек, поэтому оба перехода пишут в свою пару колонок.
     if new_status == "accepted":
-        await _capture_actor(callback, req_id, "accepted_by")
+        await _capture_actor(callback, req_id, "accepted_by", state)
     elif new_status == "done":
-        await _capture_actor(callback, req_id, "finished_by")
+        await _capture_actor(callback, req_id, "finished_by", state)
     elif new_status == "rejected":
         await _capture_rejection_reason(callback, req_id, state)
 
@@ -177,28 +176,18 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
         log.info("Заявка №%s: автору не доставлено уведомление (закрыл личку?)", req_id)
 
 
-@router.message(F.chat.id == config.dept_chat_id, F.reply_to_message)
-async def capture_dept_reply(message: Message, bot: Bot) -> None:
-    """Ловит ТОЛЬКО реплай на конкретное сообщение-просьбу контакта исполнителя —
-    сверяем ask_message_id и того, кто должен ответить. Не наш реплай —
-    пропускаем дальше (SkipHandler), а не тихо едим: без этого широкий фильтр
-    по чату блокировал /id и всё остальное в чате отдела. Состояние в
-    pending_replies/actor_contacts, переживает рестарт — тут завязан хэндовер
-    исполнителя, в отличие от причины отклонения (см. RejectionReason ниже)."""
-    pending = await db.get_pending_reply(message.chat.id, message.reply_to_message.message_id)
-    if pending is None or message.from_user is None or message.from_user.id != pending["user_id"]:
-        raise SkipHandler
-
-    text = (message.text or "").strip()
-    if not text:
-        await message.reply("Пришли текстом, пожалуйста.")
+@router.message(DeptReply.contact, F.text)
+async def capture_actor_contact(message: Message, state: FSMContext, bot: Bot) -> None:
+    data = await state.get_data()
+    req_id = data.get("req_id")
+    prefix = data.get("prefix")
+    await state.clear()
+    text = message.text.strip()
+    if not req_id or not prefix or not text:
         return
 
-    await db.clear_pending_reply(message.chat.id, message.reply_to_message.message_id)
-    req_id = pending["req_id"]
-
-    await db.set_known_contact(pending["user_id"], text)
-    await db.set_actor_contact(req_id, pending["prefix"], text)
+    await db.set_known_contact(message.from_user.id, text)
+    await db.set_actor_contact(req_id, prefix, text)
     await message.reply(ACTOR_CONTACT_SAVED.format(req_id=req_id, contact=text))
     req = await db.get_request(req_id)
     if req:
@@ -208,7 +197,12 @@ async def capture_dept_reply(message: Message, bot: Bot) -> None:
             log.info("Заявка №%s: поздний контакт не доставлен автору", req_id)
 
 
-@router.message(RejectionReason.text, F.text)
+@router.message(DeptReply.contact)
+async def actor_contact_wrong_type(message: Message) -> None:
+    await message.answer("Пришли контакт текстом, пожалуйста.")
+
+
+@router.message(DeptReply.reason, F.text)
 async def capture_rejection_reason(message: Message, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
     req_id = data.get("req_id")
@@ -227,6 +221,6 @@ async def capture_rejection_reason(message: Message, state: FSMContext, bot: Bot
             log.info("Заявка №%s: причина отказа не доставлена автору", req_id)
 
 
-@router.message(RejectionReason.text)
+@router.message(DeptReply.reason)
 async def rejection_reason_wrong_type(message: Message) -> None:
     await message.answer("Пришли причину текстом, пожалуйста.")
