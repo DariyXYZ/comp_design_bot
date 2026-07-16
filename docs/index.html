@@ -115,11 +115,13 @@ header .brand{
 .dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .dots i.on{background:var(--accent);width:14px;border-radius:999px}
 
-/* margin-top:24px — тот же 2X, что и над карточкой (см. .deck-col выше):
-   разрыв «точки → CTA» теперь визуально равен разрыву «подзаголовок → карточка». */
+/* CTA и подпись — не внутри .deck-col: это отдельный блок, который .deck-wrap
+   (flex:1, растёт на всё свободное место) отталкивает вниз, к нижней кромке
+   экрана, вместо того чтобы липнуть к карточке/точкам. margin-top здесь —
+   только подстраховка на случай, если свободного места почти не осталось. */
 .cta{
   position:relative;
-  width:min(88vw,400px);height:56px;margin-top:24px;border-radius:16px;
+  width:min(88vw,400px);height:56px;margin:16px auto 0;border-radius:16px;
   background:var(--accent);color:var(--card);
   font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
@@ -167,20 +169,20 @@ header .brand{
   <div class="deck-col">
     <div class="deck" id="deck"></div>
     <div class="dots-row dots" id="dots"></div>
-
-    <button class="cta" id="cta">
-      <span class="cta-label">Это моя задача</span>
-      <span class="cta-arrow" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path d="M5 12h13.5M13 6l6.5 6-6.5 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </span>
-    </button>
-
-    <p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
   </div>
   <button class="arrow right" aria-label="Следующая">→</button>
 </div>
+
+<button class="cta" id="cta">
+  <span class="cta-label">Это моя задача</span>
+  <span class="cta-arrow" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M5 12h13.5M13 6l6.5 6-6.5 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+</button>
+
+<p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
 
 <script>
 const CASES = [
@@ -282,7 +284,29 @@ function fill(){
     const nextIdx = (current + deck.children.length) % CASES.length;
     deck.insertBefore(makeCard(nextIdx), deck.firstChild);
   }
+  secondShowsNext = true; // свежая стопка всегда смотрит вперёд, см. setSecondCard
   layout();
+}
+
+// Слой сразу под верхней карточкой обычно показывает СЛЕДУЮЩий кейс (для
+// свайпа влево). Но если тянуть вправо (значит идём НАЗАД), под пальцем
+// должен появляться уже ПРЕДЫДУЩИЙ кейс — иначе в момент отпускания палец
+// видит один кейс, а после анимации внезапно другой (выглядит как глюк).
+// Подменяем содержимое второго слоя прямо во время движения, до отпускания.
+let secondShowsNext = true;
+
+function setSecondCard(showNext){
+  if (secondShowsNext === showNext) return;
+  secondShowsNext = showNext;
+  const cards = [...deck.children];
+  const second = cards[cards.length - 2];
+  if (!second) return;
+  const idx = showNext
+    ? (current + 1) % CASES.length
+    : (current - 1 + CASES.length) % CASES.length;
+  const fresh = makeCard(idx);
+  fresh.style.cssText = second.style.cssText; // та же позиция/масштаб слоя стопки
+  deck.replaceChild(fresh, second);
 }
 
 let animating = false; // guard: быстрый второй свайп не трогает ту же карточку
@@ -336,6 +360,7 @@ function onMove(e){
   drag.dx = e.clientX - drag.startX;
   const dy = e.clientY - drag.startY;
   if (Math.abs(drag.dx) > 8 || Math.abs(dy) > 8) drag.moved = true;
+  if (Math.abs(drag.dx) > 10) setSecondCard(drag.dx < 0);
   drag.el.style.transform = `translate(${drag.dx}px, ${dy * .25}px) rotate(${drag.dx * .05}deg)`;
 }
 
@@ -344,10 +369,14 @@ function onUp(e){
   const el = drag.el;
   drag.el = null;
   el.classList.remove("dragging");
-  if (e && e.type === "pointercancel") { layout(); return; } // прервано системой — не считаем тапом
+  if (e && e.type === "pointercancel") { setSecondCard(true); layout(); return; } // прервано системой — не считаем тапом
   if (Math.abs(drag.dx) > 90) {
     if (drag.dx < 0) goNext(); else goPrev();
   } else {
+    // Не дотянули до порога — стопка возвращается к дефолтному виду
+    // (второй слой снова смотрит вперёд), иначе после пары неудачных
+    // свайпов вправо там навсегда останется предыдущий кейс.
+    setSecondCard(true);
     layout();
     // Тап без движения = переворот карточки (детали на обратной стороне).
     // Выбор задачи — только через большую кнопку/Enter (см. chooseCurrent).
