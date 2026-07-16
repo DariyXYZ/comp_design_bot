@@ -10,7 +10,15 @@ from aiogram.types import CallbackQuery, Message
 
 from .. import db
 from ..config import config
-from ..texts import CASES, FEEDBACK_ASK_COMMENT, FEEDBACK_COMMENT_THANKS, FEEDBACK_DEPT_COMMENT, FEEDBACK_DEPT_NOTE
+from ..keyboards import feedback_review_only_button
+from ..texts import (
+    CASES,
+    FEEDBACK_ASK_COMMENT,
+    FEEDBACK_ASK_REVIEW,
+    FEEDBACK_COMMENT_THANKS,
+    FEEDBACK_DEPT_COMMENT,
+    FEEDBACK_DEPT_NOTE,
+)
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -22,15 +30,26 @@ _LABELS = {"up": "👍", "down": "👎"}
 async def rate_request(callback: CallbackQuery, bot: Bot) -> None:
     _, raw_id, value = callback.data.split(":", 2)
     req_id = int(raw_id)
-    if value not in _LABELS:
-        await callback.answer("Неизвестная оценка")
-        return
 
     req = await db.get_request(req_id)
     # Кнопки уходят персонально автору заявки личным сообщением — но на
     # всякий случай не доверяем чужому callback.from_user.id вслепую.
     if req is None or callback.from_user.id != req["user_id"]:
-        await callback.answer("Не удалось сохранить оценку", show_alert=True)
+        await callback.answer("Не удалось сохранить", show_alert=True)
+        return
+
+    if value == "review":
+        # Отзыв не привязан к 👍/👎 — можно оставить независимо от оценки
+        # (и даже без неё вовсе), поэтому своя ветка без проверки req["feedback"].
+        await callback.answer()
+        ask_msg = await callback.message.answer(FEEDBACK_ASK_REVIEW)
+        await db.add_pending_reply(
+            callback.message.chat.id, ask_msg.message_id, callback.from_user.id, "feedback_comment", req_id
+        )
+        return
+
+    if value not in _LABELS:
+        await callback.answer("Неизвестная оценка")
         return
     if req.get("feedback"):
         await callback.answer("Уже оценено, спасибо!")
@@ -38,7 +57,8 @@ async def rate_request(callback: CallbackQuery, bot: Bot) -> None:
 
     await db.set_feedback(req_id, value)
     try:
-        await callback.message.edit_reply_markup(reply_markup=None)
+        # 👍/👎 больше не нажать (уже сохранено), но «Оставить отзыв» оставляем.
+        await callback.message.edit_reply_markup(reply_markup=feedback_review_only_button(req_id))
     except TelegramBadRequest:
         pass
     await callback.answer("Спасибо за оценку!")

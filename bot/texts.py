@@ -144,6 +144,9 @@ FEEDBACK_ASK_COMMENT = (
     "Жаль! Если хочешь — ответь реплаем на это сообщение и опиши, что пошло не так. "
     "Можно пропустить, если не хочется писать."
 )
+FEEDBACK_ASK_REVIEW = (
+    "Ответь реплаем на это сообщение — напиши, что думаешь о работе отдела. Передам как есть."
+)
 FEEDBACK_COMMENT_THANKS = "Спасибо, передал в отдел!"
-FEEDBACK_DEPT_NOTE = "Заявка №{req_id} · {case_title}\nОценка от автора: {label}"
-FEEDBACK_DEPT_COMMENT = "Заявка №{req_id}: комментарий к оценке — {comment}"
+FEEDBACK_DEPT_NOTE = "Заявка №{req_id} · {case_title}\nОбратная связь: {label}"
+FEEDBACK_DEPT_COMMENT = "Заявка №{req_id}: отзыв от заявителя — {comment}"

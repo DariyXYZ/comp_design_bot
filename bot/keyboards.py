@@ -87,8 +87,17 @@ def feedback_buttons(req_id: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(text="👍 Всё отлично", callback_data=f"fb:{req_id}:up"),
                 InlineKeyboardButton(text="👎 Есть замечания", callback_data=f"fb:{req_id}:down"),
-            ]
+            ],
+            [InlineKeyboardButton(text="📝 Оставить отзыв", callback_data=f"fb:{req_id}:review")],
         ]
+    )
+
+
+def feedback_review_only_button(req_id: int) -> InlineKeyboardMarkup:
+    """После оценки 👍/👎 сама оценка больше недоступна (уже сохранена),
+    но написать отзыв можно и после — кнопка остаётся одна."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="📝 Оставить отзыв", callback_data=f"fb:{req_id}:review")]]
     )
 
 
