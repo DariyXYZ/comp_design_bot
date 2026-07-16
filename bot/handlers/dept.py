@@ -94,7 +94,7 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
 
     author = req["full_name"] + (f" (@{req['username']})" if req["username"] else "")
     photos = json.loads(req["photo_file_ids"] or "[]")
-    new_markup = dept_status_buttons(req_id, new_status)
+    new_markup = dept_status_buttons(req_id)
     acceptor_name = req.get("accepted_by_name")
 
     try:

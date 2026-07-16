@@ -80,13 +80,12 @@ def preview_step() -> InlineKeyboardMarkup:
     )
 
 
-def dept_status_buttons(req_id: int, current: str) -> InlineKeyboardMarkup:
-    """Кнопки смены статуса под заявкой в чате отдела. Текущий статус помечен точкой."""
+def dept_status_buttons(req_id: int) -> InlineKeyboardMarkup:
+    """Кнопки смены статуса под заявкой в чате отдела."""
     rows = []
     row: list[InlineKeyboardButton] = []
     for key, label in STATUSES.items():
-        text = f"• {label}" if key == current else label
-        row.append(InlineKeyboardButton(text=text, callback_data=f"st:{req_id}:{key}"))
+        row.append(InlineKeyboardButton(text=label, callback_data=f"st:{req_id}:{key}"))
         if len(row) == 2:
             rows.append(row)
             row = []

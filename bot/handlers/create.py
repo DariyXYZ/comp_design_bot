@@ -304,7 +304,7 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     case_key = data["case_key"]
     description = data["description"]
     source_path = data.get("source_path")
-    buttons = dept_status_buttons(req_id, "new")
+    buttons = dept_status_buttons(req_id)
     thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
 
     try:
