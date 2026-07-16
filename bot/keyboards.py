@@ -12,10 +12,10 @@ from aiogram.types import (
 from .config import config
 from .texts import CASES, STATUSES
 
-BTN_CAPABILITIES = "◆ Возможности отдела"
-BTN_MY = "▤ Мои заявки"
-BTN_CREATE = "+ Создать заявку"
-BTN_INFO = "ⓘ Инфо"
+BTN_CAPABILITIES = "✦ Возможности отдела"
+BTN_MY = "✉ Мои заявки"
+BTN_CREATE = "✚ Создать заявку"
+BTN_INFO = "🅘 Инфо"
 
 
 def main_menu() -> ReplyKeyboardMarkup:
