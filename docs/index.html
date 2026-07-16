@@ -24,10 +24,12 @@ body{
   background:var(--tg-theme-bg-color,var(--page));
   color:var(--tg-theme-text-color,var(--ink));
   display:flex;flex-direction:column;
-  /* Ритм отступов на базовой единице X=12px: 2X сверху и перед CTA,
-     1X между карточкой и точками, 0.5X между заголовком и подзаголовком
-     (см. header/.dots-row/.cta ниже). */
-  padding:max(24px,env(safe-area-inset-top)) 0 calc(56px + 24px + max(16px,env(safe-area-inset-bottom)));
+  /* Ритм отступов на базовой единице X=12px: 2X сверху, перед карточкой и
+     перед CTA; 1X между карточкой и точками, 0.5X между заголовком и
+     подзаголовком (см. header/.dots-row/.cta ниже). CTA и подпись теперь в
+     обычном потоке внутри .deck-col — не фиксированы, резервировать под них
+     нижний паддинг больше не нужно. */
+  padding:max(24px,env(safe-area-inset-top)) 0 max(20px,env(safe-area-inset-bottom));
   user-select:none;-webkit-user-select:none;touch-action:none;
 }
 
@@ -109,22 +111,26 @@ header .brand{
 .back-photo{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;pointer-events:none}
 
 .dots-row{display:flex;justify-content:center;gap:5px;padding:22px 0 0}
-.swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:14px}
 .dots{display:flex;gap:5px}
 .dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .dots i.on{background:var(--accent);width:14px;border-radius:999px}
 
+/* margin-top:24px — тот же 2X, что и над карточкой (см. .deck-col выше):
+   разрыв «точки → CTA» теперь визуально равен разрыву «подзаголовок → карточка». */
 .cta{
-  position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));
-  transform:translateX(-50%);
-  width:min(88vw,400px);height:56px;border-radius:16px;z-index:40;
+  position:relative;
+  width:min(88vw,400px);height:56px;margin-top:24px;border-radius:16px;
   background:var(--accent);color:var(--card);
   font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:10px;
+  display:flex;align-items:center;justify-content:center;
   box-shadow:0 14px 30px -12px rgba(0,0,0,.4);
 }
-.cta:active{transform:translateX(-50%) scale(.98)}
+.cta:active{transform:scale(.98)}
+.swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
+/* Стрелка вынесена из потока (position:absolute), чтобы не сдвигать текст
+   от истинного центра кнопки — только текст участвует в justify-content:center. */
 .cta-arrow{
+  position:absolute;top:50%;right:100px;transform:translateY(-50%);
   display:flex;align-items:center;justify-content:center;
   width:32px;height:32px;color:#9a9a9e;
 }
@@ -161,20 +167,20 @@ header .brand{
   <div class="deck-col">
     <div class="deck" id="deck"></div>
     <div class="dots-row dots" id="dots"></div>
+
+    <button class="cta" id="cta">
+      <span class="cta-label">Это моя задача</span>
+      <span class="cta-arrow" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M5 12h13.5M13 6l6.5 6-6.5 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+
+    <p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
   </div>
   <button class="arrow right" aria-label="Следующая">→</button>
 </div>
-
-<p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
-
-<button class="cta" id="cta">
-  <span>Это моя задача</span>
-  <span class="cta-arrow" aria-hidden="true">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M5 12h13.5M13 6l6.5 6-6.5 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  </span>
-</button>
 
 <script>
 const CASES = [
@@ -281,21 +287,28 @@ function fill(){
 
 let animating = false; // guard: быстрый второй свайп не трогает ту же карточку
 
-function swipe(dir){
+// Свайп/смахивание влево -> вперёд по колоде, вправо -> назад. flyDir всегда
+// совпадает с направлением ухода карточки с экрана (визуально), а не с тем,
+// вперёд мы идём или назад, — те же -1/+1, что и раньше, просто теперь оба
+// направления реально ведут в разные стороны по CASES, а не всегда вперёд.
+function goNext(flyDir = -1){
   const top = deck.lastElementChild;
   if (!top || animating) return;
   animating = true;
   top.classList.add("gone");
-  top.style.transform = `translateX(${dir * 130}%) rotate(${dir * 14}deg)`;
+  top.style.transform = `translateX(${flyDir * 130}%) rotate(${flyDir * 14}deg)`;
   current = (current + 1) % CASES.length;
   setTimeout(() => { top.remove(); fill(); animating = false; }, 460);
 }
 
-function prev(){
-  if (animating) return;
+function goPrev(flyDir = 1){
+  const top = deck.lastElementChild;
+  if (!top || animating) return;
+  animating = true;
+  top.classList.add("gone");
+  top.style.transform = `translateX(${flyDir * 130}%) rotate(${flyDir * 14}deg)`;
   current = (current - 1 + CASES.length) % CASES.length;
-  deck.replaceChildren();
-  fill();
+  setTimeout(() => { top.remove(); deck.replaceChildren(); fill(); animating = false; }, 460);
 }
 
 // Драг: одни слушатели на window + активная карточка в переменной,
@@ -333,7 +346,7 @@ function onUp(e){
   el.classList.remove("dragging");
   if (e && e.type === "pointercancel") { layout(); return; } // прервано системой — не считаем тапом
   if (Math.abs(drag.dx) > 90) {
-    swipe(Math.sign(drag.dx));
+    if (drag.dx < 0) goNext(); else goPrev();
   } else {
     layout();
     // Тап без движения = переворот карточки (детали на обратной стороне).
@@ -373,12 +386,12 @@ window.addEventListener("pointermove", onMove);
 window.addEventListener("pointerup", onUp);
 window.addEventListener("pointercancel", onUp);
 
-document.querySelector(".arrow.right").addEventListener("click", () => swipe(1));
-document.querySelector(".arrow.left").addEventListener("click", prev);
+document.querySelector(".arrow.right").addEventListener("click", () => goNext());
+document.querySelector(".arrow.left").addEventListener("click", () => goPrev());
 document.getElementById("cta").addEventListener("click", chooseCurrent);
 window.addEventListener("keydown", e => {
-  if (e.key === "ArrowRight") swipe(1);
-  if (e.key === "ArrowLeft") prev();
+  if (e.key === "ArrowRight") goNext();
+  if (e.key === "ArrowLeft") goPrev();
   if (e.key === "Enter") chooseCurrent();
 });
 
