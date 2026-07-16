@@ -1,6 +1,6 @@
 from aiogram import Dispatcher
 
-from . import create, dept, start
+from . import create, dept, feedback, start
 
 
 def register_all(dp: Dispatcher) -> None:
@@ -8,9 +8,10 @@ def register_all(dp: Dispatcher) -> None:
     # срабатывать всегда, а не попадать в текст-ловушку FSM создания заявки
     # (create.got_description/got_source матчат ЛЮБОЙ текст в своих состояниях —
     # без этого порядка нажатие другой кнопки посреди заявки уходило в неё как описание).
-    # dept — последним: его message-хендлер живёт в группе отдела и ловит
-    # реплаи на ASK_ACTOR_CONTACT, но /id (без chat.type-фильтра, нужен
-    # именно из чата отдела при настройке) не должен застревать раньше него.
+    # feedback/dept ловят чужие реплаи через SkipHandler, если это не их случай —
+    # порядок между ними и остальными роутерами уже не критичен, но держим их
+    # ближе к концу для читаемости (их хендлеры — узкоспециальные ловушки).
     dp.include_router(start.router)
     dp.include_router(create.router)
+    dp.include_router(feedback.router)
     dp.include_router(dept.router)

@@ -30,14 +30,18 @@ CREATE TABLE IF NOT EXISTS actor_contacts (
     contact TEXT NOT NULL
 );
 
--- Кого попросили прислать контакт (ASK_ACTOR_CONTACT) и на какую заявку/роль это
--- ляжет — ключ по id самого сообщения-просьбы, чтобы ответ на НЕЁ (reply) не
--- путался с обычной перепиской в чате отдела и переживал рестарт бота.
-CREATE TABLE IF NOT EXISTS pending_contacts (
-    ask_message_id INTEGER PRIMARY KEY,
+-- Общий "жду реплай на моё сообщение": контакт исполнителя, причина отклонения,
+-- комментарий к оценке от заявителя. Ключ (chat_id, ask_message_id) — message_id
+-- уникален только В ПРЕДЕЛАХ чата, эти же номера легко повторятся в другом чате
+-- (дept-чат и личка с заявителем — разные чаты). Переживает рестарт бота.
+CREATE TABLE IF NOT EXISTS pending_replies (
+    chat_id INTEGER NOT NULL,
+    ask_message_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
     req_id INTEGER NOT NULL,
-    prefix TEXT NOT NULL
+    prefix TEXT,
+    PRIMARY KEY (chat_id, ask_message_id)
 );
 """
 
@@ -66,6 +70,9 @@ _NEW_COLUMNS = {
     "finished_by_username": "TEXT",
     "finished_by_name": "TEXT",
     "finished_by_contact": "TEXT",
+    "rejection_reason": "TEXT",
+    "feedback": "TEXT",  # 'up' / 'down', пусто пока не оценили
+    "feedback_comment": "TEXT",
 }
 
 # Единственные два префикса, которые когда-либо подставляются в SQL как имена
@@ -85,11 +92,33 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
             await db.execute(f"ALTER TABLE requests ADD COLUMN {name} {coltype}")
 
 
+async def _migrate_old_pending_contacts(db: aiosqlite.Connection) -> None:
+    """pending_contacts — таблица из прошлой ревизии этой фичи (жила пару дней),
+    вытеснена общей pending_replies. Переносим то, что не успели разобрать,
+    и больше эту таблицу не трогаем."""
+    cur = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='pending_contacts'"
+    )
+    if await cur.fetchone() is None:
+        return
+    cur = await db.execute("SELECT ask_message_id, user_id, req_id, prefix FROM pending_contacts")
+    rows = await cur.fetchall()
+    for ask_message_id, user_id, req_id, prefix in rows:
+        await db.execute(
+            "INSERT OR IGNORE INTO pending_replies (chat_id, ask_message_id, user_id, kind, req_id, prefix)"
+            " VALUES (?, ?, ?, 'contact', ?, ?)",
+            (config.dept_chat_id, ask_message_id, user_id, req_id, prefix),
+        )
+    if rows:
+        await db.execute("DELETE FROM pending_contacts")
+
+
 async def init_db() -> None:
     async with _connect() as db:
         await _setup(db)
         await db.executescript(_SCHEMA)
         await _ensure_columns(db)
+        await _migrate_old_pending_contacts(db)
         await db.commit()
 
 
@@ -199,35 +228,75 @@ async def set_known_contact(user_id: int, contact: str) -> None:
         await db.commit()
 
 
-async def add_pending_contact(ask_message_id: int, user_id: int, req_id: int, prefix: str) -> None:
-    if prefix not in _ACTOR_PREFIXES:
-        raise ValueError(f"неизвестный actor prefix: {prefix!r}")
+_REPLY_KINDS = {"contact", "rejection_reason", "feedback_comment"}
+
+
+async def add_pending_reply(
+    chat_id: int, ask_message_id: int, user_id: int, kind: str, req_id: int, prefix: str | None = None
+) -> None:
+    if kind not in _REPLY_KINDS:
+        raise ValueError(f"неизвестный kind: {kind!r}")
     async with _connect() as db:
         await _setup(db)
         await db.execute(
-            "INSERT OR REPLACE INTO pending_contacts (ask_message_id, user_id, req_id, prefix)"
-            " VALUES (?, ?, ?, ?)",
-            (ask_message_id, user_id, req_id, prefix),
+            "INSERT OR REPLACE INTO pending_replies (chat_id, ask_message_id, user_id, kind, req_id, prefix)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (chat_id, ask_message_id, user_id, kind, req_id, prefix),
         )
         await db.commit()
 
 
-async def get_pending_contact(ask_message_id: int) -> tuple[int, int, str] | None:
-    """Не удаляет запись — вызывающий сам решает, дошёл ли ответ до валидного контакта."""
+async def get_pending_reply(chat_id: int, ask_message_id: int) -> dict | None:
+    """Не удаляет запись — вызывающий сам решает, дошёл ли ответ до валидного результата."""
     async with _connect() as db:
         await _setup(db)
+        db.row_factory = aiosqlite.Row
         cur = await db.execute(
-            "SELECT user_id, req_id, prefix FROM pending_contacts WHERE ask_message_id = ?",
-            (ask_message_id,),
+            "SELECT user_id, kind, req_id, prefix FROM pending_replies"
+            " WHERE chat_id = ? AND ask_message_id = ?",
+            (chat_id, ask_message_id),
         )
         row = await cur.fetchone()
-        return tuple(row) if row else None
+        return dict(row) if row else None
 
 
-async def clear_pending_contact(ask_message_id: int) -> None:
+async def clear_pending_reply(chat_id: int, ask_message_id: int) -> None:
     async with _connect() as db:
         await _setup(db)
-        await db.execute("DELETE FROM pending_contacts WHERE ask_message_id = ?", (ask_message_id,))
+        await db.execute(
+            "DELETE FROM pending_replies WHERE chat_id = ? AND ask_message_id = ?",
+            (chat_id, ask_message_id),
+        )
+        await db.commit()
+
+
+async def set_rejection_reason(req_id: int, reason: str) -> None:
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "UPDATE requests SET rejection_reason = ?, updated_at = ? WHERE id = ?",
+            (reason, _now(), req_id),
+        )
+        await db.commit()
+
+
+async def set_feedback(req_id: int, feedback: str) -> None:
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "UPDATE requests SET feedback = ?, updated_at = ? WHERE id = ?",
+            (feedback, _now(), req_id),
+        )
+        await db.commit()
+
+
+async def set_feedback_comment(req_id: int, comment: str) -> None:
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "UPDATE requests SET feedback_comment = ?, updated_at = ? WHERE id = ?",
+            (comment, _now(), req_id),
+        )
         await db.commit()
 
 

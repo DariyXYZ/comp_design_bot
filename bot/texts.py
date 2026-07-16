@@ -131,3 +131,19 @@ ACTOR_CONTACT_SAVED = "Принято — контакт для заявки №
 ACCEPTED_CONTACT_LINE = "\n\nЕсли появятся вопросы — можно написать: {contact}"
 DONE_CONTACT_LINE = "\n\nДля связи и передачи решения: {contact}"
 DONE_CONTACT_UNKNOWN = "\n\nИсполнитель не зафиксирован — уточните в чате отдела."
+CONTACT_LATE_NOTIFY = "По заявке №{req_id} появился контакт для связи: {contact}"
+
+ASK_REJECTION_REASON = (
+    "Заявка №{req_id}: отмечено «Отклонена».\n"
+    "Ответь реплаем на это сообщение — коротко, почему. Перешлю автору заявки."
+)
+REJECTION_REASON_SAVED = "Принято — причина для заявки №{req_id} сохранена."
+REJECTION_REASON_NOTIFY = "Причина отклонения заявки №{req_id}:\n{reason}"
+
+FEEDBACK_ASK_COMMENT = (
+    "Жаль! Если хочешь — ответь реплаем на это сообщение и опиши, что пошло не так. "
+    "Можно пропустить, если не хочется писать."
+)
+FEEDBACK_COMMENT_THANKS = "Спасибо, передал в отдел!"
+FEEDBACK_DEPT_NOTE = "Заявка №{req_id} · {case_title}\nОценка от автора: {label}"
+FEEDBACK_DEPT_COMMENT = "Заявка №{req_id}: комментарий к оценке — {comment}"

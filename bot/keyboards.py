@@ -80,6 +80,18 @@ def preview_step() -> InlineKeyboardMarkup:
     )
 
 
+def feedback_buttons(req_id: int) -> InlineKeyboardMarkup:
+    """Оценка результата — под уведомлением о «Готово» в личке заявителя."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👍 Всё отлично", callback_data=f"fb:{req_id}:up"),
+                InlineKeyboardButton(text="👎 Есть замечания", callback_data=f"fb:{req_id}:down"),
+            ]
+        ]
+    )
+
+
 def dept_status_buttons(req_id: int) -> InlineKeyboardMarkup:
     """Кнопки смены статуса под заявкой в чате отдела."""
     rows = []

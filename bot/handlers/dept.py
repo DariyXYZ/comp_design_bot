@@ -5,19 +5,24 @@ import json
 import logging
 
 from aiogram import F, Bot, Router
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message, User
 
 from .. import db
 from ..config import config
-from ..keyboards import dept_status_buttons
+from ..keyboards import dept_status_buttons, feedback_buttons
 from ..texts import (
     ACCEPTED_CONTACT_LINE,
     ACTOR_CONTACT_SAVED,
     ASK_ACTOR_CONTACT,
+    ASK_REJECTION_REASON,
     CASES,
+    CONTACT_LATE_NOTIFY,
     DONE_CONTACT_LINE,
     DONE_CONTACT_UNKNOWN,
+    REJECTION_REASON_NOTIFY,
+    REJECTION_REASON_SAVED,
     STATUS_CHANGED_NOTIFY,
     STATUSES,
 )
@@ -49,7 +54,18 @@ async def _capture_actor(callback: CallbackQuery, req_id: int, prefix: str) -> N
             ask_msg = await callback.message.answer(
                 ASK_ACTOR_CONTACT.format(name=actor.full_name, req_id=req_id)
             )
-            await db.add_pending_contact(ask_msg.message_id, actor.id, req_id, prefix)
+            await db.add_pending_reply(
+                callback.message.chat.id, ask_msg.message_id, actor.id, "contact", req_id, prefix
+            )
+
+
+async def _capture_rejection_reason(callback: CallbackQuery, req_id: int) -> None:
+    """Отклонение без причины заявителю ничего не объясняет — просим коротко
+    пояснить тем же реплай-механизмом, что и контакт исполнителя."""
+    ask_msg = await callback.message.answer(ASK_REJECTION_REASON.format(req_id=req_id))
+    await db.add_pending_reply(
+        callback.message.chat.id, ask_msg.message_id, callback.from_user.id, "rejection_reason", req_id
+    )
 
 
 @router.callback_query(F.data.startswith("st:"))
@@ -83,6 +99,8 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
         await _capture_actor(callback, req_id, "accepted_by")
     elif new_status == "done":
         await _capture_actor(callback, req_id, "finished_by")
+    elif new_status == "rejected":
+        await _capture_rejection_reason(callback, req_id)
 
     req = await db.set_status(req_id, new_status)
     await callback.answer(f"Статус: {STATUSES[new_status]}")
@@ -142,29 +160,53 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
     elif new_status == "done":
         contact = _actor_display(req, "finished_by")
         notify += DONE_CONTACT_LINE.format(contact=contact) if contact else DONE_CONTACT_UNKNOWN
+    # Оценку просим только у «Готово» — на промежуточных статусах оценивать нечего.
+    feedback_markup = feedback_buttons(req_id) if new_status == "done" else None
     try:
-        await bot.send_message(req["user_id"], notify)
+        await bot.send_message(req["user_id"], notify, reply_markup=feedback_markup)
     except Exception:
         log.info("Заявка №%s: автору не доставлено уведомление (закрыл личку?)", req_id)
 
 
 @router.message(F.chat.id == config.dept_chat_id, F.reply_to_message)
-async def capture_actor_contact(message: Message) -> None:
-    """Ловит ТОЛЬКО реплай на конкретное сообщение-просьбу ASK_ACTOR_CONTACT
-    (сверяем ask_message_id и того, кто отвечает) — обычная переписка в чате
-    отдела реплаем на что-то другое контактом не считается. Состояние в БД
-    (pending_contacts/actor_contacts), переживает рестарт бота."""
-    pending = await db.get_pending_contact(message.reply_to_message.message_id)
-    if pending is None:
+async def capture_dept_reply(message: Message, bot: Bot) -> None:
+    """Ловит ТОЛЬКО реплай на конкретное сообщение-просьбу (контакт исполнителя
+    или причина отклонения) — сверяем ask_message_id и того, кто должен
+    ответить. Не наш реплай — пропускаем дальше (SkipHandler), а не тихо едим:
+    без этого широкий фильтр по чату блокировал /id и всё остальное в чате
+    отдела. Состояние в pending_replies/actor_contacts, переживает рестарт."""
+    pending = await db.get_pending_reply(message.chat.id, message.reply_to_message.message_id)
+    if pending is None or message.from_user is None or message.from_user.id != pending["user_id"]:
+        raise SkipHandler
+
+    text = (message.text or "").strip()
+    if not text:
+        await message.reply("Пришли текстом, пожалуйста.")
         return
-    user_id, req_id, prefix = pending
-    if message.from_user is None or message.from_user.id != user_id:
-        return  # не тот человек ответил на чужой вопрос
-    contact = (message.text or "").strip()
-    if not contact:
-        await message.reply("Пришли контакт текстом, пожалуйста.")
-        return
-    await db.clear_pending_contact(message.reply_to_message.message_id)
-    await db.set_known_contact(user_id, contact)
-    await db.set_actor_contact(req_id, prefix, contact)
-    await message.reply(ACTOR_CONTACT_SAVED.format(req_id=req_id, contact=contact))
+
+    await db.clear_pending_reply(message.chat.id, message.reply_to_message.message_id)
+    req_id = pending["req_id"]
+
+    if pending["kind"] == "contact":
+        await db.set_known_contact(pending["user_id"], text)
+        await db.set_actor_contact(req_id, pending["prefix"], text)
+        await message.reply(ACTOR_CONTACT_SAVED.format(req_id=req_id, contact=text))
+        req = await db.get_request(req_id)
+        if req:
+            try:
+                await bot.send_message(
+                    req["user_id"], CONTACT_LATE_NOTIFY.format(req_id=req_id, contact=text)
+                )
+            except Exception:
+                log.info("Заявка №%s: поздний контакт не доставлен автору", req_id)
+    elif pending["kind"] == "rejection_reason":
+        await db.set_rejection_reason(req_id, text)
+        await message.reply(REJECTION_REASON_SAVED.format(req_id=req_id))
+        req = await db.get_request(req_id)
+        if req:
+            try:
+                await bot.send_message(
+                    req["user_id"], REJECTION_REASON_NOTIFY.format(req_id=req_id, reason=text)
+                )
+            except Exception:
+                log.info("Заявка №%s: причина отказа не доставлена автору", req_id)
