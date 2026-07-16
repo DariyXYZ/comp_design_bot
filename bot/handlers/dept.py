@@ -6,12 +6,13 @@ import logging
 
 from aiogram import F, Bot, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, User
 
 from .. import db
 from ..config import config
 from ..keyboards import dept_status_buttons
 from ..texts import (
+    ACCEPTED_CONTACT_LINE,
     ACTOR_CONTACT_SAVED,
     ASK_ACTOR_CONTACT,
     CASES,
@@ -24,12 +25,12 @@ from ..texts import (
 router = Router()
 log = logging.getLogger(__name__)
 
-# Кто должен прислать контакт текстом (нет @username) — user_id -> req_id.
-# Всегда про "finished_by": именно тот, кто жмёт "Готово", отдаёт решение
-# заявителю, поэтому только для него контакт вообще нужен (см. change_status).
+# Кто должен прислать контакт текстом (нет @username) — user_id -> (req_id, prefix).
+# prefix — "accepted_by" или "finished_by", смотря на какой кнопке спросили.
 # Не FSM, лёгкий словарь — состояние переживает только текущий запуск процесса.
-AWAITING_CONTACT: dict[int, int] = {}
-# Однажды присланный контакт запоминаем за user_id — второй раз не переспрашиваем.
+AWAITING_CONTACT: dict[int, tuple[int, str]] = {}
+# Однажды присланный контакт запоминаем за user_id — второй раз не переспрашиваем,
+# независимо от того, в роли принявшего или завершившего он снова окажется.
 KNOWN_CONTACTS: dict[int, str] = {}
 
 
@@ -40,6 +41,23 @@ def _actor_display(req: dict, prefix: str) -> str | None:
     if req.get(f"{prefix}_username"):
         return f"@{req[f'{prefix}_username']}"
     return req.get(f"{prefix}_name") or None
+
+
+async def _capture_actor(callback: CallbackQuery, req_id: int, prefix: str) -> None:
+    """Фиксирует, кто нажал кнопку (accepted_by/finished_by), и если у него нет
+    @username — просит прислать контакт текстом в чат отдела (один раз на
+    человека, дальше берём из KNOWN_CONTACTS)."""
+    actor: User = callback.from_user
+    await db.set_actor(req_id, prefix, actor.id, actor.username, actor.full_name)
+    if not actor.username:
+        cached = KNOWN_CONTACTS.get(actor.id)
+        if cached:
+            await db.set_actor_contact(req_id, prefix, cached)
+        else:
+            AWAITING_CONTACT[actor.id] = (req_id, prefix)
+            await callback.message.answer(
+                ASK_ACTOR_CONTACT.format(name=actor.full_name, req_id=req_id)
+            )
 
 
 @router.callback_query(F.data.startswith("st:"))
@@ -66,25 +84,13 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
 
     # Telegram сам говорит боту, кто нажал кнопку (callback.from_user —
     # серверные данные, не подделать), так что user_id/имя всегда надёжны.
-    # "Принял" — только для видимости на карточке (кто взял задачу, чтобы
-    # два дизайнера не схватили одну и ту же). Контакт для заявителя берём
-    # только у того, кто реально жмёт "Готово" — он и передаёт решение,
-    # а не тот, кто когда-то давно принял заявку в работу.
+    # "Принята" — фиксирует, к кому обращаться с вопросами по ходу работы;
+    # "Готово" — фиксирует, у кого забирать готовое решение. Это не всегда
+    # один и тот же человек, поэтому оба перехода пишут в свою пару колонок.
     if new_status == "accepted":
-        actor = callback.from_user
-        await db.set_actor(req_id, "accepted_by", actor.id, actor.username, actor.full_name)
+        await _capture_actor(callback, req_id, "accepted_by")
     elif new_status == "done":
-        actor = callback.from_user
-        await db.set_actor(req_id, "finished_by", actor.id, actor.username, actor.full_name)
-        if not actor.username:
-            cached = KNOWN_CONTACTS.get(actor.id)
-            if cached:
-                await db.set_actor_contact(req_id, "finished_by", cached)
-            else:
-                AWAITING_CONTACT[actor.id] = req_id
-                await callback.message.answer(
-                    ASK_ACTOR_CONTACT.format(name=actor.full_name, req_id=req_id)
-                )
+        await _capture_actor(callback, req_id, "finished_by")
 
     req = await db.set_status(req_id, new_status)
     await callback.answer(f"Статус: {STATUSES[new_status]}")
@@ -135,7 +141,13 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
     notify = STATUS_CHANGED_NOTIFY.format(
         req_id=req_id, case_title=case_title, status=STATUSES[new_status]
     )
-    if new_status == "done":
+    if new_status == "accepted":
+        contact = _actor_display(req, "accepted_by")
+        if contact:
+            notify += ACCEPTED_CONTACT_LINE.format(contact=contact)
+        # Если контакта ещё нет (ждём, пока принявший пришлёт его текстом) —
+        # просто не добавляем строку сейчас, заявителя это не блокирует.
+    elif new_status == "done":
         contact = _actor_display(req, "finished_by")
         notify += DONE_CONTACT_LINE.format(contact=contact) if contact else DONE_CONTACT_UNKNOWN
     try:
@@ -150,14 +162,15 @@ async def capture_actor_contact(message: Message) -> None:
     контакт (см. ASK_ACTOR_CONTACT выше). Молчит для всех остальных
     сообщений в чате отдела — обычная переписка команды бота не касается."""
     user_id = message.from_user.id if message.from_user else None
-    req_id = AWAITING_CONTACT.get(user_id) if user_id else None
-    if req_id is None:
+    pending = AWAITING_CONTACT.get(user_id) if user_id else None
+    if pending is None:
         return
+    req_id, prefix = pending
     contact = (message.text or "").strip()
     if not contact:
         await message.reply("Пришли контакт текстом, пожалуйста.")
         return
     AWAITING_CONTACT.pop(user_id, None)
     KNOWN_CONTACTS[user_id] = contact
-    await db.set_actor_contact(req_id, "finished_by", contact)
+    await db.set_actor_contact(req_id, prefix, contact)
     await message.reply(ACTOR_CONTACT_SAVED.format(req_id=req_id, contact=contact))
