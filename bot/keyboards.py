@@ -13,7 +13,7 @@ from .config import config
 from .texts import CASES, STATUSES
 
 BTN_CAPABILITIES = "✦ Возможности отдела"
-BTN_MY = "✉︎ Мои заявки"
+BTN_MY = "☰ Мои заявки"
 BTN_CREATE = "✚ Создать заявку"
 BTN_INFO = "🅘 Инфо"
 
