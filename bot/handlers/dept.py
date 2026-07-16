@@ -25,14 +25,6 @@ from ..texts import (
 router = Router()
 log = logging.getLogger(__name__)
 
-# Кто должен прислать контакт текстом (нет @username) — user_id -> (req_id, prefix).
-# prefix — "accepted_by" или "finished_by", смотря на какой кнопке спросили.
-# Не FSM, лёгкий словарь — состояние переживает только текущий запуск процесса.
-AWAITING_CONTACT: dict[int, tuple[int, str]] = {}
-# Однажды присланный контакт запоминаем за user_id — второй раз не переспрашиваем,
-# независимо от того, в роли принявшего или завершившего он снова окажется.
-KNOWN_CONTACTS: dict[int, str] = {}
-
 
 def _actor_display(req: dict, prefix: str) -> str | None:
     """Лучшее, что можно показать для связи по этому актёру; None — неизвестен."""
@@ -45,19 +37,19 @@ def _actor_display(req: dict, prefix: str) -> str | None:
 
 async def _capture_actor(callback: CallbackQuery, req_id: int, prefix: str) -> None:
     """Фиксирует, кто нажал кнопку (accepted_by/finished_by), и если у него нет
-    @username — просит прислать контакт текстом в чат отдела (один раз на
-    человека, дальше берём из KNOWN_CONTACTS)."""
+    @username — просит прислать контакт РЕПЛАЕМ на вопрос (один раз на
+    человека, дальше берём из БД actor_contacts)."""
     actor: User = callback.from_user
     await db.set_actor(req_id, prefix, actor.id, actor.username, actor.full_name)
     if not actor.username:
-        cached = KNOWN_CONTACTS.get(actor.id)
+        cached = await db.get_known_contact(actor.id)
         if cached:
             await db.set_actor_contact(req_id, prefix, cached)
         else:
-            AWAITING_CONTACT[actor.id] = (req_id, prefix)
-            await callback.message.answer(
+            ask_msg = await callback.message.answer(
                 ASK_ACTOR_CONTACT.format(name=actor.full_name, req_id=req_id)
             )
+            await db.add_pending_contact(ask_msg.message_id, actor.id, req_id, prefix)
 
 
 @router.callback_query(F.data.startswith("st:"))
@@ -156,21 +148,23 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
         log.info("Заявка №%s: автору не доставлено уведомление (закрыл личку?)", req_id)
 
 
-@router.message(F.chat.id == config.dept_chat_id)
+@router.message(F.chat.id == config.dept_chat_id, F.reply_to_message)
 async def capture_actor_contact(message: Message) -> None:
-    """Ловит текстовый ответ от того, кого только что попросили прислать
-    контакт (см. ASK_ACTOR_CONTACT выше). Молчит для всех остальных
-    сообщений в чате отдела — обычная переписка команды бота не касается."""
-    user_id = message.from_user.id if message.from_user else None
-    pending = AWAITING_CONTACT.get(user_id) if user_id else None
+    """Ловит ТОЛЬКО реплай на конкретное сообщение-просьбу ASK_ACTOR_CONTACT
+    (сверяем ask_message_id и того, кто отвечает) — обычная переписка в чате
+    отдела реплаем на что-то другое контактом не считается. Состояние в БД
+    (pending_contacts/actor_contacts), переживает рестарт бота."""
+    pending = await db.get_pending_contact(message.reply_to_message.message_id)
     if pending is None:
         return
-    req_id, prefix = pending
+    user_id, req_id, prefix = pending
+    if message.from_user is None or message.from_user.id != user_id:
+        return  # не тот человек ответил на чужой вопрос
     contact = (message.text or "").strip()
     if not contact:
         await message.reply("Пришли контакт текстом, пожалуйста.")
         return
-    AWAITING_CONTACT.pop(user_id, None)
-    KNOWN_CONTACTS[user_id] = contact
+    await db.clear_pending_contact(message.reply_to_message.message_id)
+    await db.set_known_contact(user_id, contact)
     await db.set_actor_contact(req_id, prefix, contact)
     await message.reply(ACTOR_CONTACT_SAVED.format(req_id=req_id, contact=contact))

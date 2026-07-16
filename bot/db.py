@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS requests (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+-- Контакт человека без @username, однажды присланный — чтобы больше не переспрашивать.
+CREATE TABLE IF NOT EXISTS actor_contacts (
+    user_id INTEGER PRIMARY KEY,
+    contact TEXT NOT NULL
+);
+
+-- Кого попросили прислать контакт (ASK_ACTOR_CONTACT) и на какую заявку/роль это
+-- ляжет — ключ по id самого сообщения-просьбы, чтобы ответ на НЕЁ (reply) не
+-- путался с обычной перепиской в чате отдела и переживал рестарт бота.
+CREATE TABLE IF NOT EXISTS pending_contacts (
+    ask_message_id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    req_id INTEGER NOT NULL,
+    prefix TEXT NOT NULL
+);
 """
 
 
@@ -160,6 +176,58 @@ async def set_actor_contact(req_id: int, prefix: str, contact: str) -> None:
             f"UPDATE requests SET {prefix}_contact = ?, updated_at = ? WHERE id = ?",
             (contact, _now(), req_id),
         )
+        await db.commit()
+
+
+async def get_known_contact(user_id: int) -> str | None:
+    """Контакт, который этот человек уже когда-то присылал — не переспрашивать снова."""
+    async with _connect() as db:
+        await _setup(db)
+        cur = await db.execute("SELECT contact FROM actor_contacts WHERE user_id = ?", (user_id,))
+        row = await cur.fetchone()
+        return row[0] if row else None
+
+
+async def set_known_contact(user_id: int, contact: str) -> None:
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "INSERT INTO actor_contacts (user_id, contact) VALUES (?, ?)"
+            " ON CONFLICT(user_id) DO UPDATE SET contact = excluded.contact",
+            (user_id, contact),
+        )
+        await db.commit()
+
+
+async def add_pending_contact(ask_message_id: int, user_id: int, req_id: int, prefix: str) -> None:
+    if prefix not in _ACTOR_PREFIXES:
+        raise ValueError(f"неизвестный actor prefix: {prefix!r}")
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "INSERT OR REPLACE INTO pending_contacts (ask_message_id, user_id, req_id, prefix)"
+            " VALUES (?, ?, ?, ?)",
+            (ask_message_id, user_id, req_id, prefix),
+        )
+        await db.commit()
+
+
+async def get_pending_contact(ask_message_id: int) -> tuple[int, int, str] | None:
+    """Не удаляет запись — вызывающий сам решает, дошёл ли ответ до валидного контакта."""
+    async with _connect() as db:
+        await _setup(db)
+        cur = await db.execute(
+            "SELECT user_id, req_id, prefix FROM pending_contacts WHERE ask_message_id = ?",
+            (ask_message_id,),
+        )
+        row = await cur.fetchone()
+        return tuple(row) if row else None
+
+
+async def clear_pending_contact(ask_message_id: int) -> None:
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute("DELETE FROM pending_contacts WHERE ask_message_id = ?", (ask_message_id,))
         await db.commit()
 
 
