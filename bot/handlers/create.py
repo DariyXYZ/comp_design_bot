@@ -74,14 +74,14 @@ def request_card(
     author: str,
     status: str = "new",
     max_len: int | None = None,
-    acceptor: str | None = None,
+    actor_line: str | None = None,
 ) -> str:
     """Единственный рендерер карточки. Весь пользовательский текст экранируется.
 
     max_len — если задан (для caption к фото/альбому), обрезается только
     описание, чтобы не разрезать HTML-теги в шапке/хвосте карточки.
-    acceptor — имя того, кто нажал «Принята» (см. dept.py); None, пока
-    заявка ещё не принята никем или принята была без фиксации исполнителя.
+    actor_line — готовая строка вида "Принял: Имя" / "Завершил: Имя"
+    (см. dept.py._actor_display вызовы) или None, если ещё некого показать.
     """
     case = CASES.get(case_key, {"title": case_key, "eta": "—"})
     header = f"Заявка №{req_id}" if req_id else "Новая заявка"
@@ -95,8 +95,8 @@ def request_card(
     if source_path:
         tail_lines += ["", f"📁 Исходники: <code>{html.escape(source_path)}</code>"]
     tail_lines += ["", STATUSES.get(status, status)]
-    if acceptor:
-        tail_lines += [f"Исполнитель: {html.escape(acceptor)}"]
+    if actor_line:
+        tail_lines += [html.escape(actor_line)]
 
     desc = html.escape(description)
     if max_len is not None:

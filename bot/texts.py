@@ -119,13 +119,13 @@ STATUS_CHANGED_NOTIFY = (
     "Статус вашей заявки №{req_id} («{case_title}») изменился:\n{status}"
 )
 
-ASK_ACCEPTOR_CONTACT = (
+ASK_ACTOR_CONTACT = (
     "{name}, у тебя не указан юзернейм в Telegram — автору заявки №{req_id} "
-    "не с кем будет связаться, когда всё будет готово.\n"
+    "не с кем будет связаться для передачи решения.\n"
     "Напиши сюда одним сообщением свой контакт (юзернейм/телефон) — подставлю его."
 )
 
-ACCEPTOR_CONTACT_SAVED = "Принято — контакт для заявки №{req_id} сохранён: {contact}"
+ACTOR_CONTACT_SAVED = "Принято — контакт для заявки №{req_id} сохранён: {contact}"
 
 DONE_CONTACT_LINE = "\n\nДля связи и передачи решения: {contact}"
 DONE_CONTACT_UNKNOWN = "\n\nИсполнитель не зафиксирован — уточните в чате отдела."

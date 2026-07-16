@@ -45,8 +45,17 @@ _NEW_COLUMNS = {
     "accepted_by_user_id": "INTEGER",
     "accepted_by_username": "TEXT",
     "accepted_by_name": "TEXT",
-    "accepted_by_contact": "TEXT",
+    "accepted_by_contact": "TEXT",  # больше не заполняется, оставлено ради старых строк
+    "finished_by_user_id": "INTEGER",
+    "finished_by_username": "TEXT",
+    "finished_by_name": "TEXT",
+    "finished_by_contact": "TEXT",
 }
+
+# Единственные два префикса, которые когда-либо подставляются в SQL как имена
+# колонок (см. set_actor/set_actor_contact) — жёстко ограничены этим множеством,
+# никогда не приходят как есть от пользователя/Telegram.
+_ACTOR_PREFIXES = {"accepted_by", "finished_by"}
 
 
 async def _ensure_columns(db: aiosqlite.Connection) -> None:
@@ -125,24 +134,30 @@ async def set_status(req_id: int, status: str) -> dict | None:
         return dict(row) if row else None
 
 
-async def set_acceptor(req_id: int, user_id: int, username: str | None, full_name: str) -> None:
-    """Кто нажал «Принята» — фиксируется в момент перехода в этот статус."""
+async def set_actor(req_id: int, prefix: str, user_id: int, username: str | None, full_name: str) -> None:
+    """Кто нажал кнопку статуса — prefix задаёт, какую пару колонок писать:
+    "accepted_by" (кто взял в работу, для карточки) или "finished_by"
+    (кто реально сдал результат, для контакта заявителю)."""
+    if prefix not in _ACTOR_PREFIXES:
+        raise ValueError(f"неизвестный actor prefix: {prefix!r}")
     async with _connect() as db:
         await _setup(db)
         await db.execute(
-            "UPDATE requests SET accepted_by_user_id = ?, accepted_by_username = ?,"
-            " accepted_by_name = ?, updated_at = ? WHERE id = ?",
+            f"UPDATE requests SET {prefix}_user_id = ?, {prefix}_username = ?,"
+            f" {prefix}_name = ?, updated_at = ? WHERE id = ?",
             (user_id, username, full_name, _now(), req_id),
         )
         await db.commit()
 
 
-async def set_acceptor_contact(req_id: int, contact: str) -> None:
+async def set_actor_contact(req_id: int, prefix: str, contact: str) -> None:
     """Контакт, присланный вручную — для тех, у кого нет @username в Telegram."""
+    if prefix not in _ACTOR_PREFIXES:
+        raise ValueError(f"неизвестный actor prefix: {prefix!r}")
     async with _connect() as db:
         await _setup(db)
         await db.execute(
-            "UPDATE requests SET accepted_by_contact = ?, updated_at = ? WHERE id = ?",
+            f"UPDATE requests SET {prefix}_contact = ?, updated_at = ? WHERE id = ?",
             (contact, _now(), req_id),
         )
         await db.commit()
