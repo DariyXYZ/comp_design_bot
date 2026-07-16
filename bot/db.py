@@ -30,11 +30,12 @@ CREATE TABLE IF NOT EXISTS actor_contacts (
     contact TEXT NOT NULL
 );
 
--- Общий "жду реплай на моё сообщение" в чате отдела: контакт исполнителя,
--- причина отклонения (комментарий к оценке заявителя — через FSM в feedback.py,
--- личка не нуждается в реплае). Ключ (chat_id, ask_message_id) — message_id
--- уникален только В ПРЕДЕЛАХ чата, эти же номера легко повторятся в другом чате.
--- Переживает рестарт бота — важно, тут завязан хэндовер исполнителя.
+-- Реплай на конкретное сообщение-просьбу контакта исполнителя (единственный
+-- оставшийся кейс — причина отклонения и комментарий фидбека переехали на
+-- обычный FSM-текст, реплай в личке/чате отдела оказался неочевидным жестом).
+-- Ключ (chat_id, ask_message_id) — message_id уникален только В ПРЕДЕЛАХ
+-- чата, эти же номера легко повторятся в другом чате. Переживает рестарт
+-- бота — важно, тут завязан хэндовер исполнителя.
 CREATE TABLE IF NOT EXISTS pending_replies (
     chat_id INTEGER NOT NULL,
     ask_message_id INTEGER NOT NULL,
@@ -229,7 +230,7 @@ async def set_known_contact(user_id: int, contact: str) -> None:
         await db.commit()
 
 
-_REPLY_KINDS = {"contact", "rejection_reason"}
+_REPLY_KINDS = {"contact"}
 
 
 async def add_pending_reply(
