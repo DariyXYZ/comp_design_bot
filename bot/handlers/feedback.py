@@ -45,10 +45,12 @@ async def rate_request(callback: CallbackQuery, bot: Bot) -> None:
 
     if config.dept_chat_id:
         case_title = CASES.get(req["case_key"], {}).get("title", req["case_key"])
+        thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
         try:
             await bot.send_message(
                 config.dept_chat_id,
                 FEEDBACK_DEPT_NOTE.format(req_id=req_id, case_title=case_title, label=_LABELS[value]),
+                **thread,
             )
         except Exception:
             log.info("Заявка №%s: оценка не доставлена в чат отдела", req_id)
@@ -83,9 +85,10 @@ async def capture_feedback_comment(message: Message, bot: Bot) -> None:
     await message.reply(FEEDBACK_COMMENT_THANKS)
 
     if config.dept_chat_id:
+        thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
         try:
             await bot.send_message(
-                config.dept_chat_id, FEEDBACK_DEPT_COMMENT.format(req_id=req_id, comment=text)
+                config.dept_chat_id, FEEDBACK_DEPT_COMMENT.format(req_id=req_id, comment=text), **thread
             )
         except Exception:
             log.info("Заявка №%s: комментарий к оценке не доставлен в чат отдела", req_id)
