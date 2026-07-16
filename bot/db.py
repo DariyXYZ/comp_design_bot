@@ -41,10 +41,30 @@ async def _setup(db: aiosqlite.Connection) -> None:
     await db.execute("PRAGMA busy_timeout=10000")
 
 
+_NEW_COLUMNS = {
+    "accepted_by_user_id": "INTEGER",
+    "accepted_by_username": "TEXT",
+    "accepted_by_name": "TEXT",
+    "accepted_by_contact": "TEXT",
+}
+
+
+async def _ensure_columns(db: aiosqlite.Connection) -> None:
+    """ALTER TABLE ADD COLUMN, но только если колонки ещё нет — CREATE TABLE
+    IF NOT EXISTS не трогает уже существующую таблицу, схему приходится
+    доращивать руками при каждом обновлении, не теряя старые данные."""
+    cur = await db.execute("PRAGMA table_info(requests)")
+    existing = {row[1] for row in await cur.fetchall()}
+    for name, coltype in _NEW_COLUMNS.items():
+        if name not in existing:
+            await db.execute(f"ALTER TABLE requests ADD COLUMN {name} {coltype}")
+
+
 async def init_db() -> None:
     async with _connect() as db:
         await _setup(db)
         await db.executescript(_SCHEMA)
+        await _ensure_columns(db)
         await db.commit()
 
 
@@ -103,6 +123,29 @@ async def set_status(req_id: int, status: str) -> dict | None:
         cur = await db.execute("SELECT * FROM requests WHERE id = ?", (req_id,))
         row = await cur.fetchone()
         return dict(row) if row else None
+
+
+async def set_acceptor(req_id: int, user_id: int, username: str | None, full_name: str) -> None:
+    """Кто нажал «Принята» — фиксируется в момент перехода в этот статус."""
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "UPDATE requests SET accepted_by_user_id = ?, accepted_by_username = ?,"
+            " accepted_by_name = ?, updated_at = ? WHERE id = ?",
+            (user_id, username, full_name, _now(), req_id),
+        )
+        await db.commit()
+
+
+async def set_acceptor_contact(req_id: int, contact: str) -> None:
+    """Контакт, присланный вручную — для тех, у кого нет @username в Telegram."""
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "UPDATE requests SET accepted_by_contact = ?, updated_at = ? WHERE id = ?",
+            (contact, _now(), req_id),
+        )
+        await db.commit()
 
 
 async def get_request(req_id: int) -> dict | None:

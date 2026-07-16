@@ -6,15 +6,41 @@ import logging
 
 from aiogram import F, Bot, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from .. import db
 from ..config import config
 from ..keyboards import dept_status_buttons
-from ..texts import CASES, STATUS_CHANGED_NOTIFY, STATUSES
+from ..texts import (
+    ACCEPTOR_CONTACT_SAVED,
+    ASK_ACCEPTOR_CONTACT,
+    CASES,
+    DONE_CONTACT_LINE,
+    DONE_CONTACT_UNKNOWN,
+    STATUS_CHANGED_NOTIFY,
+    STATUSES,
+)
 
 router = Router()
 log = logging.getLogger(__name__)
+
+# Кто принял заявку без @username — ждём от него текст с контактом,
+# user_id -> req_id. Не FSM: тот же лёгкий паттерн, что и в других местах
+# бота (см. AWAITING_TOPUP_USERS-подобные словари) — состояние переживает
+# только текущий запуск процесса, и это ок для разовой подсказки.
+AWAITING_CONTACT: dict[int, int] = {}
+# Однажды присланный контакт запоминаем за user_id — второй раз для той же
+# заявки-исполнителя не переспрашиваем.
+KNOWN_CONTACTS: dict[int, str] = {}
+
+
+def _acceptor_display(req: dict) -> str | None:
+    """Лучшее, что можно показать заявителю для связи; None — исполнитель неизвестен."""
+    if req.get("accepted_by_contact"):
+        return req["accepted_by_contact"]
+    if req.get("accepted_by_username"):
+        return f"@{req['accepted_by_username']}"
+    return req.get("accepted_by_name") or None
 
 
 @router.callback_query(F.data.startswith("st:"))
@@ -39,6 +65,24 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
         await callback.answer("Уже в этом статусе")
         return
 
+    # Кто принял — фиксируем ровно в момент перехода в "Принята". Telegram
+    # сам говорит боту, кто нажал кнопку (callback.from_user — серверные
+    # данные, не подделать), так что user_id/имя всегда надёжны; единственное
+    # реально «нераспознаваемое» — это отсутствие @username, для него отдельная
+    # ветка ниже.
+    if new_status == "accepted":
+        acceptor = callback.from_user
+        await db.set_acceptor(req_id, acceptor.id, acceptor.username, acceptor.full_name)
+        if not acceptor.username:
+            cached = KNOWN_CONTACTS.get(acceptor.id)
+            if cached:
+                await db.set_acceptor_contact(req_id, cached)
+            else:
+                AWAITING_CONTACT[acceptor.id] = req_id
+                await callback.message.answer(
+                    ASK_ACCEPTOR_CONTACT.format(name=acceptor.full_name, req_id=req_id)
+                )
+
     req = await db.set_status(req_id, new_status)
     await callback.answer(f"Статус: {STATUSES[new_status]}")
 
@@ -51,21 +95,25 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
     author = req["full_name"] + (f" (@{req['username']})" if req["username"] else "")
     photos = json.loads(req["photo_file_ids"] or "[]")
     new_markup = dept_status_buttons(req_id, new_status)
+    acceptor_name = req.get("accepted_by_name")
 
     try:
         if len(photos) >= 2:
             case_title = CASES.get(req["case_key"], {}).get("title", req["case_key"])
             short = f"Заявка №{req_id} · {case_title}\n{STATUSES[new_status]}"
+            if acceptor_name:
+                short += f"\nИсполнитель: {acceptor_name}"
             await callback.message.edit_text(short, reply_markup=new_markup)
         elif len(photos) == 1:
             caption = request_card(
                 req_id, req["case_key"], req["description"], req["source_path"],
-                author, new_status, max_len=CAPTION_LIMIT,
+                author, new_status, max_len=CAPTION_LIMIT, acceptor=acceptor_name,
             )
             await callback.message.edit_caption(caption=caption, reply_markup=new_markup)
         else:
             new_text = request_card(
-                req_id, req["case_key"], req["description"], req["source_path"], author, new_status
+                req_id, req["case_key"], req["description"], req["source_path"], author, new_status,
+                acceptor=acceptor_name,
             )
             await callback.message.edit_text(new_text, reply_markup=new_markup)
     except TelegramBadRequest as e:
@@ -74,12 +122,32 @@ async def change_status(callback: CallbackQuery, bot: Bot) -> None:
         log.warning("Заявка №%s: не удалось обновить карточку: %s", req_id, e)
 
     case_title = CASES.get(req["case_key"], {}).get("title", req["case_key"])
+    notify = STATUS_CHANGED_NOTIFY.format(
+        req_id=req_id, case_title=case_title, status=STATUSES[new_status]
+    )
+    if new_status == "done":
+        contact = _acceptor_display(req)
+        notify += DONE_CONTACT_LINE.format(contact=contact) if contact else DONE_CONTACT_UNKNOWN
     try:
-        await bot.send_message(
-            req["user_id"],
-            STATUS_CHANGED_NOTIFY.format(
-                req_id=req_id, case_title=case_title, status=STATUSES[new_status]
-            ),
-        )
+        await bot.send_message(req["user_id"], notify)
     except Exception:
         log.info("Заявка №%s: автору не доставлено уведомление (закрыл личку?)", req_id)
+
+
+@router.message(F.chat.id == config.dept_chat_id)
+async def capture_acceptor_contact(message: Message) -> None:
+    """Ловит текстовый ответ от того, кого только что попросили прислать
+    контакт (см. ASK_ACCEPTOR_CONTACT выше). Молчит для всех остальных
+    сообщений в чате отдела — обычная переписка команды бота не касается."""
+    user_id = message.from_user.id if message.from_user else None
+    req_id = AWAITING_CONTACT.get(user_id) if user_id else None
+    if req_id is None:
+        return
+    contact = (message.text or "").strip()
+    if not contact:
+        await message.reply("Пришли контакт текстом, пожалуйста.")
+        return
+    AWAITING_CONTACT.pop(user_id, None)
+    KNOWN_CONTACTS[user_id] = contact
+    await db.set_acceptor_contact(req_id, contact)
+    await message.reply(ACCEPTOR_CONTACT_SAVED.format(req_id=req_id, contact=contact))
