@@ -113,8 +113,13 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
         await callback.answer("Статусы меняются только в чате отдела", show_alert=True)
         return
 
-    _, raw_id, new_status = callback.data.split(":", 2)
-    req_id = int(raw_id)
+    try:
+        _, raw_id, new_status = callback.data.split(":", 2)
+        req_id = int(raw_id)
+    except ValueError:
+        # Битый/устаревший callback_data — кнопка не должна повиснуть без ответа.
+        await callback.answer("Ошибка", show_alert=True)
+        return
     if new_status not in STATUSES:
         await callback.answer("Неизвестный статус")
         return

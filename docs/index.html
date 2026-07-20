@@ -231,7 +231,14 @@ function pick(key){
   if (picked) return;
   if (tg?.sendData) {
     picked = true;
-    tg.sendData(JSON.stringify({case:key}));
+    try {
+      tg.sendData(JSON.stringify({case:key}));
+    } catch (e) {
+      // Нестандартное окружение — sendData кинул исключение вместо тихого
+      // закрытия. Без сброса picked/animating вся колода виснет намертво.
+      picked = false;
+      animating = false;
+    }
   } else {
     // Открыто не из кнопки бота (прямая ссылка/браузер) — sendData недоступен.
     alert("Выбор работает только внутри Telegram — откройте бота @comp_design_bot и нажмите «Возможности отдела».");

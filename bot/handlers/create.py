@@ -339,11 +339,19 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
                 reply_to_message_id=album_msgs[0].message_id,
                 **thread,
             )
-        await db.set_dept_message_id(req_id, dept_msg.message_id)
     except Exception:
         # Заявка уже в БД (req_id) — не теряем её молча, а честно говорим пользователю.
         log.exception("Заявка №%s сохранена, но не доставлена в чат отдела", req_id)
         await callback.message.answer(SENT_DEPT_FAILED.format(req_id=req_id))
         return
+
+    # Отдельно от отправки: карточка в чат отдела УЖЕ ушла и рабочая (кнопки
+    # есть) — если этот чисто вспомогательный write в БД упадёт, заявителю
+    # нельзя врать про SENT_DEPT_FAILED (он увидит рабочую карточку в отделе,
+    # но получит сообщение "не доставлено" — ложная тревога, дубль заявки).
+    try:
+        await db.set_dept_message_id(req_id, dept_msg.message_id)
+    except Exception:
+        log.warning("Заявка №%s: карточка доставлена, но dept_message_id не сохранён", req_id)
 
     await callback.message.answer(SENT_OK.format(req_id=req_id))

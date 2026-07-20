@@ -35,8 +35,12 @@ class FeedbackComment(StatesGroup):
 
 @router.callback_query(F.data.startswith("fb:"))
 async def rate_request(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
-    _, raw_id, value = callback.data.split(":", 2)
-    req_id = int(raw_id)
+    try:
+        _, raw_id, value = callback.data.split(":", 2)
+        req_id = int(raw_id)
+    except ValueError:
+        await callback.answer("Ошибка", show_alert=True)
+        return
 
     req = await db.get_request(req_id)
     # Кнопки уходят персонально автору заявки личным сообщением — но на
