@@ -49,6 +49,11 @@ async def rate_request(callback: CallbackQuery, bot: Bot, state: FSMContext) -> 
         # Отзыв не привязан к 👍/👎 — можно оставить независимо от оценки
         # (и даже без неё вовсе), поэтому своя ветка без проверки req["feedback"].
         await callback.answer()
+        if await state.get_state() is not None:
+            # У этого же человека уже открыт вопрос по ДРУГОЙ заявке (два
+            # завершённых заказа подряд, кликнул отзыв на обоих) — состояние
+            # на пользователя одно, перезапись потеряла бы первый вопрос молча.
+            return
         await state.set_state(FeedbackComment.text)
         await state.update_data(req_id=req_id)
         await callback.message.answer(FEEDBACK_ASK_REVIEW)
@@ -81,7 +86,7 @@ async def rate_request(callback: CallbackQuery, bot: Bot, state: FSMContext) -> 
         except Exception:
             log.info("Заявка №%s: оценка не доставлена в чат отдела", req_id)
 
-    if value == "down":
+    if value == "down" and await state.get_state() is None:
         await state.set_state(FeedbackComment.text)
         await state.update_data(req_id=req_id)
         await callback.message.answer(FEEDBACK_ASK_COMMENT)
