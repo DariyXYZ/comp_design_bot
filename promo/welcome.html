@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Welcome picture — @comp_design_bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Канвас 1280x720 = 2x от телеграмного 640x360. Палитра и карточка — 1:1 из
+   docs/index.html (светлая тема), чтобы картинка и Mini App читались как одно. */
+:root{
+  --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
+  --line:#e4e4e1; --pill:#efefec;
+}
+*{box-sizing:border-box;margin:0}
+body{background:#555;font-family:"Golos Text",-apple-system,sans-serif;color:var(--ink)}
+
+.stage{
+  position:relative;width:1280px;height:720px;overflow:hidden;
+  background:#ffffff;
+}
+
+.brand{position:absolute;top:44px;left:52px;z-index:20;
+  font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.handle{position:absolute;top:44px;right:52px;z-index:20;
+  font-size:25px;font-weight:600;color:var(--ink)}
+
+.dept{position:absolute;bottom:40px;left:0;right:0;z-index:20;text-align:center;
+  font-size:26px;font-weight:600;letter-spacing:-.01em}
+.plus{position:absolute;bottom:36px;z-index:20;font-size:30px;font-weight:600;line-height:1}
+.plus.pl{left:56px}
+.plus.pr{right:56px}
+
+/* --- колода --- */
+.fan{position:absolute;left:50%;top:46%;z-index:10}
+
+.card{
+  position:absolute;left:0;top:0;width:360px;aspect-ratio:5/7;
+  transform-origin:50% 85%;
+  display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--line);border-radius:26px;overflow:hidden;
+  box-shadow:0 22px 54px -20px rgba(0,0,0,.25);
+}
+.card.left {transform:translate(-50%,-50%) translateX(-250px) translateY(14px) rotate(-8deg) scale(.95);z-index:1}
+.card.right{transform:translate(-50%,-50%) translateX( 250px) translateY(14px) rotate( 8deg) scale(.95);z-index:1}
+.card.center{transform:translate(-50%,-50%);z-index:5;
+  box-shadow:0 30px 70px -22px rgba(0,0,0,.32)}
+
+.media{flex:0 0 50%;min-height:0;background:#e9e9e6;overflow:hidden}
+.media img{width:100%;height:100%;object-fit:cover;display:block}
+
+.body{flex:1;min-height:0;padding:20px 22px 52px;display:flex;flex-direction:column;gap:9px;position:relative}
+.body h3{font-size:20px;font-weight:600;line-height:1.3;letter-spacing:-.01em}
+.body p{font-size:14.5px;line-height:1.5;color:var(--sub);flex:1;overflow:hidden}
+
+/* Радиус карточки 26px; отступ бейджа 14px → радиус 12px — углы концентричны. */
+.eta,.num{
+  position:absolute;bottom:14px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:12px;background:var(--pill);color:var(--ink);
+  font-size:13px;font-weight:600;white-space:nowrap;padding:0 14px;
+}
+.eta{left:14px}
+.num{right:14px;font-size:12px;font-weight:700;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="brand">IND</div>
+  <div class="handle">@comp_design_bot</div>
+
+  <div class="fan">
+    <div class="card left">
+      <div class="media"><img src="../docs/img/unique.jpg" alt=""></div>
+      <div class="body">
+        <h3>Много уникальных элементов</h3>
+        <p>Панели, ламели или МАФы не повторяются один в один — скрипт сам генерирует всю партию по правилам.</p>
+        <span class="eta">⏱ 2–3 дня</span><span class="num">01 / 08</span>
+      </div>
+    </div>
+    <div class="card right">
+      <div class="media"><img src="../docs/img/physics.jpg" alt=""></div>
+      <div class="body">
+        <h3>Нужно просчитать физику проекта</h3>
+        <p>Инсоляция, ветер, пешеходные потоки, шум. Считаем сценарии и визуализируем.</p>
+        <span class="eta">⏱ 1–2 дня</span><span class="num">07 / 08</span>
+      </div>
+    </div>
+    <div class="card center">
+      <div class="media"><img src="../docs/img/curved.jpg" alt=""></div>
+      <div class="body">
+        <h3>Форма здания криволинейная</h3>
+        <p>Объём или фасад не плоский: кривизна целиком или локально. Построим параметрически и разобьём на панели под сборку.</p>
+        <span class="eta">⏱ 2–3 дня</span><span class="num">03 / 08</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="plus pl">+</div>
+  <div class="dept">Отдел вычислительного проектирования</div>
+  <div class="plus pr">+</div>
+</div>
+</body>
+</html>
