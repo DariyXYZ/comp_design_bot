@@ -4,5 +4,7 @@ __pycache__/
 venv/
 node_modules/
 requests.sqlite3
+requests.sqlite3-shm
+requests.sqlite3-wal
 bot.log
 bot.err.log

@@ -54,10 +54,10 @@ def photos_step() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Дальше →", callback_data="photos:done"),
+                InlineKeyboardButton(text="Отменить заявку", callback_data="req:cancel"),
                 InlineKeyboardButton(text="Пропустить", callback_data="photos:skip"),
             ],
-            _cancel_row(),
+            [InlineKeyboardButton(text="Дальше →", callback_data="photos:done")],
         ]
     )
 
