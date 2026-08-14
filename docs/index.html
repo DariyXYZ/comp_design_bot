@@ -93,13 +93,16 @@ header .brand{
    22 - 12 = 10px радиуса, углы визуально концентричны углу карточки. */
 .eta, .num{
   position:absolute;bottom:12px;
-  width:92px;height:30px;
+  height:30px;
   display:flex;align-items:center;justify-content:center;gap:4px;
   border-radius:10px;background:var(--pill);color:var(--ink);
   font-size:.72rem;font-weight:600;white-space:nowrap;
 }
-.eta{left:12px}
-.num{right:12px;font-size:.66rem;font-weight:700;letter-spacing:.06em}
+/* eta теперь редактируется свободно через Supabase — ширина под контент
+   (padding вместо фикс. width), но не длиннее места до .num справа;
+   совсем длинный текст обрезается многоточием, а не вылезает за карточку. */
+.eta{left:12px;padding:0 14px;max-width:calc(100% - 130px);overflow:hidden;text-overflow:ellipsis}
+.num{right:12px;width:92px;font-size:.66rem;font-weight:700;letter-spacing:.06em}
 
 /* Тот же принцип, что у .eta/.num: отступ 12px + радиус 10px = 22px
    радиуса карточки — угол плейсхолдера концентричен углу карточки. */
