@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Возможности отдела</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
+  --line:#e4e4e1; --pill:#efefec; --accent:#141416;
+}
+@media (prefers-color-scheme: dark){
+  :root{--ink:#f0f0ee; --sub:#94949a; --page:#101012; --card:#1b1b1e;
+        --line:#2a2a2e; --pill:#26262a; --accent:#f0f0ee}
+}
+*{box-sizing:border-box;margin:0;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;max-width:100vw;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:"Golos Text",-apple-system,sans-serif;
+  background:var(--tg-theme-bg-color,var(--page));
+  color:var(--tg-theme-text-color,var(--ink));
+  display:flex;flex-direction:column;
+  /* Ритм отступов на базовой единице X=12px: 2X сверху, перед карточкой и
+     перед CTA; 1X между карточкой и точками, 0.5X между заголовком и
+     подзаголовком (см. header/.dots-row/.cta ниже). CTA и подпись теперь в
+     обычном потоке внутри .deck-col — не фиксированы, резервировать под них
+     нижний паддинг больше не нужно. */
+  padding:max(24px,env(safe-area-inset-top)) 0 max(20px,env(safe-area-inset-bottom));
+  user-select:none;-webkit-user-select:none;touch-action:none;
+}
+
+header{padding:0 22px;text-align:center}
+header h1{
+  font-size:1.55rem;font-weight:800;
+  line-height:1.2;letter-spacing:-.02em;
+}
+header .brand{
+  font-family:"Golos Text",-apple-system,sans-serif;font-size:.72rem;font-weight:400;
+  color:var(--sub);margin-top:6px;
+}
+
+.deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:flex-start;justify-content:center}
+/* margin-top:24px = 2X, тот же отступ что и над заголовком и перед CTA.
+   Карточка — фиксированная высота (не тянется на всё свободное место в
+   .deck-wrap), точки садятся сразу под ней; что остаётся ниже — просто
+   запас перед зоной CTA, не сжимается ни один из явных отступов. */
+.deck-col{display:flex;flex-direction:column;align-items:center;margin-top:24px}
+/* Пропорции игральной карты (5:7) вместо независимых width/height —
+   иначе высота от vh почти всегда даёт коротковатую, не карточную форму.
+   max-height — подстраховка на случай совсем невысокого экрана. */
+.deck{position:relative;width:min(88vw,400px);aspect-ratio:5/7;max-height:min(62vh,560px)}
+
+.swipe-card{
+  position:absolute;inset:0;perspective:1200px;
+  border-radius:22px;
+  box-shadow:0 18px 44px -18px rgba(0,0,0,.22);
+  cursor:grab;will-change:transform;
+  transition:transform .46s cubic-bezier(.25,.8,.35,1), opacity .35s ease;
+}
+.swipe-card.dragging{transition:none;cursor:grabbing}
+.swipe-card.gone{transition:transform .5s cubic-bezier(.25,.46,.45,.94), opacity .4s ease-in;opacity:0}
+/* Замах: короткий сброс вниз перед стартом полёта — см. chooseCurrent(). */
+.swipe-card.anticipate{transition:transform .13s cubic-bezier(.4,0,.6,1)}
+.swipe-card.flying{transition:transform .48s cubic-bezier(.16,.84,.32,1), opacity .32s ease .1s;opacity:0}
+
+.card-inner{
+  position:relative;width:100%;height:100%;
+  transition:transform .5s cubic-bezier(.3,.7,.4,1);
+  transform-style:preserve-3d;
+}
+.swipe-card.flipped .card-inner{transform:rotateY(180deg)}
+
+.card-face{
+  position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden;
+}
+.card-back{transform:rotateY(180deg);padding:12px}
+
+.media{flex:0 0 50%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
+@media (prefers-color-scheme: dark){.media{background:#26262a}}
+.media img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+
+.body{flex:1;min-height:0;padding:18px 20px 44px;display:flex;flex-direction:column;gap:8px;position:relative}
+.body h3{font-size:1.04rem;font-weight:600;line-height:1.3;letter-spacing:-.01em}
+.body p{font-size:.84rem;line-height:1.5;color:var(--sub);flex:1}
+
+/* Радиус карточки 22px; бейджи вписаны с отступом 12px от края —
+   22 - 12 = 10px радиуса, углы визуально концентричны углу карточки. */
+.eta, .num{
+  position:absolute;bottom:12px;
+  width:92px;height:30px;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  border-radius:10px;background:var(--pill);color:var(--ink);
+  font-size:.72rem;font-weight:600;white-space:nowrap;
+}
+.eta{left:12px}
+.num{right:12px;font-size:.66rem;font-weight:700;letter-spacing:.06em}
+
+/* Тот же принцип, что у .eta/.num: отступ 12px + радиус 10px = 22px
+   радиуса карточки — угол плейсхолдера концентричен углу карточки. */
+.back-placeholder{
+  flex:1;border-radius:10px;border:1.5px dashed var(--line);background:var(--pill);
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  color:var(--sub);font-size:.78rem;line-height:1.4;padding:16px;
+}
+.back-photo{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;pointer-events:none}
+
+.dots-row{display:flex;justify-content:center;gap:5px;padding:22px 0 0}
+.dots{display:flex;gap:5px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
+.dots i.on{background:var(--accent);width:14px;border-radius:999px}
+
+/* CTA и подпись — не внутри .deck-col: это отдельный блок, который .deck-wrap
+   (flex:1, растёт на всё свободное место) отталкивает вниз, к нижней кромке
+   экрана, вместо того чтобы липнуть к карточке/точкам. margin-top здесь —
+   только подстраховка на случай, если свободного места почти не осталось. */
+.cta{
+  position:relative;
+  width:min(88vw,400px);height:56px;margin:16px auto 0;border-radius:16px;
+  background:var(--accent);color:var(--card);
+  font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 14px 30px -12px rgba(0,0,0,.4);
+}
+.cta:active{transform:scale(.98)}
+.swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
+/* Стрелка вынесена из потока (position:absolute), чтобы не сдвигать текст
+   от истинного центра кнопки — только текст участвует в justify-content:center. */
+.cta-arrow{
+  position:absolute;top:50%;right:88px;transform:translateY(-50%);
+  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;color:#9a9a9e;
+}
+
+.arrow{
+  position:absolute;top:50%;transform:translateY(-50%);z-index:30;
+  width:38px;height:38px;border-radius:50%;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:1rem;cursor:pointer;
+  display:none;align-items:center;justify-content:center;
+}
+.arrow:hover{background:var(--pill)}
+.arrow.left{left:calc(50% - min(44vw,200px) - 58px)}
+.arrow.right{right:calc(50% - min(44vw,200px) - 58px)}
+@media (hover:hover) and (min-width:640px){.arrow{display:flex}}
+
+@media (prefers-reduced-motion: reduce){
+  /* .card-inner (флип) исключён нарочно: без анимации тап по карточке не
+     даёт вообще никакой видимой реакции — это хуже для доступности, чем
+     короткий поворот. Свайпы/перелёт (крупное перемещение по экрану,
+     собственно то, ради чего эта настройка существует) по-прежнему гасим. */
+  .swipe-card{transition:none}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Когда звать нас</h1>
+  <div class="brand">Отдел вычислительного проектирования</div>
+</header>
+
+<div class="deck-wrap">
+  <button class="arrow left" aria-label="Предыдущая">←</button>
+  <div class="deck-col">
+    <div class="deck" id="deck"></div>
+    <div class="dots-row dots" id="dots"></div>
+  </div>
+  <button class="arrow right" aria-label="Следующая">→</button>
+</div>
+
+<button class="cta" id="cta">
+  <span class="cta-label">Это моя задача</span>
+  <span class="cta-arrow" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M5 12h13.5M13 6l6.5 6-6.5 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+</button>
+
+<p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
+
+<script>
+const CASES = [
+  {key:"unique", title:"Много уникальных элементов",
+   hint:"Панели, ламели или МАФы не повторяются один в один — руками это дни рутины. Скрипт сам генерирует всю партию по правилам.", eta:"⏱ 2–3 дня",
+   backImg:"img/unique-back.jpg"},
+  {key:"reference", title:"Есть задумка, но неясно как собрать",
+   hint:"Референс — скульптура, паттерн, сложная форма, где рисунок меняется по правилу. Разберём на алгоритм и соберём прототип.", eta:"⏱ 2–3 дня",
+   backImg:"img/reference-back.jpg"},
+  {key:"curved", title:"Форма здания криволинейная",
+   hint:"Объём или фасад не плоский: кривизна целиком или локально. Построим параметрически и разобьём на панели под сборку.", eta:"⏱ 2–3 дня",
+   backImg:"img/curved-back.jpg"},
+  {key:"revit", title:"Геометрию нужно передать в Revit",
+   hint:"Форма из Rhino/Grasshopper должна жить в Revit — семействами, с чистой топологией, без мусорной сетки.", eta:"⏱ 1–2 дня",
+   backImg:"img/revit-back.jpg"},
+  {key:"repeat", title:"Действие повторяется по всему проекту",
+   hint:"Расстановка, разбивка, подрезка — в десятках мест, при правках всё заново. Сделаем инструмент, который пересчитывает за секунды.", eta:"⏱ 1 день",
+   backImg:"img/repeat-back.jpg"},
+  {key:"variants", title:"Нужно перебрать много вариантов",
+   hint:"Десятки вариантов паттерна, массинга или панелизации, решение нужно уже сегодня-завтра. Меняете параметр — сразу видите результат.", eta:"⏱ 1–2 дня",
+   backImg:"img/variants-back.jpg"},
+  {key:"physics", title:"Нужно просчитать физику проекта",
+   hint:"Инсоляция, ветер, пешеходные потоки, шум. Считаем сценарии и визуализируем — форма подстраивается осознанно, а не на глаз.", eta:"⏱ 1–2 дня",
+   backImg:"img/physics-back.jpg"},
+  {key:"custom", title:"Нетиповая или разовая задача",
+   hint:"Не попадает в пункты выше: чистка геометрии, скан, графика на 3D-форму или что-то совсем новое. Разберём и решим по ситуации.", eta:"⏱ обсудим",
+   backImg:"img/custom-back.jpg"},
+];
+
+const tg = window.Telegram?.WebApp;
+tg?.ready(); tg?.expand();
+tg?.disableVerticalSwipes?.(); // вертикальный драг карточки не должен закрывать Mini App
+
+const deck = document.getElementById("deck");
+const dots = document.getElementById("dots");
+let current = 0;
+
+CASES.forEach((_, i) => {
+  const d = document.createElement("i");
+  if (i === 0) d.className = "on";
+  dots.appendChild(d);
+});
+
+let picked = false; // sendData закрывает Mini App; дубль до закрытия глушим
+function pick(key){
+  if (picked) return;
+  if (tg?.sendData) {
+    picked = true;
+    try {
+      tg.sendData(JSON.stringify({case:key}));
+    } catch (e) {
+      // Нестандартное окружение — sendData кинул исключение вместо тихого
+      // закрытия. Без сброса picked/animating вся колода виснет намертво.
+      picked = false;
+      animating = false;
+    }
+  } else {
+    // Открыто не из кнопки бота (прямая ссылка/браузер) — sendData недоступен.
+    alert("Выбор работает только внутри Telegram — откройте бота @comp_design_bot и нажмите «Возможности отдела».");
+  }
+}
+
+function makeCard(idx){
+  const c = CASES[idx % CASES.length];
+  const el = document.createElement("div");
+  el.className = "swipe-card";
+  el.dataset.idx = idx % CASES.length;
+  el.innerHTML = `
+    <div class="card-inner">
+      <div class="card-face card-front">
+        <div class="media">
+          <img src="img/${c.key}.jpg" alt="" draggable="false" loading="lazy">
+        </div>
+        <div class="body">
+          <h3>${c.title}</h3>
+          <p>${c.hint}</p>
+          <span class="eta">${c.eta}</span>
+          <span class="num">${String(idx % CASES.length + 1).padStart(2,"0")} / ${String(CASES.length).padStart(2,"0")}</span>
+        </div>
+      </div>
+      <div class="card-face card-back">
+        ${c.backImg
+          ? `<img class="back-photo" src="${c.backImg}" alt="" draggable="false" loading="lazy">`
+          : `<div class="back-placeholder">Примеры такой геометрии</div>`}
+      </div>
+    </div>`;
+  return el;
+}
+
+// стопка из трёх: текущая + две за ней
+function layout(){
+  const cards = [...deck.children];
+  cards.forEach((el, i) => {
+    const depth = cards.length - 1 - i;   // 0 = верхняя (последний ребёнок)
+    el.style.zIndex = 10 - depth;
+    if (!el.classList.contains("dragging")) {
+      el.style.transform = `translateY(${depth * 12}px) scale(${1 - depth * .045})`;
+      el.style.opacity = depth > 2 ? 0 : 1;
+    }
+  });
+  [...dots.children].forEach((d, i) => d.className = i === current ? "on" : "");
+}
+
+function fill(){
+  while (deck.children.length < 3) {
+    const nextIdx = (current + deck.children.length) % CASES.length;
+    deck.insertBefore(makeCard(nextIdx), deck.firstChild);
+  }
+  secondShowsNext = true; // свежая стопка всегда смотрит вперёд, см. setSecondCard
+  layout();
+}
+
+// Слой сразу под верхней карточкой обычно показывает СЛЕДУЮЩий кейс (для
+// свайпа влево). Но если тянуть вправо (значит идём НАЗАД), под пальцем
+// должен появляться уже ПРЕДЫДУЩИЙ кейс — иначе в момент отпускания палец
+// видит один кейс, а после анимации внезапно другой (выглядит как глюк).
+// Подменяем содержимое второго слоя прямо во время движения, до отпускания.
+let secondShowsNext = true;
+
+function setSecondCard(showNext){
+  if (secondShowsNext === showNext) return;
+  secondShowsNext = showNext;
+  const cards = [...deck.children];
+  const second = cards[cards.length - 2];
+  if (!second) return;
+  const idx = showNext
+    ? (current + 1) % CASES.length
+    : (current - 1 + CASES.length) % CASES.length;
+  const fresh = makeCard(idx);
+  fresh.style.cssText = second.style.cssText; // та же позиция/масштаб слоя стопки
+  deck.replaceChild(fresh, second);
+}
+
+let animating = false; // guard: быстрый второй свайп не трогает ту же карточку
+
+// Свайп/смахивание влево -> вперёд по колоде, вправо -> назад. flyDir всегда
+// совпадает с направлением ухода карточки с экрана (визуально), а не с тем,
+// вперёд мы идём или назад, — те же -1/+1, что и раньше, просто теперь оба
+// направления реально ведут в разные стороны по CASES, а не всегда вперёд.
+function goNext(flyDir = -1){
+  const top = deck.lastElementChild;
+  if (!top || animating) return;
+  animating = true;
+  top.classList.add("gone");
+  top.style.transform = `translateX(${flyDir * 130}%) rotate(${flyDir * 14}deg)`;
+  current = (current + 1) % CASES.length;
+  setTimeout(() => { top.remove(); fill(); animating = false; }, 460);
+}
+
+function goPrev(flyDir = 1){
+  const top = deck.lastElementChild;
+  if (!top || animating) return;
+  animating = true;
+  top.classList.add("gone");
+  top.style.transform = `translateX(${flyDir * 130}%) rotate(${flyDir * 14}deg)`;
+  current = (current - 1 + CASES.length) % CASES.length;
+  setTimeout(() => { top.remove(); deck.replaceChildren(); fill(); animating = false; }, 460);
+}
+
+// Драг: одни слушатели на window + активная карточка в переменной,
+// иначе на каждую созданную карточку копился бы новый window-хендлер.
+// Pointer Events, а не отдельно touch+mouse: на тач-устройствах браузер
+// синтезирует mousedown/mouseup ПОСЛЕ touchend — с раздельными хендлерами
+// один тап дважды переключал .flipped (флип→сразу обратно), отсюда
+// нестабильность «иногда работает». Один событийный поток эту гонку убирает.
+const drag = {el: null, startX: 0, startY: 0, dx: 0, moved: false};
+
+function onDown(e){
+  const top = deck.lastElementChild;
+  if (!top || animating) return;
+  if (!top.contains(e.target)) return;
+  drag.el = top;
+  drag.moved = false;
+  drag.dx = 0;
+  drag.startX = e.clientX;
+  drag.startY = e.clientY;
+  top.classList.add("dragging");
+}
+
+function onMove(e){
+  if (!drag.el) return;
+  drag.dx = e.clientX - drag.startX;
+  const dy = e.clientY - drag.startY;
+  if (Math.abs(drag.dx) > 8 || Math.abs(dy) > 8) drag.moved = true;
+  if (Math.abs(drag.dx) > 10) setSecondCard(drag.dx < 0);
+  drag.el.style.transform = `translate(${drag.dx}px, ${dy * .25}px) rotate(${drag.dx * .05}deg)`;
+}
+
+function onUp(e){
+  if (!drag.el) return;
+  const el = drag.el;
+  drag.el = null;
+  el.classList.remove("dragging");
+  if (e && e.type === "pointercancel") { setSecondCard(true); layout(); return; } // прервано системой — не считаем тапом
+  if (Math.abs(drag.dx) > 90) {
+    if (drag.dx < 0) goNext(); else goPrev();
+  } else {
+    // Не дотянули до порога — стопка возвращается к дефолтному виду
+    // (второй слой снова смотрит вперёд), иначе после пары неудачных
+    // свайпов вправо там навсегда останется предыдущий кейс.
+    setSecondCard(true);
+    layout();
+    // Тап без движения = переворот карточки (детали на обратной стороне).
+    // Выбор задачи — только через большую кнопку/Enter (см. chooseCurrent).
+    if (!drag.moved) el.classList.toggle("flipped");
+  }
+}
+
+function chooseCurrent(){
+  const top = deck.lastElementChild;
+  if (!top || animating) return;
+  const key = CASES[top.dataset.idx].key;
+  if (!tg?.sendData) { pick(key); return; } // вне Telegram — просто подскажем, картой не жертвуем
+  animating = true;
+
+  // Карточки под верхней гаснут вместе со стартом полёта — иначе последний
+  // кадр перед закрытием миниаппа это соседняя карточка стопки, а не пусто.
+  // Инлайн, а не класс: layout() сам держит opacity инлайном на каждой
+  // карточке — класс с opacity в стилевом листе такой инлайн не перебьёт.
+  [...deck.children].filter(el => el !== top).forEach(el => { el.style.transition = "none"; el.style.opacity = "0"; });
+
+  // Замах: короткий сброс вниз, потом полёт вверх — короче, чем раньше,
+  // чтобы чат открывался почти сразу следом, а не после долгой паузы.
+  top.classList.add("anticipate");
+  top.style.transform = "translateY(14px) scale(.99)";
+  setTimeout(() => {
+    top.classList.remove("anticipate");
+    top.classList.add("flying");
+    top.style.transform = "translateY(-150%) scale(.94)";
+  }, 120);
+
+  setTimeout(() => pick(key), 120 + 460);
+}
+
+window.addEventListener("pointerdown", onDown);
+window.addEventListener("pointermove", onMove);
+window.addEventListener("pointerup", onUp);
+window.addEventListener("pointercancel", onUp);
+
+document.querySelector(".arrow.right").addEventListener("click", () => goNext());
+document.querySelector(".arrow.left").addEventListener("click", () => goPrev());
+document.getElementById("cta").addEventListener("click", chooseCurrent);
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") goNext();
+  if (e.key === "ArrowLeft") goPrev();
+  if (e.key === "Enter") chooseCurrent();
+});
+
+fill();
+</script>
+
+</body>
+</html>
