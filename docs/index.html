@@ -185,32 +185,13 @@ header .brand{
 <p class="swipe-hint">Свайпайте карточки, нажимайте на них — увидите примеры</p>
 
 <script>
-const CASES = [
-  {key:"unique", title:"Много уникальных элементов",
-   hint:"Панели, ламели или МАФы не повторяются один в один — руками это дни рутины. Скрипт сам генерирует всю партию по правилам.", eta:"⏱ 2–3 дня",
-   backImg:"img/unique-back.jpg"},
-  {key:"reference", title:"Есть задумка, но неясно как собрать",
-   hint:"Референс — скульптура, паттерн, сложная форма, где рисунок меняется по правилу. Разберём на алгоритм и соберём прототип.", eta:"⏱ 2–3 дня",
-   backImg:"img/reference-back.jpg"},
-  {key:"curved", title:"Форма здания криволинейная",
-   hint:"Объём или фасад не плоский: кривизна целиком или локально. Построим параметрически и разобьём на панели под сборку.", eta:"⏱ 2–3 дня",
-   backImg:"img/curved-back.jpg"},
-  {key:"revit", title:"Геометрию нужно передать в Revit",
-   hint:"Форма из Rhino/Grasshopper должна жить в Revit — семействами, с чистой топологией, без мусорной сетки.", eta:"⏱ 1–2 дня",
-   backImg:"img/revit-back.jpg"},
-  {key:"repeat", title:"Действие повторяется по всему проекту",
-   hint:"Расстановка, разбивка, подрезка — в десятках мест, при правках всё заново. Сделаем инструмент, который пересчитывает за секунды.", eta:"⏱ 1 день",
-   backImg:"img/repeat-back.jpg"},
-  {key:"variants", title:"Нужно перебрать много вариантов",
-   hint:"Десятки вариантов паттерна, массинга или панелизации, решение нужно уже сегодня-завтра. Меняете параметр — сразу видите результат.", eta:"⏱ 1–2 дня",
-   backImg:"img/variants-back.jpg"},
-  {key:"physics", title:"Нужно просчитать физику проекта",
-   hint:"Инсоляция, ветер, пешеходные потоки, шум. Считаем сценарии и визуализируем — форма подстраивается осознанно, а не на глаз.", eta:"⏱ 1–2 дня",
-   backImg:"img/physics-back.jpg"},
-  {key:"custom", title:"Нетиповая или разовая задача",
-   hint:"Не попадает в пункты выше: чистка геометрии, скан, графика на 3D-форму или что-то совсем новое. Разберём и решим по ситуации.", eta:"⏱ обсудим",
-   backImg:"img/custom-back.jpg"},
-];
+// Кейсы читаются из Supabase (таблица `cases`) — единый источник с ботом
+// (bot/texts.py), чтобы не редактировать одно и то же в двух местах.
+// anon-ключ публичный по дизайну (read-only по Row Level Security на
+// таблице) — его нормально держать прямо в клиентском коде.
+const SUPABASE_URL = "https://ehpokxcxxpatxdrljasc.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_0pBtURLi2hnoBSjFfs2-PA_sNISxVfL";
+let CASES = [];
 
 const tg = window.Telegram?.WebApp;
 tg?.ready(); tg?.expand();
@@ -219,12 +200,6 @@ tg?.disableVerticalSwipes?.(); // вертикальный драг карточ
 const deck = document.getElementById("deck");
 const dots = document.getElementById("dots");
 let current = 0;
-
-CASES.forEach((_, i) => {
-  const d = document.createElement("i");
-  if (i === 0) d.className = "on";
-  dots.appendChild(d);
-});
 
 let picked = false; // sendData закрывает Mini App; дубль до закрытия глушим
 function pick(key){
@@ -254,7 +229,7 @@ function makeCard(idx){
     <div class="card-inner">
       <div class="card-face card-front">
         <div class="media">
-          <img src="img/${c.key}.jpg" alt="" draggable="false" loading="lazy">
+          <img src="${c.frontImg}" alt="" draggable="false" loading="lazy">
         </div>
         <div class="body">
           <h3>${c.title}</h3>
@@ -431,7 +406,40 @@ window.addEventListener("keydown", e => {
   if (e.key === "Enter") chooseCurrent();
 });
 
-fill();
+async function init(){
+  let rows;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/cases?select=key,title,hint,eta,image_front,image_back&order=sort_order`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    rows = await res.json();
+    if (!rows.length) throw new Error("empty");
+  } catch (e) {
+    deck.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;padding:24px;color:var(--sub);font-size:.85rem;line-height:1.5">Не получилось загрузить карточки — проверьте интернет и откройте ещё раз.</div>`;
+    return;
+  }
+
+  CASES = rows.map(r => ({
+    key: r.key,
+    title: r.title,
+    hint: r.hint,
+    eta: `⏱ ${r.eta}`,
+    frontImg: r.image_front,
+    backImg: r.image_back || null,
+  }));
+
+  CASES.forEach((_, i) => {
+    const d = document.createElement("i");
+    if (i === 0) d.className = "on";
+    dots.appendChild(d);
+  });
+
+  fill();
+}
+
+init();
 </script>
 
 </body>

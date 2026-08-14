@@ -31,6 +31,8 @@ class Config:
     dept_thread_id: int | None
     webapp_url: str
     db_path: Path
+    supabase_url: str
+    supabase_anon_key: str
 
     @classmethod
     def load(cls) -> "Config":
@@ -52,12 +54,21 @@ class Config:
             )
             webapp_url = ""
 
+        # Тексты и картинки карточек (CASES) читаются из Supabase — единый
+        # источник с Mini App (docs/index.html), см. bot/texts.py.
+        supabase_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+        supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+        if not supabase_url or not supabase_anon_key:
+            raise RuntimeError("SUPABASE_URL / SUPABASE_ANON_KEY не заданы в .env")
+
         return cls(
             token=token,
             dept_chat_id=_int_or_none("DEPT_CHAT_ID"),
             dept_thread_id=_int_or_none("DEPT_THREAD_ID"),
             webapp_url=webapp_url,
             db_path=BASE_DIR / os.environ.get("DB_FILE", "requests.sqlite3"),
+            supabase_url=supabase_url,
+            supabase_anon_key=supabase_anon_key,
         )
 
 

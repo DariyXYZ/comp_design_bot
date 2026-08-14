@@ -1,47 +1,60 @@
-"""Все пользовательские тексты бота. Кейсы — из чек-листа отдела (8 карточек)."""
+"""Все пользовательские тексты бота."""
+from __future__ import annotations
 
-CASES: dict[str, dict[str, str]] = {
-    "unique": {
-        "title": "Много уникальных элементов",
-        "hint": "Панели, ламели или МАФы не повторяются один в один — руками это дни рутины.",
-        "eta": "2–3 дня",
-    },
-    "reference": {
-        "title": "Есть задумка, но неясно как собрать",
-        "hint": "Референс со сложной формой или паттерном, где рисунок меняется по правилу.",
-        "eta": "2–3 дня",
-    },
-    "curved": {
-        "title": "Форма здания криволинейная",
-        "hint": "Объём или фасад не плоский: кривизна целиком или локально.",
-        "eta": "2–3 дня",
-    },
-    "revit": {
-        "title": "Геометрию нужно передать в Revit",
-        "hint": "Форма из Rhino/Grasshopper должна жить в Revit — семействами, с чистой топологией.",
-        "eta": "1–2 дня",
-    },
-    "repeat": {
-        "title": "Действие повторяется по всему проекту",
-        "hint": "Расстановка, разбивка, подрезка — в десятках мест, при правках всё заново.",
-        "eta": "1 день",
-    },
-    "variants": {
-        "title": "Нужно перебрать много вариантов",
-        "hint": "Десятки вариантов паттерна, массинга или панелизации, решение нужно быстро.",
-        "eta": "1–2 дня",
-    },
-    "physics": {
-        "title": "Нужно просчитать физику проекта",
-        "hint": "Инсоляция, ветер, пешеходные потоки, шум — осознанно, а не на глаз.",
-        "eta": "1–2 дня",
-    },
-    "custom": {
-        "title": "Нетиповая или разовая задача",
-        "hint": "Не попадает в пункты выше: чистка геометрии, скан, графика на 3D-форму, новое.",
-        "eta": "по договорённости",
-    },
-}
+import json
+import logging
+import time
+import urllib.request
+
+from .config import config
+
+log = logging.getLogger(__name__)
+
+
+def _load_cases(attempts: int = 3, delay: float = 2.0) -> dict[str, dict[str, str]]:
+    """Кейсы читаются из Supabase (таблица `cases`) — единый источник с
+    Mini App (docs/index.html), чтобы не редактировать одно и то же в двух
+    местах и не гонять правки через git. Запрос — один раз при импорте
+    модуля (при старте бота); новый текст бот увидит только после
+    следующего рестарта (Mini App подхватывает его сразу же, без рестарта —
+    там свой fetch на каждое открытие).
+
+    Несколько попыток с паузой — раньше источником был локальный файл,
+    который не мог быть недоступен; теперь это сеть, и один короткий сбой
+    при старте не должен ронять бота в краш-цикл, если Supabase ответит
+    секунд через пять.
+    """
+    url = (
+        f"{config.supabase_url}/rest/v1/cases"
+        "?select=key,title,hint,eta&order=sort_order"
+    )
+    req = urllib.request.Request(
+        url,
+        headers={
+            "apikey": config.supabase_anon_key,
+            "Authorization": f"Bearer {config.supabase_anon_key}",
+        },
+    )
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                rows = json.loads(resp.read().decode("utf-8"))
+            if not rows:
+                raise RuntimeError("Supabase вернул пустой список кейсов")
+            return {
+                r["key"]: {"title": r["title"], "hint": r.get("hint") or "", "eta": r["eta"]}
+                for r in rows
+            }
+        except Exception as e:  # noqa: BLE001 — при старте важно не упасть молча на первом же сбое сети
+            last_error = e
+            log.warning("Попытка %s/%s загрузить кейсы из Supabase не удалась: %s", attempt, attempts, e)
+            if attempt < attempts:
+                time.sleep(delay)
+    raise RuntimeError(f"Не удалось загрузить кейсы из Supabase после {attempts} попыток") from last_error
+
+
+CASES: dict[str, dict[str, str]] = _load_cases()
 
 STATUSES: dict[str, str] = {
     "new": "⏸️ На паузе",
