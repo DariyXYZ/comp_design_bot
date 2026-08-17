@@ -64,8 +64,8 @@ header .brand{
 .swipe-card.dragging{transition:none;cursor:grabbing}
 .swipe-card.gone{transition:transform .5s cubic-bezier(.25,.46,.45,.94), opacity .4s ease-in;opacity:0}
 /* Замах: короткий сброс вниз перед стартом полёта — см. chooseCurrent(). */
-.swipe-card.anticipate{transition:transform .13s cubic-bezier(.4,0,.6,1)}
-.swipe-card.flying{transition:transform .48s cubic-bezier(.16,.84,.32,1), opacity .32s ease .1s;opacity:0}
+.swipe-card.anticipate{transition:transform .17s cubic-bezier(.4,0,.6,1)}
+.swipe-card.flying{transition:transform .64s cubic-bezier(.16,.84,.32,1), opacity .32s ease .1s;opacity:0}
 
 .card-inner{
   position:relative;width:100%;height:100%;
@@ -396,17 +396,18 @@ function chooseCurrent(){
   // карточке — класс с opacity в стилевом листе такой инлайн не перебьёт.
   [...deck.children].filter(el => el !== top).forEach(el => { el.style.transition = "none"; el.style.opacity = "0"; });
 
-  // Замах: короткий сброс вниз, потом полёт вверх — короче, чем раньше,
-  // чтобы чат открывался почти сразу следом, а не после долгой паузы.
+  // Замах: короткий сброс вниз, потом полёт вверх — чуть неспешнее, чем
+  // раньше (было 120+460=580мс, стало 160+620=780мс), чат всё ещё открывается
+  // быстро следом, но полёт читается, а не дёргается.
   top.classList.add("anticipate");
   top.style.transform = "translateY(14px) scale(.99)";
   setTimeout(() => {
     top.classList.remove("anticipate");
     top.classList.add("flying");
     top.style.transform = "translateY(-150%) scale(.94)";
-  }, 120);
+  }, 160);
 
-  setTimeout(() => pick(key), 120 + 460);
+  setTimeout(() => pick(key), 160 + 620);
 }
 
 window.addEventListener("pointerdown", onDown);
