@@ -30,6 +30,8 @@ from ..texts import (
     ASK_SOURCE,
     CANCELED,
     CASES,
+    CLARIFYING_HINT_BLOCK,
+    CLARIFYING_HINTS,
     PREVIEW_HEADER,
     SENT_DEPT_FAILED,
     SENT_NO_DEPT,
@@ -114,9 +116,11 @@ async def start_request(message: Message, state: FSMContext, case_key: str) -> N
     await state.clear()
     await state.update_data(case_key=case_key, photos=[])
     await state.set_state(NewRequest.description)
-    await message.answer(
-        ASK_DESCRIPTION.format(case_title=CASES[case_key]["title"])
-    )
+    text = ASK_DESCRIPTION.format(case_title=CASES[case_key]["title"])
+    hint = CLARIFYING_HINTS.get(case_key)
+    if hint:
+        text += CLARIFYING_HINT_BLOCK.format(clarifying_hint=hint)
+    await message.answer(text)
 
 
 @router.message(Command("new"), F.chat.type == "private")
