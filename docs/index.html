@@ -125,20 +125,22 @@ header .brand{
    экрана, вместо того чтобы липнуть к карточке/точкам. margin-top здесь —
    только подстраховка на случай, если свободного места почти не осталось. */
 .cta{
-  position:relative;
   width:min(88vw,400px);height:56px;margin:16px auto 0;border-radius:16px;
   background:var(--accent);color:var(--card);
   font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 22px;
   box-shadow:0 14px 30px -12px rgba(0,0,0,.4);
 }
 .cta:active{transform:scale(.98)}
 .swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
-/* Стрелка вынесена из потока (position:absolute), чтобы не сдвигать текст
-   от истинного центра кнопки — только текст участвует в justify-content:center. */
+.cta-label{text-align:left}
+/* justify-content:space-between на .cta прижимает стрелку к правому краю
+   при любой длине текста — раньше был фиксированный отступ (position:absolute),
+   рассчитанный под короткую фразу, и длинный текст в неё упирался. */
 .cta-arrow{
-  position:absolute;top:50%;right:88px;transform:translateY(-50%);
   display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;
   width:32px;height:32px;color:#9a9a9e;
 }
 
