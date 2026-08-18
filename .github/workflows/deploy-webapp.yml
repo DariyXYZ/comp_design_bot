@@ -1,0 +1,58 @@
+name: Deploy Mini App
+
+# Собирает Next.js из web/ и публикует статику на GitHub Pages.
+# Раньше Pages раздавал папку docs/ прямо из main — теперь источником должен
+# быть выбран «GitHub Actions» (Settings → Pages → Source), иначе этот workflow
+# соберётся, но не опубликуется.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-webapp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Параллельные деплои Pages конфликтуют между собой; cancel-in-progress:false —
+# чтобы уже начатая публикация дособлюдалась, а не обрывалась следующим пушем.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+        working-directory: web
+
+      - run: npm run build
+        working-directory: web
+
+      # output:'export' кладёт готовую статику в web/out (там же .nojekyll,
+      # без него Pages выкинул бы каталог _next как «служебный» для Jekyll).
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
