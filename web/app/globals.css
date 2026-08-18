@@ -1,0 +1,160 @@
+:root{
+  --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
+  --line:#e4e4e1; --pill:#efefec; --accent:#141416;
+}
+@media (prefers-color-scheme: dark){
+  :root{--ink:#f0f0ee; --sub:#94949a; --page:#101012; --card:#1b1b1e;
+        --line:#2a2a2e; --pill:#26262a; --accent:#f0f0ee}
+}
+*{box-sizing:border-box;margin:0;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;max-width:100vw;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:var(--font-golos),-apple-system,sans-serif;
+  background:var(--tg-theme-bg-color,var(--page));
+  color:var(--tg-theme-text-color,var(--ink));
+  display:flex;flex-direction:column;
+  /* Ритм отступов на базовой единице X=12px: 2X сверху, перед карточкой и
+     перед CTA; 1X между карточкой и точками, 0.5X между заголовком и
+     подзаголовком (см. header/.dots-row/.cta ниже). CTA и подпись теперь в
+     обычном потоке внутри .deck-col — не фиксированы, резервировать под них
+     нижний паддинг больше не нужно. */
+  padding:max(24px,env(safe-area-inset-top)) 0 max(20px,env(safe-area-inset-bottom));
+  user-select:none;-webkit-user-select:none;touch-action:none;
+}
+
+header{padding:0 22px;text-align:center}
+header h1{
+  font-size:1.55rem;font-weight:800;
+  line-height:1.2;letter-spacing:-.02em;
+}
+header .brand{
+  font-family:var(--font-golos),-apple-system,sans-serif;font-size:.72rem;font-weight:400;
+  color:var(--sub);margin-top:6px;
+}
+
+.deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:flex-start;justify-content:center}
+/* margin-top:24px = 2X, тот же отступ что и над заголовком и перед CTA.
+   Карточка — фиксированная высота (не тянется на всё свободное место в
+   .deck-wrap), точки садятся сразу под ней; что остаётся ниже — просто
+   запас перед зоной CTA, не сжимается ни один из явных отступов. */
+.deck-col{display:flex;flex-direction:column;align-items:center;margin-top:24px}
+/* Пропорции игральной карты (5:7) вместо независимых width/height —
+   иначе высота от vh почти всегда даёт коротковатую, не карточную форму.
+   max-height — подстраховка на случай совсем невысокого экрана. */
+.deck{position:relative;width:min(88vw,400px);aspect-ratio:5/7;max-height:min(62vh,560px)}
+
+.swipe-card{
+  position:absolute;inset:0;perspective:1200px;
+  border-radius:22px;
+  box-shadow:0 18px 44px -18px rgba(0,0,0,.22);
+  cursor:grab;will-change:transform;
+  transition:transform .46s cubic-bezier(.25,.8,.35,1), opacity .35s ease;
+}
+.swipe-card.dragging{transition:none;cursor:grabbing}
+.swipe-card.gone{transition:transform .5s cubic-bezier(.25,.46,.45,.94), opacity .4s ease-in;opacity:0}
+/* Замах: короткий сброс вниз перед стартом полёта — см. chooseCurrent(). */
+.swipe-card.anticipate{transition:transform .17s cubic-bezier(.4,0,.6,1)}
+.swipe-card.flying{transition:transform .64s cubic-bezier(.16,.84,.32,1), opacity .32s ease .1s;opacity:0}
+
+.card-inner{
+  position:relative;width:100%;height:100%;
+  transition:transform .5s cubic-bezier(.3,.7,.4,1);
+  transform-style:preserve-3d;
+}
+.swipe-card.flipped .card-inner{transform:rotateY(180deg)}
+
+.card-face{
+  position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden;
+}
+.card-back{transform:rotateY(180deg);padding:12px}
+
+.media{flex:0 0 50%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
+@media (prefers-color-scheme: dark){.media{background:#26262a}}
+.media img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+
+.body{flex:1;min-height:0;padding:18px 20px 44px;display:flex;flex-direction:column;gap:8px;position:relative}
+.body h3{font-size:1.04rem;font-weight:600;line-height:1.3;letter-spacing:-.01em}
+.body p{font-size:.84rem;line-height:1.5;color:var(--sub);flex:1}
+
+/* Радиус карточки 22px; бейджи вписаны с отступом 12px от края —
+   22 - 12 = 10px радиуса, углы визуально концентричны углу карточки. */
+.eta, .num{
+  position:absolute;bottom:12px;
+  height:30px;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  border-radius:10px;background:var(--pill);color:var(--ink);
+  font-size:.72rem;font-weight:600;white-space:nowrap;
+}
+/* eta теперь редактируется свободно через Supabase — ширина под контент
+   (padding вместо фикс. width), но не длиннее места до .num справа;
+   совсем длинный текст обрезается многоточием, а не вылезает за карточку. */
+.eta{left:12px;padding:0 14px;max-width:calc(100% - 130px);overflow:hidden;text-overflow:ellipsis}
+.num{right:12px;width:92px}
+
+/* Тот же принцип, что у .eta/.num: отступ 12px + радиус 10px = 22px
+   радиуса карточки — угол плейсхолдера концентричен углу карточки. */
+.back-placeholder{
+  flex:1;border-radius:10px;border:1.5px dashed var(--line);background:var(--pill);
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  color:var(--sub);font-size:.78rem;line-height:1.4;padding:16px;
+}
+/* object-position:top — обрезаем только снизу, не сверху: у многих примеров
+   работ легенда/иконка/лого сидит в верхнем углу картинки, а не в центре. */
+.back-photo{width:100%;height:100%;object-fit:cover;object-position:top;border-radius:10px;display:block;pointer-events:none}
+
+.dots-row{display:flex;justify-content:center;gap:5px;padding:22px 0 0}
+.dots{display:flex;gap:5px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
+.dots i.on{background:var(--accent);width:14px;border-radius:999px}
+
+/* CTA и подпись — не внутри .deck-col: это отдельный блок, который .deck-wrap
+   (flex:1, растёт на всё свободное место) отталкивает вниз, к нижней кромке
+   экрана, вместо того чтобы липнуть к карточке/точкам. margin-top здесь —
+   только подстраховка на случай, если свободного места почти не осталось. */
+.cta{
+  width:min(88vw,400px);height:56px;margin:16px auto 0;border-radius:16px;
+  background:var(--accent);color:var(--card);
+  font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 22px;
+  box-shadow:0 14px 30px -12px rgba(0,0,0,.4);
+}
+.cta:active{transform:scale(.98)}
+.swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
+.cta-label{text-align:left}
+/* justify-content:space-between на .cta прижимает стрелку к правому краю
+   при любой длине текста — раньше был фиксированный отступ (position:absolute),
+   рассчитанный под короткую фразу, и длинный текст в неё упирался. */
+.cta-arrow{
+  display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;
+  width:32px;height:32px;color:#9a9a9e;
+}
+
+.arrow{
+  position:absolute;top:50%;transform:translateY(-50%);z-index:30;
+  width:38px;height:38px;border-radius:50%;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);cursor:pointer;
+  display:none;align-items:center;justify-content:center;
+}
+.arrow svg{display:block}
+.arrow.left svg{transform:scaleX(-1)}
+.arrow:hover{background:var(--pill)}
+.arrow.left{left:calc(50% - min(44vw,200px) - 58px)}
+.arrow.right{right:calc(50% - min(44vw,200px) - 58px)}
+@media (hover:hover) and (min-width:640px){.arrow{display:flex}}
+
+.deck-error{
+  display:flex;align-items:center;justify-content:center;height:100%;
+  text-align:center;padding:24px;color:var(--sub);font-size:.85rem;line-height:1.5;
+}
+
+@media (prefers-reduced-motion: reduce){
+  /* .card-inner (флип) исключён нарочно: без анимации тап по карточке не
+     даёт вообще никакой видимой реакции — это хуже для доступности, чем
+     короткий поворот. Свайпы/перелёт (крупное перемещение по экрану,
+     собственно то, ради чего эта настройка существует) по-прежнему гасим. */
+  .swipe-card{transition:none}
+}
