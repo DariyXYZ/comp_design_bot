@@ -16,28 +16,26 @@ register_autostart.ps1  # автозапуск при входе в Windows (б�
 
 ### Mini App
 
-Витрина кейсов переписана на Next.js (App Router, `output: 'export'` —
-статика, сервера нет). Живёт в `web/`, деплоится workflow'ом
-`.github/workflows/deploy-webapp.yml` на каждый пуш в `main`, который трогает
-`web/**`.
+Витрина кейсов — Next.js (App Router, TypeScript, `output: 'export'`) в папке
+`web/`. Собирается и публикуется на GitHub Pages workflow'ом
+`.github/workflows/deploy-webapp.yml`.
 
 ```powershell
 cd web
 npm install
-npm run dev     # http://localhost:3000/comp_design_bot
-npm run build   # статика в web/out
+Copy-Item .env.example .env.local   # вписать значения Supabase
+npm run dev                         # http://localhost:3000/comp_design_bot
 ```
 
-`basePath` — `/comp_design_bot`, потому что Pages раздаёт project-сайт по
-адресу `https://dariyxyz.github.io/comp_design_bot/`.
+Подробности — структура, переменные окружения, архитектурные решения и
+отклонения от стандарта бюро — в [web/README.md](web/README.md).
 
 Карточки берутся из Supabase (таблица `cases`) — тот же источник, что у бота,
 править контент нужно там, а не в коде.
 
-`docs/` остаётся как прежняя версия, пока новая не подтверждена в живом
-Telegram. Пока в Settings → Pages источником выбрана папка `docs`, в проде
-работает именно она; переключение на «GitHub Actions» и есть момент
-переезда.
+`docs/` — прежняя однофайловая версия витрины. Оставлена как путь отката
+(вернуть в Settings → Pages источником папку `docs`); в проде она больше не
+используется.
 
 ## Настройка
 

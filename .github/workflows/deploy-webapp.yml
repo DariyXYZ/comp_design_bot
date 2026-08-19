@@ -1,12 +1,15 @@
 name: Deploy Mini App
 
-# Собирает Next.js из web/ и публикует статику на GitHub Pages.
-# Раньше Pages раздавал папку docs/ прямо из main — теперь источником должен
-# быть выбран «GitHub Actions» (Settings → Pages → Source), иначе этот workflow
-# соберётся, но не опубликуется.
+# Проверяет и публикует Mini App из web/ на GitHub Pages.
+# Источником Pages должен быть выбран «GitHub Actions» (Settings → Pages),
+# иначе job соберётся, но публикация не применится.
 on:
   push:
     branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-webapp.yml"
+  pull_request:
     paths:
       - "web/**"
       - ".github/workflows/deploy-webapp.yml"
@@ -23,27 +26,58 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+defaults:
+  run:
+    working-directory: web
+
 jobs:
-  build:
+  # Проверки отдельным job'ом: на pull_request он идёт один, без публикации.
+  verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
 
       - run: npm ci
-        working-directory: web
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+  build:
+    needs: verify
+    # На PR только проверяем — публикация идёт с main.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      # Публичные по дизайну (anon-ключ Supabase, read-only по RLS), поэтому
+      # переменные репозитория, а не секреты. При output:'export' значения
+      # вшиваются в бандл на этапе сборки — без них build падает осознанно.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
 
       - run: npm run build
-        working-directory: web
 
       # output:'export' кладёт готовую статику в web/out (там же .nojekyll,
       # без него Pages выкинул бы каталог _next как «служебный» для Jekyll).
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: web/out
 
@@ -55,4 +89,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

@@ -151,6 +151,16 @@ header .brand{
   text-align:center;padding:24px;color:var(--sub);font-size:.85rem;line-height:1.5;
 }
 
+/* Экраны error.tsx и not-found.tsx: тот же ритм, что у основного экрана —
+   заголовок, поясняющий текст, одна кнопка того же вида, что CTA колоды. */
+.fallback{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;text-align:center;padding:24px;
+}
+.fallback h1{font-size:1.25rem;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+.fallback p{font-size:.85rem;line-height:1.5;color:var(--sub);max-width:34ch}
+.fallback .cta{margin-top:14px;justify-content:center}
+
 @media (prefers-reduced-motion: reduce){
   /* .card-inner (флип) исключён нарочно: без анимации тап по карточке не
      даёт вообще никакой видимой реакции — это хуже для доступности, чем
