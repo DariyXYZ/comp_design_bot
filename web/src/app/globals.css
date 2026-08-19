@@ -1,6 +1,28 @@
 :root{
   --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
   --line:#e4e4e1; --pill:#efefec; --accent:#141416;
+
+  /* Высота всей обвязки вокруг карточки: паддинги body, заголовок, отступ до
+     карточки, точки, CTA с отступом, подпись с отступом. */
+  --chrome-h:245px;
+  /* Ширина карточки — единственный источник её размера, высота выводится из
+     aspect-ratio. Берём минимум из «сколько разрешает ширина экрана» и
+     «сколько разрешает свободная высота», поэтому пропорция 5:7 не нарушается
+     ни при каком размере фрейма: карточка уменьшается целиком, а не сплющивается.
+     Telegram открывает Mini App невысоким фреймом — там решает второе слагаемое.
+     Значение приблизительное (заголовок может перенестись на две строки) и
+     уточняется замером из JS — см. sizeCard() в case-deck.tsx. */
+  --card-w:min(
+    88vw,
+    400px,
+    calc((var(--tg-viewport-stable-height, 100dvh) - var(--chrome-h)) * 5 / 7)
+  );
+  /* Сотая доля ширины карточки — внутренние размеры считаются от неё, чтобы
+     содержимое уменьшалось вместе с карточкой, а не вылезало за её край.
+     То же, что даёт единица cqi, но без container-type: контейнерное
+     containment на грани карточки мешает 3D-флипу. Множители подобраны так,
+     что при карточке 400px значения совпадают с исходным дизайном. */
+  --cu:calc(var(--card-w) / 100);
 }
 @media (prefers-color-scheme: dark){
   :root{--ink:#f0f0ee; --sub:#94949a; --page:#101012; --card:#1b1b1e;
@@ -32,20 +54,26 @@ header .brand{
   color:var(--sub);margin-top:6px;
 }
 
-.deck-wrap{flex:1;position:relative;min-height:0;display:flex;align-items:flex-start;justify-content:center}
-/* margin-top:24px = 2X, тот же отступ что и над заголовком и перед CTA.
-   Карточка — фиксированная высота (не тянется на всё свободное место в
-   .deck-wrap), точки садятся сразу под ней; что остаётся ниже — просто
-   запас перед зоной CTA, не сжимается ни один из явных отступов. */
-.deck-col{display:flex;flex-direction:column;align-items:center;margin-top:24px}
-/* Пропорции игральной карты (5:7) вместо независимых width/height —
-   иначе высота от vh почти всегда даёт коротковатую, не карточную форму.
-   max-height — подстраховка на случай совсем невысокого экрана. */
-.deck{position:relative;width:min(88vw,400px);aspect-ratio:5/7;max-height:min(62vh,560px)}
+/* padding-top:24px = 2X (тот же отступ, что над заголовком и перед CTA) — именно
+   паддингом, а не отступом у .deck-col: замер свободной высоты в sizeCard()
+   вычитает паддинги этого блока, а внешний margin ребёнка в clientHeight не
+   виден. */
+.deck-wrap{
+  flex:1;position:relative;min-height:0;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding-top:24px;
+}
+.deck-col{display:flex;flex-direction:column;align-items:center}
+/* Пропорции игральной карты (5:7). Задана только ширина — высота выводится из
+   aspect-ratio, поэтому пропорция соблюдается всегда. Ограничения по высоте
+   здесь быть не должно: max-height перебивает aspect-ratio и карточка
+   сплющивается (ровно это и происходило в невысоком фрейме Telegram).
+   Прежний предел 560px сохраняется сам собой: 400px × 7/5 = 560px. */
+.deck{position:relative;width:var(--card-w);aspect-ratio:5/7}
 
 .swipe-card{
   position:absolute;inset:0;perspective:1200px;
-  border-radius:22px;
+  border-radius:calc(var(--cu) * 5.5);
   box-shadow:0 18px 44px -18px rgba(0,0,0,.22);
   cursor:grab;will-change:transform;
   transition:transform .46s cubic-bezier(.25,.8,.35,1), opacity .35s ease;
@@ -66,43 +94,79 @@ header .brand{
 .card-face{
   position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
   display:flex;flex-direction:column;
-  background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:calc(var(--cu) * 5.5);overflow:hidden;
 }
-.card-back{transform:rotateY(180deg);padding:12px}
+.card-back{transform:rotateY(180deg);padding:calc(var(--cu) * 3)}
 
 .media{flex:0 0 50%;min-height:0;background:#e9e9e6;position:relative;overflow:hidden}
 @media (prefers-color-scheme: dark){.media{background:#26262a}}
 .media img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 
-.body{flex:1;min-height:0;padding:18px 20px 44px;display:flex;flex-direction:column;gap:8px;position:relative}
-.body h3{font-size:1.04rem;font-weight:600;line-height:1.3;letter-spacing:-.01em}
-.body p{font-size:.84rem;line-height:1.5;color:var(--sub);flex:1}
+.body{
+  flex:1;min-height:0;position:relative;
+  display:flex;flex-direction:column;
+  padding:calc(var(--cu) * 4.5) calc(var(--cu) * 5) calc(var(--cu) * 11);
+  gap:calc(var(--cu) * 2);
+}
+/* Кегли масштабируются вместе с карточкой, но не ниже читаемого предела —
+   поэтому clamp, а не чистая пропорция: в самом низком фрейме идеальная
+   миниатюра дала бы текст ~7px. */
+.body h3{
+  font-size:clamp(.82rem, calc(var(--cu) * 4.16), 1.04rem);
+  font-weight:600;line-height:1.3;letter-spacing:-.01em;
+}
+/* min-height:0 + overflow:hidden — жёсткая страховка: даже если текста больше,
+   чем влезает, он обрезается внутри своей области, а не наезжает на бейджи
+   срока и счётчика и не вылезает за край карточки.
+   Затухание последней строки: обрез приходится на середину строки, и без него
+   виден ряд «разрезанных» букв. Длину подсказки правят в Supabase, поэтому
+   подобрать размеры так, чтобы текст всегда влезал целиком, нельзя — нужен
+   приём, работающий при любой длине. Если текст короче области, зона
+   затухания приходится на пустое место и никак не проявляется. */
+.body p{
+  font-size:clamp(.7rem, calc(var(--cu) * 3.36), .84rem);
+  line-height:1.5;color:var(--sub);
+  flex:1;min-height:0;overflow:hidden;
+  -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 1.1em), transparent);
+  mask-image:linear-gradient(to bottom, #000 calc(100% - 1.1em), transparent);
+}
 
-/* Радиус карточки 22px; бейджи вписаны с отступом 12px от края —
-   22 - 12 = 10px радиуса, углы визуально концентричны углу карточки. */
+/* Радиус карточки 5.5cu (22px при карточке 400px); бейджи вписаны с отступом
+   3cu — 5.5 - 3 = 2.5cu радиуса, углы визуально концентричны углу карточки.
+   Всё в долях ширины карточки, поэтому соотношение сохраняется при любом
+   её размере. */
 .eta, .num{
-  position:absolute;bottom:12px;
-  height:30px;
-  display:flex;align-items:center;justify-content:center;gap:4px;
-  border-radius:10px;background:var(--pill);color:var(--ink);
-  font-size:.72rem;font-weight:600;white-space:nowrap;
+  position:absolute;bottom:calc(var(--cu) * 3);
+  height:calc(var(--cu) * 7.5);
+  display:flex;align-items:center;justify-content:center;gap:calc(var(--cu) * 1);
+  border-radius:calc(var(--cu) * 2.5);background:var(--pill);color:var(--ink);
+  font-size:clamp(.6rem, calc(var(--cu) * 2.88), .72rem);
+  font-weight:600;white-space:nowrap;
 }
 /* eta теперь редактируется свободно через Supabase — ширина под контент
    (padding вместо фикс. width), но не длиннее места до .num справа;
    совсем длинный текст обрезается многоточием, а не вылезает за карточку. */
-.eta{left:12px;padding:0 14px;max-width:calc(100% - 130px);overflow:hidden;text-overflow:ellipsis}
-.num{right:12px;width:92px}
+.eta{
+  left:calc(var(--cu) * 3);padding:0 calc(var(--cu) * 3.5);
+  max-width:calc(100% - var(--cu) * 32.5);
+  overflow:hidden;text-overflow:ellipsis;
+}
+.num{right:calc(var(--cu) * 3);width:calc(var(--cu) * 23)}
 
 /* Тот же принцип, что у .eta/.num: отступ 12px + радиус 10px = 22px
    радиуса карточки — угол плейсхолдера концентричен углу карточки. */
 .back-placeholder{
-  flex:1;border-radius:10px;border:1.5px dashed var(--line);background:var(--pill);
+  flex:1;border-radius:calc(var(--cu) * 2.5);
+  border:1.5px dashed var(--line);background:var(--pill);
   display:flex;align-items:center;justify-content:center;text-align:center;
-  color:var(--sub);font-size:.78rem;line-height:1.4;padding:16px;
+  color:var(--sub);line-height:1.4;
+  font-size:clamp(.66rem, calc(var(--cu) * 3.12), .78rem);
+  padding:calc(var(--cu) * 4);
 }
 /* object-position:top — обрезаем только снизу, не сверху: у многих примеров
    работ легенда/иконка/лого сидит в верхнем углу картинки, а не в центре. */
-.back-photo{width:100%;height:100%;object-fit:cover;object-position:top;border-radius:10px;display:block;pointer-events:none}
+.back-photo{width:100%;height:100%;object-fit:cover;object-position:top;border-radius:calc(var(--cu) * 2.5);display:block;pointer-events:none}
 
 .dots-row{display:flex;justify-content:center;gap:5px;padding:22px 0 0}
 .dots{display:flex;gap:5px}
@@ -114,7 +178,8 @@ header .brand{
    экрана, вместо того чтобы липнуть к карточке/точкам. margin-top здесь —
    только подстраховка на случай, если свободного места почти не осталось. */
 .cta{
-  width:min(88vw,400px);height:56px;margin:16px auto 0;border-radius:16px;
+  /* Ровно по ширине карточки — та же переменная, что у .deck. */
+  width:var(--card-w);height:56px;margin:16px auto 0;border-radius:16px;
   background:var(--accent);color:var(--card);
   font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -142,8 +207,10 @@ header .brand{
 .arrow svg{display:block}
 .arrow.left svg{transform:scaleX(-1)}
 .arrow:hover{background:var(--pill)}
-.arrow.left{left:calc(50% - min(44vw,200px) - 58px)}
-.arrow.right{right:calc(50% - min(44vw,200px) - 58px)}
+/* Отступ от края карточки, а не от фиксированной доли экрана — иначе при
+   уменьшенной карточке стрелки остаются висеть в стороне. */
+.arrow.left{left:calc(50% - var(--card-w) / 2 - 58px)}
+.arrow.right{right:calc(50% - var(--card-w) / 2 - 58px)}
 @media (hover:hover) and (min-width:640px){.arrow{display:flex}}
 
 .deck-error{

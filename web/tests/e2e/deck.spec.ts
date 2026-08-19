@@ -178,6 +178,114 @@ test.describe("колода кейсов", () => {
   });
 });
 
+// Telegram открывает Mini App невысоким фреймом, и высота меняется при
+// разворачивании. Карточка обязана уменьшаться целиком, а не сплющиваться:
+// раньше `max-height` перебивал `aspect-ratio` и пропорция ехала.
+test.describe("пропорции карточки", () => {
+  const CARD_RATIO = 5 / 7;
+  const FRAMES = [
+    { width: 390, height: 460 }, // предельно низкий фрейм
+    { width: 390, height: 560 },
+    { width: 390, height: 660 }, // примерно как открывает Telegram
+    { width: 390, height: 844 }, // почти во весь экран
+    { width: 320, height: 520 }, // узкий и низкий сразу
+    { width: 430, height: 932 },
+  ];
+
+  for (const frame of FRAMES) {
+    test(`${frame.width}×${frame.height}: пропорция 5:7, CTA по ширине карточки, всё влезает`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(frame);
+      await open(page);
+
+      const m = await page.evaluate(() => {
+        const rect = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+        const card = rect(".deck");
+        const cta = rect(".cta");
+        const hint = rect(".swipe-hint");
+        return {
+          ratio: card.width / card.height,
+          cardW: Math.round(card.width),
+          ctaW: Math.round(cta.width),
+          cardTop: card.top,
+          cardBottom: card.bottom,
+          hintBottom: hint.bottom,
+          viewportH: window.innerHeight,
+          overflowY: document.documentElement.scrollHeight - window.innerHeight,
+          overflowX: document.documentElement.scrollWidth - window.innerWidth,
+        };
+      });
+
+      expect(m.ratio).toBeCloseTo(CARD_RATIO, 2);
+      expect(m.ctaW).toBe(m.cardW);
+      // Карточка целиком в кадре, а не обрезана сверху или снизу.
+      expect(m.cardTop).toBeGreaterThanOrEqual(0);
+      expect(m.cardBottom).toBeLessThanOrEqual(m.viewportH);
+      // Подпись под CTA — последний элемент, она замыкает экран.
+      expect(m.hintBottom).toBeLessThanOrEqual(m.viewportH + 1);
+      expect(m.overflowY).toBeLessThanOrEqual(0);
+      expect(m.overflowX).toBeLessThanOrEqual(0);
+    });
+  }
+
+  for (const frame of FRAMES) {
+    test(`${frame.width}×${frame.height}: содержимое карточки не вылезает за её край`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(frame);
+      await open(page);
+
+      const m = await page.evaluate(() => {
+        const card = document.querySelector(".deck .swipe-card:last-child")!;
+        const box = (s: string) => card.querySelector(s)!.getBoundingClientRect();
+        const face = box(".card-front");
+        const text = box(".body p");
+        const title = box("h3");
+        const eta = box(".eta");
+        const num = box(".num");
+        return {
+          // Описание не должно доезжать до бейджей срока и счётчика.
+          textOverlapsBadges: text.bottom > Math.min(eta.top, num.top) + 0.5,
+          textOutsideCard: text.bottom > face.bottom + 0.5 || text.right > face.right + 0.5,
+          titleOutsideCard: title.bottom > face.bottom + 0.5,
+          badgesInsideCard: eta.bottom <= face.bottom + 0.5 && num.bottom <= face.bottom + 0.5,
+          badgesDoNotCollide: eta.right <= num.left + 0.5,
+          textVisible: text.height > 0,
+        };
+      });
+
+      expect(m.textOverlapsBadges).toBe(false);
+      expect(m.textOutsideCard).toBe(false);
+      expect(m.titleOutsideCard).toBe(false);
+      expect(m.badgesInsideCard).toBe(true);
+      expect(m.badgesDoNotCollide).toBe(true);
+      expect(m.textVisible).toBe(true);
+    });
+  }
+
+  test("при разворачивании фрейма карточка растёт, пропорция держится", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 520 });
+    await open(page);
+
+    const measure = () =>
+      page.evaluate(() => {
+        const c = document.querySelector(".deck")!.getBoundingClientRect();
+        const cta = document.querySelector(".cta")!.getBoundingClientRect();
+        return { w: c.width, ratio: c.width / c.height, ctaW: Math.round(cta.width) };
+      });
+
+    const low = await measure();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => (await measure()).w > low.w).toBe(true);
+
+    const tall = await measure();
+    expect(low.ratio).toBeCloseTo(5 / 7, 2);
+    expect(tall.ratio).toBeCloseTo(5 / 7, 2);
+    expect(tall.ctaW).toBe(Math.round(tall.w));
+  });
+});
+
 test.describe("широкий экран", () => {
   // Стрелки показываются только при `(hover:hover)` и ширине от 640px, поэтому
   // здесь эмулируем мышь: с hasTouch браузер сообщает грубый указатель без

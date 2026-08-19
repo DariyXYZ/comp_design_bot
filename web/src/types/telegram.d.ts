@@ -12,6 +12,14 @@ interface TelegramWebApp {
   disableVerticalSwipes?(): void;
   /** Отправляет данные боту и закрывает Mini App. Работает только внутри Telegram. */
   sendData(data: string): void;
+  /**
+   * Подписка на события клиента. Нужен `viewportChanged`: Telegram открывает
+   * Mini App невысоким фреймом, и его высота меняется при разворачивании —
+   * размер карточки надо пересчитывать. Событие `resize` при этом не всегда
+   * приходит, поэтому одного window-слушателя мало.
+   */
+  onEvent?(event: string, handler: (...args: unknown[]) => void): void;
+  offEvent?(event: string, handler: (...args: unknown[]) => void): void;
 }
 
 interface TelegramNamespace {

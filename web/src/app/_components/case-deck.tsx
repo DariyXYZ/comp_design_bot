@@ -42,6 +42,7 @@ const FLY_UP_MS = 620;
  * декларативный React.
  */
 export function CaseDeck() {
+  const deckWrapRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
   const arrowLeftRef = useRef<HTMLButtonElement>(null);
@@ -49,12 +50,13 @@ export function CaseDeck() {
   const ctaRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    const deckWrap = deckWrapRef.current;
     const deck = deckRef.current;
     const dots = dotsRef.current;
     const arrowLeft = arrowLeftRef.current;
     const arrowRight = arrowRightRef.current;
     const cta = ctaRef.current;
-    if (!deck || !dots || !arrowLeft || !arrowRight || !cta) return;
+    if (!deckWrap || !deck || !dots || !arrowLeft || !arrowRight || !cta) return;
 
     let cases: Case[] = [];
     let current = 0;
@@ -78,6 +80,32 @@ export function CaseDeck() {
     tg?.ready();
     tg?.expand();
     tg?.disableVerticalSwipes?.(); // вертикальный драг карточки не должен закрывать Mini App
+
+    /**
+     * Уточняет ширину карточки замером вместо приблизительной формулы в CSS.
+     *
+     * Свободную высоту даёт сам флексбокс: `.deck-wrap` растянут на остаток
+     * экрана после заголовка, CTA и подписи, так что считать высоту обвязки
+     * руками не нужно. Ширину берём по пропорции 5:7 от того, что осталось под
+     * карточку, но не больше предела по ширине экрана — карточка уменьшается
+     * целиком и никогда не сплющивается.
+     *
+     * Обратной связи по вёрстке нет: `.deck-wrap` растянут флексом, и карточка,
+     * которая в него влезает, его размер не меняет.
+     */
+    function sizeCard() {
+      const wrapStyle = getComputedStyle(deckWrap!);
+      const insets =
+        (parseFloat(wrapStyle.paddingTop) || 0) +
+        (parseFloat(wrapStyle.paddingBottom) || 0);
+      const availableH = deckWrap!.clientHeight - insets - dots!.offsetHeight;
+      const maxByWidth = Math.min(window.innerWidth * 0.88, 400);
+      const width = Math.min(maxByWidth, (availableH * 5) / 7);
+      document.documentElement.style.setProperty(
+        "--card-w",
+        `${Math.max(0, Math.round(width))}px`,
+      );
+    }
 
     function pick(key: string) {
       if (picked) return;
@@ -303,9 +331,18 @@ export function CaseDeck() {
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", sizeCard);
+    // Фрейм Mini App меняет высоту при разворачивании — своё событие клиента
+    // приходит и там, где window.resize не срабатывает.
+    tg?.onEvent?.("viewportChanged", sizeCard);
     arrowRight.addEventListener("click", onNextClick);
     arrowLeft.addEventListener("click", onPrevClick);
     cta.addEventListener("click", chooseCurrent);
+
+    sizeCard();
+    // Пока не подхватился Golos, заголовок другой высоты — после подмены шрифта
+    // свободного места под карточку становится иначе, пересчитываем.
+    document.fonts?.ready.then(() => sizeCard());
 
     const abort = new AbortController();
     let disposed = false;
@@ -327,6 +364,7 @@ export function CaseDeck() {
         if (i === 0) d.className = "on";
         dots.appendChild(d);
       });
+      sizeCard(); // точки появились — свободной высоты под карточку стало меньше
       fill();
     })();
 
@@ -340,9 +378,14 @@ export function CaseDeck() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", sizeCard);
+      tg?.offEvent?.("viewportChanged", sizeCard);
       arrowRight.removeEventListener("click", onNextClick);
       arrowLeft.removeEventListener("click", onPrevClick);
       cta.removeEventListener("click", chooseCurrent);
+      // Возвращаем расчёт ширины к CSS-формуле, иначе замер от размонтированной
+      // разметки останется висеть на :root.
+      document.documentElement.style.removeProperty("--card-w");
       deck.replaceChildren();
       dots.replaceChildren();
     };
@@ -350,7 +393,7 @@ export function CaseDeck() {
 
   return (
     <>
-      <div className="deck-wrap">
+      <div className="deck-wrap" ref={deckWrapRef}>
         <button ref={arrowLeftRef} className="arrow left" aria-label="Предыдущая">
           <ArrowIcon />
         </button>
