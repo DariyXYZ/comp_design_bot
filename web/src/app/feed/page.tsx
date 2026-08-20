@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { PathField } from "@/components/path-field";
-import { FEED, type FeedItem } from "@/lib/mock/materials";
+import { PathField } from "@/components/ui/path-field";
+import { FEED, type FeedItem } from "@/features/feed";
 import { plural } from "@/lib/plural";
-import { requestHref } from "@/lib/routes";
+import { requestHref } from "@/config/navigation";
 
 /**
  * Поток отдела: что делается сейчас и что уже сделано.

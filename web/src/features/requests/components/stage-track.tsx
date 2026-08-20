@@ -1,4 +1,4 @@
-import { REQUEST_STAGES } from "@/lib/mock/materials";
+import { REQUEST_STAGES } from "../data";
 
 /**
  * Вехи заявки: пройденное закрашено, текущее обведено, будущее пунктиром.

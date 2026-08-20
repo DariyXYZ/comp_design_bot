@@ -1,11 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { ActionBar } from "@/components/action-bar";
-import { PathField } from "@/components/path-field";
-import { Screen } from "@/components/screen";
-import { MATERIAL_TYPE_LABEL, materialById } from "@/lib/mock/materials";
-import { requestHref, routes } from "@/lib/routes";
+import { ActionBar } from "@/components/layout/action-bar";
+import { PathField } from "@/components/ui/path-field";
+import { Screen } from "@/components/layout/screen";
+import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
+import { requestHref, routes } from "@/config/navigation";
 
 /**
  * Оформленный материал: кейс, инструмент или модуль.

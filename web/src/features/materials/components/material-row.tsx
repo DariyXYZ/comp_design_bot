@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { MATERIAL_TYPE_LABEL, type Material } from "@/lib/mock/materials";
-import { itemHref } from "@/lib/routes";
+import { MATERIAL_TYPE_LABEL, type Material } from "../data";
+import { itemHref } from "@/config/navigation";
 
 /**
  * Строка списка материалов под темой.

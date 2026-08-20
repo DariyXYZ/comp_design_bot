@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { initTelegramViewport } from "@/lib/telegram";
+import { initTelegramViewport } from "@/lib/client/telegram";
 import { TabBar } from "./tab-bar";
 
 /**

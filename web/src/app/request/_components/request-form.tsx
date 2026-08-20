@@ -1,10 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { ActionBar } from "@/components/action-bar";
-import { Screen } from "@/components/screen";
-import { MATERIAL_TYPE_LABEL, materialById } from "@/lib/mock/materials";
-import { itemHref, routes } from "@/lib/routes";
+import { ActionBar } from "@/components/layout/action-bar";
+import { Screen } from "@/components/layout/screen";
+import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
+import { itemHref, routes } from "@/config/navigation";
 
 /**
  * Новая заявка.

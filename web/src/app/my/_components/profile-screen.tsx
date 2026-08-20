@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { StageTrack } from "@/components/stage-track";
+import { myRequestHref } from "@/config/navigation";
+import { MY_REQUESTS, StageTrack } from "@/features/requests";
 import { useViewer } from "@/hooks/use-viewer";
-import { MY_REQUESTS } from "@/lib/mock/materials";
-import { myRequestHref } from "@/lib/routes";
 
 /**
  * Профиль: кто ты для отдела и что у тебя открыто.

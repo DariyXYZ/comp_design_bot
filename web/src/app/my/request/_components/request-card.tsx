@@ -1,11 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { ActionBar } from "@/components/action-bar";
-import { Screen } from "@/components/screen";
-import { StageTrack } from "@/components/stage-track";
-import { myRequestById, type MyRequest } from "@/lib/mock/materials";
-import { routes } from "@/lib/routes";
+import { ActionBar } from "@/components/layout/action-bar";
+import { Screen } from "@/components/layout/screen";
+import { StageTrack, myRequestById, type MyRequest } from "@/features/requests";
+import { routes } from "@/config/navigation";
 
 /**
  * Карточка заявки: где она сейчас и что с ней можно сделать.

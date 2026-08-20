@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TAB_ROUTES, isSameRoute, routes } from "@/lib/routes";
+import { TAB_ROUTES, isSameRoute, routes } from "@/config/navigation";
 
 type Tab = {
   href: string;

@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ActionBar } from "@/components/action-bar";
-import { MaterialRow } from "@/components/material-row";
-import { materialsByTopic } from "@/lib/mock/materials";
-import { requestHref } from "@/lib/routes";
+import { ActionBar } from "@/components/layout/action-bar";
+import { requestHref } from "@/config/navigation";
+import { MaterialRow, materialsByTopic } from "@/features/materials";
 import type { Case } from "../_lib/deck-math";
 import { CaseDeck } from "./case-deck";
 

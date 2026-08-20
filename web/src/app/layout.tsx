@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Golos_Text } from "next/font/google";
 import Script from "next/script";
-import { AppShell } from "@/components/app-shell";
+import { AppShell } from "@/components/layout/app-shell";
 import "./globals.css";
 
 // Раньше шрифт тянулся тремя тегами из fonts.googleapis.com. next/font

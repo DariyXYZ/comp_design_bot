@@ -1,0 +1,166 @@
+/**
+ * Поток отдела: что делается сейчас и что уже сделано.
+ *
+ * В отличие от материалов эти строки никто не готовит руками — они приходят из
+ * задач. Ценность строки — название, проект и путь к папке с файлами.
+ * Содержимое выгружено из ClickUp, пути требуют сверки (см. `../materials`).
+ */
+
+export type FeedItem = {
+  id: string;
+  title: string;
+  project: string;
+  status: "in_work" | "done";
+  /** Кто ведёт — показываем только у задач в работе. */
+  owner?: string;
+  files: string;
+  when: string;
+};
+
+export const FEED: readonly FeedItem[] = [
+  {
+    id: "f-louvers-openings",
+    title: "Логика разрывов ламелей под проёмы",
+    project: "1-19-2026 МР Верейская БЦ",
+    status: "in_work",
+    owner: "Дарий",
+    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    when: "",
+  },
+  {
+    id: "f-louvers-complex",
+    title: "Генерация ламелей сложной формы вдоль фасада",
+    project: "1-19-2026 МР Верейская БЦ",
+    status: "in_work",
+    owner: "Дарий",
+    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    when: "",
+  },
+  {
+    id: "f-wind-testing",
+    title: "Тестирование инструмента ветра в рабочих проектах",
+    project: "Ветровой комфорт · IND Tools",
+    status: "in_work",
+    owner: "Дарий",
+    files: "X:\\CompDesign_Projects\\Library\\wind\\Templates New",
+    when: "",
+  },
+  {
+    id: "f-insolation-calc",
+    title: "Погрешность расчёта инсоляции",
+    project: "Инсоляция · IND Tools",
+    status: "in_work",
+    owner: "Елена",
+    files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
+    when: "",
+  },
+  {
+    id: "f-plancy-projects",
+    title: "Оформление проектов в архитектуре Plancy",
+    project: "Plancy Projects · IND Tools",
+    status: "in_work",
+    owner: "Дарий",
+    files: "X:\\CompDesign_Projects\\Library\\plancy",
+    when: "",
+  },
+  {
+    id: "f-google-3d",
+    title: "Выгрузка 3D-окружения по API из Google — проверка возможности",
+    project: "Google Maps · Tools",
+    status: "in_work",
+    owner: "Пётр",
+    files: "X:\\CompDesign_Projects\\Library\\tools\\google_maps",
+    when: "",
+  },
+  {
+    id: "f-landscape-tool",
+    title: "Инструмент для ландшафтников — старт работ",
+    project: "Ландшафтный отдел",
+    status: "in_work",
+    owner: "Пётр",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\landscape",
+    when: "",
+  },
+  {
+    id: "f-bishkek-cornice",
+    title: "Раскладка карниза: линии реза, сгибов, отверстий, швов",
+    project: "1-69-2024 Western Bus Station Bishkek",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\1-69-2024\\gh",
+    when: "19 августа",
+  },
+  {
+    id: "f-bishkek-mockup",
+    title: "Подготовка развёрток к мокапу",
+    project: "1-69-2024 Western Bus Station Bishkek",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\1-69-2024\\mockup",
+    when: "19 августа",
+  },
+  {
+    id: "f-izmailovo-revit",
+    title: "Передача панелей в Revit через Rhino.Inside",
+    project: "1-76-2025 ФСК Измайлово БЦ",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\1-76-2025\\gh",
+    when: "10 августа",
+  },
+  {
+    id: "f-vereyskaya-patterns",
+    title: "8 вариантов паттернов фасада",
+    project: "1-19-2026 МР Верейская БЦ",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    when: "24 июня",
+  },
+  {
+    id: "f-mosfilm-rods",
+    title: "Скрипт стержневого моделинга из блоков",
+    project: "1-24-2026 MR Мосфильмовская ЖК",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\1-24-2026\\gh",
+    when: "24 июня",
+  },
+  {
+    id: "f-crowdflow-release",
+    title: "GhCrowdFlow — публикация в Yak и интеграция в INDTools",
+    project: "Пешеходные потоки · Tools",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\Library\\tools\\crowdflow",
+    when: "24 июня",
+  },
+  {
+    id: "f-wind-offline",
+    title: "Оффлайн-пакет расчёта ветра с MPI-патчем",
+    project: "Ветровой комфорт · IND Tools",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\Library\\wind\\Templates New",
+    when: "9 апреля",
+  },
+  {
+    id: "f-centrlab-panels",
+    title: "Фасадные панели исследовательского центра",
+    project: "1-2-2026 ЦентрЛаб Исследовательский Центр",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\1-2-2026\\gh",
+    when: "31 марта",
+  },
+  {
+    id: "f-bowls",
+    title: "Алгоритм бетонных слоёных чаш",
+    project: "Ландшафтный отдел",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\concrete_bowls",
+    when: "6 марта",
+  },
+  {
+    id: "f-solar-envelope",
+    title: "Оформление solar_envelope для архитекторов",
+    project: "Инсоляция · IND Tools",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
+    when: "11 февраля",
+  },
+];
+
+/** Вехи заявки. Порядок = порядок прохождения. */

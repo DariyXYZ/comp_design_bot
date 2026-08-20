@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { readViewer, type Viewer } from "@/lib/telegram";
+import { readViewer, type Viewer } from "@/lib/client/telegram";
 
 /**
  * Кто смотрит приложение — доступно только в браузере.
