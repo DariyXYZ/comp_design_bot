@@ -6,9 +6,12 @@ name: Deploy draft Mini App
 # Отдельный репозиторий, а не отдельная папка: Pages отдаёт один сайт на
 # репозиторий, и деплой черновика в рабочий репозиторий перезаписал бы боевой
 # Mini App, который открывается кнопкой в боте.
+# В репозитории черновика ветка называется main (это его единственная ветка), в
+# рабочем репозитории тот же код лежит в draft/miniapp-flow — поэтому обе ветки
+# в триггере, а разделение по репозиторию сделано условием ниже.
 on:
   push:
-    branches: [draft/miniapp-flow]
+    branches: [main, draft/miniapp-flow]
     paths:
       - "web/**"
       - ".github/workflows/deploy-draft.yml"
@@ -29,6 +32,10 @@ defaults:
 
 jobs:
   build:
+    # Тот же файл лежит и в рабочем репозитории (ветка draft/miniapp-flow) —
+    # там он не должен публиковать ничего: Pages рабочего репозитория отдаёт
+    # боевой Mini App, который открывается кнопкой в боте.
+    if: github.repository == 'DariyXYZ/comp_design_bot-draft'
     runs-on: ubuntu-latest
     env:
       # Черновик живёт по другому пути, чем прод, — иначе ассеты `_next`

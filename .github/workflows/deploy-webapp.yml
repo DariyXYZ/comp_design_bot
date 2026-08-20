@@ -33,6 +33,9 @@ defaults:
 jobs:
   # Проверки отдельным job'ом: на pull_request он идёт один, без публикации.
   verify:
+    # Только рабочий репозиторий: в репозитории черновика ветка main — это
+    # черновик, и публиковать его боевым workflow нельзя.
+    if: github.repository == 'DariyXYZ/comp_design_bot'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
