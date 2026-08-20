@@ -314,6 +314,10 @@ export function CaseDeck({
     // свободного места под карточку становится иначе, пересчитываем.
     document.fonts?.ready.then(() => sizeCard());
 
+    // Заглушка на время загрузки: сеть до Supabase бывает медленной, и без неё
+    // экран выглядит сломанным, а не занятым.
+    deck.innerHTML = '<div class="deck-skeleton" aria-hidden="true"></div>';
+
     const abort = new AbortController();
     let disposed = false;
 
@@ -329,6 +333,7 @@ export function CaseDeck({
       if (disposed) return;
 
       cases = rows;
+      deck.replaceChildren(); // убираем заглушку загрузки
       cases.forEach((_, i) => {
         const d = document.createElement("i");
         if (i === 0) d.className = "on";

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PathField } from "@/components/path-field";
 import { FEED, type FeedItem } from "@/lib/mock/materials";
+import { plural } from "@/lib/plural";
 import { requestHref } from "@/lib/routes";
 
 /**
@@ -26,7 +27,10 @@ export default function FeedPage() {
 
       <div className="load-line">
         <strong>Берём новые задачи</strong>
-        <span>Ответим за 1–2 дня · {inWork.length} задачи в работе</span>
+        <span>
+          Ответим за 1–2 дня · {inWork.length}{" "}
+          {plural(inWork.length, ["задача", "задачи", "задач"])} в работе
+        </span>
       </div>
 
       <section className="section">
@@ -86,11 +90,14 @@ function FeedRow({ item }: Readonly<{ item: FeedItem }>) {
             <span className={inWork ? "tag tag-work" : "tag"}>
               {inWork ? "В работе" : "Готово"}
             </span>
-            <span className="row-dim">{item.when}</span>
+            {/* У задачи в работе даты в данных нет, а слово «в работе» уже
+                стоит в теге — вместо повтора показываем, кто ведёт. */}
+            <span className="row-dim">
+              {inWork ? (item.owner ? `Ведёт ${item.owner}` : "") : item.when}
+            </span>
           </div>
           <h3>{item.title}</h3>
           <p>{item.project}</p>
-          {item.owner ? <p className="row-dim">Ведёт {item.owner}</p> : null}
         </div>
       </div>
       <PathField path={item.files} />

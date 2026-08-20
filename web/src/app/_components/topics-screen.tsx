@@ -54,14 +54,18 @@ export function TopicsScreen() {
                 <MaterialRow key={material.id} material={material} />
               ))}
             </div>
-          ) : (
+          ) : null}
+
+          {/* «Ничего нет» — только когда тема действительно выбрана: пока
+              карточки едут, отсутствие материалов ничего не означает. */}
+          {topic && materials.length === 0 ? (
             <div className="empty">
               <p>
                 По этой теме готового пока нет — такие задачи отдел собирает под
                 проект.
               </p>
             </div>
-          )}
+          ) : null}
         </section>
       </div>
 

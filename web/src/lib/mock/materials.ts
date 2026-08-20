@@ -532,7 +532,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Дарий",
     files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-louvers-complex",
@@ -541,7 +541,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Дарий",
     files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-wind-testing",
@@ -550,7 +550,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Дарий",
     files: "X:\\CompDesign_Projects\\Library\\wind\\Templates New",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-insolation-calc",
@@ -559,7 +559,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Елена",
     files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-plancy-projects",
@@ -568,7 +568,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Дарий",
     files: "X:\\CompDesign_Projects\\Library\\plancy",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-google-3d",
@@ -577,7 +577,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Пётр",
     files: "X:\\CompDesign_Projects\\Library\\tools\\google_maps",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-landscape-tool",
@@ -586,7 +586,7 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Пётр",
     files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\landscape",
-    when: "в работе",
+    when: "",
   },
   {
     id: "f-bishkek-cornice",

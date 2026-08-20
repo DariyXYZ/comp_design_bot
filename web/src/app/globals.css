@@ -15,7 +15,7 @@
   /* Шаг отступов. Всё в разделах считается только этими значениями — иначе
      набегают 13px и 22px, которые по отдельности незаметны, а вместе читаются
      как неряшливость. */
-  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:40px;
   /* Радиусы: вложенный элемент всегда на ступень меньше родителя. */
   --r1:8px; --r2:12px; --r3:16px; --r4:20px;
   /* Типографика разделов. Шаг ~1.15 — в продуктовом интерфейсе элементов
@@ -239,6 +239,21 @@ header .brand{
 .arrow.right{right:calc(50% - var(--card-w) / 2 - 58px)}
 @media (hover:hover) and (min-width:640px){.arrow{display:flex}}
 
+/* Заглушка на время загрузки карточек: та же пропорция и радиус, что у
+   карточки, поэтому вёрстка не дёргается, когда данные приходят. */
+.deck-skeleton{
+  position:absolute;inset:0;border-radius:calc(var(--cu) * 5.5);
+  background:var(--pill);border:1px solid var(--line);
+  animation:deck-pulse 1.4s ease-in-out infinite;
+}
+@keyframes deck-pulse{
+  0%,100%{opacity:.55}
+  50%{opacity:.9}
+}
+@media (prefers-reduced-motion: reduce){
+  .deck-skeleton{animation:none}
+}
+
 .deck-error{
   display:flex;align-items:center;justify-content:center;height:100%;
   text-align:center;padding:24px;color:var(--sub);font-size:.85rem;line-height:1.5;
@@ -281,10 +296,14 @@ header .brand{
   touch-action:pan-y;-webkit-overflow-scrolling:touch;
   padding:0 var(--s4) var(--s3);
 }
+/* Сбрасываем центрирование и боковые отступы, которые задаёт `header` для
+   колоды: в разделах шапка выровнена по левому краю вместе со списком. */
 .scroll > header{padding:0;text-align:left}
 
-/* Шапка таб-экрана: название раздела и одна строка о том, что внутри. */
-.topics-head{padding-bottom:var(--s6)}
+/* Шапка таб-экрана: название раздела и одна строка о том, что внутри.
+   Селектор с тегом — не для красоты: правило `.scroll > header` выше
+   специфичнее одного класса и обнуляло бы отступ снизу. */
+.scroll > header.topics-head{padding-bottom:var(--s7)}
 /* 700, а не унаследованные от колоды 800: на 1.22rem жирность 800 выглядит
    плотно и спорит с содержимым за внимание. */
 .topics-head h1{
@@ -299,12 +318,12 @@ header .brand{
    54svh подобраны глазами: заголовок «Уже готово по теме» и первая строка
    списка попадают в первый экран, иначе он читается как «здесь только
    карточки» и до готовых решений никто не доскроллит. */
-.scroll .deck-wrap{height:min(54svh,470px);flex:none;padding-top:var(--s2)}
+.scroll .deck-wrap{height:min(48svh,430px);flex:none;padding-top:var(--s2)}
 /* Низкий экран (или невысокий фрейм Telegram): доля под колоду уменьшается,
    иначе она занимает первый экран целиком и раздел читается как «здесь только
    карточки» — до готовых решений никто не доскроллит. */
 @media (max-height:640px){
-  .scroll .deck-wrap{height:46svh}
+  .scroll .deck-wrap{height:42svh}
 }
 .scroll .swipe-hint{margin:var(--s3) 0 0;padding:0}
 
