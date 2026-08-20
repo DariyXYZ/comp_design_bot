@@ -55,7 +55,7 @@ export const MATERIALS: readonly Material[] = [
     topic: "physics",
     type: "tool",
     title: "IND Solar — инсоляция и КЕО",
-    summary: "Окна, площадки и solar envelope с тепловой картой и нормами",
+    summary: "Окна, площадки и solar envelope с тепловой картой",
     media: "Гифка: тепловая карта инсоляции квартала",
     steps: [
       "Подать геометрию контекста и своё здание (INPUT: geometry context)",
@@ -103,7 +103,7 @@ export const MATERIALS: readonly Material[] = [
     topic: "physics",
     type: "case",
     title: "Ветровой комфорт НПС БЦ Шелепиха",
-    summary: "Первый проект, под который собрали алгоритм генерации модели расчёта",
+    summary: "Проект, под который собирали алгоритм генерации модели расчёта",
     project: "1-72-2025 НПС БЦ Шелепиха",
     media: "Гифка: модель расчёта ветра по площадке",
     steps: [
@@ -268,21 +268,6 @@ export const MATERIALS: readonly Material[] = [
   // curved — «Форма здания криволинейная»
   // ──────────────────────────────────────────────────────────────────────
   {
-    id: "module-cornice-triangles",
-    topic: "curved",
-    type: "module",
-    title: "Деление криволинейного карниза на треугольные панели",
-    summary: "Сложная сетка на двойной кривизне без ручной подгонки",
-    media: "Гифка: карниз разбивается на треугольники",
-    steps: [
-      "Подать поверхность карниза и направление сетки",
-      "Задать допуск на плоскость панели",
-      "Получить линии реза, сгибов, отверстий и швов одним набором",
-    ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\cornice_panels",
-    updated: "19 августа",
-  },
-  {
     id: "tool-remesh",
     topic: "curved",
     type: "tool",
@@ -301,31 +286,31 @@ export const MATERIALS: readonly Material[] = [
     id: "case-bishkek",
     topic: "curved",
     type: "case",
-    title: "Автовокзал в Бишкеке — карниз двойной кривизны",
-    summary: "8 вариантов паттерна карниза, развёртки к мокапу, раскладка под резку",
+    title: "Автовокзал в Бишкеке — карниз",
+    summary: "Деление на треугольные панели, развёртки к мокапу, раскладка под резку",
     project: "1-69-2024 Western Bus Station Bishkek",
     media: "Гифка: карниз и развёртки панелей",
     steps: [
-      "Посмотреть, как подбирался паттерн и как готовились развёртки",
-      "Взять раскладку с линиями реза и сгибов",
-      "Заявка «Хочу так же» с номером своего проекта",
+      "Посмотреть, как карниз разбит на треугольные панели по сложной сетке",
+      "Открыть раскладку: линии реза, сгибов, отверстий и швов",
+      "Заявка «Хочу так же» — под другую геометрию это собирается заново, готового определения нет",
     ],
     files: "X:\\CompDesign_Projects\\1-69-2024\\gh",
     updated: "19 августа",
   },
   {
-    id: "module-concrete-bowls",
+    id: "case-concrete-bowls",
     topic: "curved",
-    type: "module",
+    type: "case",
     title: "Бетонные слоёные чаши",
-    summary: "Криволинейные объёмы слоями под опалубку и производство",
+    summary: "Ландшафтный объект: объём разложен слоями под опалубку, форма под этот случай",
     media: "Гифка: чаша собирается слоями",
     steps: [
-      "Подать габарит и профиль чаши",
-      "Задать толщину слоя под технологию",
-      "Выгрузить контуры слоёв для раскроя",
+      "Посмотреть, как объём разложен на слои и как считалась опалубка",
+      "Открыть контуры слоёв для раскроя",
+      "Заявка «Хочу так же» — под другую форму алгоритм собирается заново",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\concrete_bowls",
+    files: "X:\\CompDesign_Projects\\landscape\\bowls",
     updated: "6 марта",
   },
 
@@ -337,7 +322,7 @@ export const MATERIALS: readonly Material[] = [
     topic: "reference",
     type: "tool",
     title: "AI-геометрия: из референса в массинг",
-    summary: "Три сценария — Reference, Simplification, Massing — и упрощение mesh",
+    summary: "Три сценария — Reference, Simplification, Massing. Дорабатывается, спросите отдел",
     media: "Гифка: башня упрощается от v8 к v20",
     steps: [
       "Выбрать сценарий: разобрать референс, упростить модель или собрать массинг",
@@ -385,8 +370,8 @@ export const MATERIALS: readonly Material[] = [
     id: "module-pattern-variants",
     topic: "variants",
     type: "module",
-    title: "Перебор вариантов паттерна фасада",
-    summary: "Восемь вариантов одним прогоном, с картинкой на каждый",
+    title: "Перебор вариантов паттерна",
+    summary: "Восемь вариантов одним прогоном — так подбирали фасад Верейской и карниз Бишкека",
     media: "Гифка: сетка вариантов паттерна",
     steps: [
       "Задать параметры паттерна и их диапазоны",
@@ -512,21 +497,6 @@ export const MATERIALS: readonly Material[] = [
     files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\logo_import",
     updated: "10 февраля",
   },
-  {
-    id: "tool-google-3d",
-    topic: "custom",
-    type: "tool",
-    title: "Окружение из Google по API",
-    summary: "Выгрузка 3D-контекста площадки — проверяется, пока не для всех",
-    media: "Гифка: контекст площадки подгружается в модель",
-    steps: [
-      "Уточнить у отдела, доступна ли выгрузка для вашей площадки",
-      "Получить модель окружения и проверить точность высот",
-      "Использовать как контекст для инсоляции и ветра",
-    ],
-    files: "X:\\CompDesign_Projects\\Library\\tools\\google_maps",
-    updated: "в разработке",
-  },
 ];
 
 export function materialsByTopic(topic: string): Material[] {
@@ -598,6 +568,15 @@ export const FEED: readonly FeedItem[] = [
     status: "in_work",
     owner: "Дарий",
     files: "X:\\CompDesign_Projects\\Library\\plancy",
+    when: "в работе",
+  },
+  {
+    id: "f-google-3d",
+    title: "Выгрузка 3D-окружения по API из Google — проверка возможности",
+    project: "Google Maps · Tools",
+    status: "in_work",
+    owner: "Пётр",
+    files: "X:\\CompDesign_Projects\\Library\\tools\\google_maps",
     when: "в работе",
   },
   {
