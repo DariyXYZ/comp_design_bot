@@ -42,9 +42,9 @@ export function TopicsScreen() {
             ) : null}
           </div>
 
-          {topic ? (
-            <p className="section-note">{topic.title}</p>
-          ) : (
+          {/* Название темы не повторяем: оно уже на карточке над списком и в
+              подписи у кнопки заявки. Три повтора на одном экране — шум. */}
+          {topic ? null : (
             <p className="section-note">Листайте колоду — список меняется вместе с темой</p>
           )}
 
