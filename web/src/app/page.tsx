@@ -1,13 +1,5 @@
-import { CaseDeck } from "./_components/case-deck";
+import { TopicsScreen } from "./_components/topics-screen";
 
-export default function HomePage() {
-  return (
-    <>
-      <header>
-        <h1>Когда звать нас</h1>
-        <div className="brand">Отдел вычислительного проектирования</div>
-      </header>
-      <CaseDeck />
-    </>
-  );
+export default function TopicsPage() {
+  return <TopicsScreen />;
 }

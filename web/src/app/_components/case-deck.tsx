@@ -19,8 +19,6 @@ import {
 
 /** Длительности анимаций, подобранные эмпирически — не «круглые» числа наугад. */
 const SWIPE_OUT_MS = 460;
-const ANTICIPATE_MS = 160;
-const FLY_UP_MS = 620;
 
 /**
  * Свайп-колода кейсов.
@@ -36,18 +34,31 @@ const FLY_UP_MS = 620;
  *    `applyStack()` сам держит там `opacity` инлайном, а инлайн не
  *    перебивается классом из стилевого листа.
  *
- * React владеет статичной оболочкой (стрелки, CTA, подпись), решения о
- * жестах и индексах вынесены в `_lib/deck-math.ts` под тесты. Будущие табы
- * (каталог, лента, профиль) — списки и формы, там будет обычный
- * декларативный React.
+ * React владеет статичной оболочкой (стрелки, подпись), решения о жестах и
+ * индексах вынесены в `_lib/deck-math.ts` под тесты. Остальные экраны —
+ * списки и формы, там обычный декларативный React.
+ *
+ * Дека больше ничего не отправляет боту: её работа — выбрать тему. Что
+ * делать с выбранной темой, решает экран (`onTopicChange` → список
+ * материалов под колодой и кнопка «Создать заявку» внизу).
  */
-export function CaseDeck() {
+export function CaseDeck({
+  onTopicChange,
+}: Readonly<{ onTopicChange: (topic: Case) => void }>) {
   const deckWrapRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
   const arrowLeftRef = useRef<HTMLButtonElement>(null);
   const arrowRightRef = useRef<HTMLButtonElement>(null);
-  const ctaRef = useRef<HTMLButtonElement>(null);
+
+  // Колбэк в ref: эффект деки поднимается один раз (в нём живут DOM-узлы и
+  // анимации), а замыкание на первый проп сделало бы обновления немыми.
+  // Присваивание в эффекте, а не в рендере: рендер обязан быть без побочных
+  // эффектов, иначе повторный проход в строгом режиме ведёт себя иначе.
+  const notifyRef = useRef(onTopicChange);
+  useEffect(() => {
+    notifyRef.current = onTopicChange;
+  }, [onTopicChange]);
 
   useEffect(() => {
     const deckWrap = deckWrapRef.current;
@@ -55,14 +66,13 @@ export function CaseDeck() {
     const dots = dotsRef.current;
     const arrowLeft = arrowLeftRef.current;
     const arrowRight = arrowRightRef.current;
-    const cta = ctaRef.current;
-    if (!deckWrap || !deck || !dots || !arrowLeft || !arrowRight || !cta) return;
+    if (!deckWrap || !deck || !dots || !arrowLeft || !arrowRight) return;
 
     let cases: Case[] = [];
     let current = 0;
     let animating = false; // guard: быстрый второй свайп не трогает ту же карточку
-    let picked = false; // sendData закрывает Mini App; дубль до закрытия глушим
     let secondShowsNext = true;
+    let announced = ""; // ключ темы, о котором экран уже знает
 
     // Таймеры анимаций трогают DOM после задержки — на размонтировании
     // (строгий режим в dev, HMR) их нужно снять, иначе колбэк придёт к уже
@@ -76,10 +86,10 @@ export function CaseDeck() {
       timers.add(id);
     }
 
+    // Настройка фрейма (ready/expand/disableVerticalSwipes) переехала в
+    // `AppShell` — она нужна всем экранам, не только колоде. Здесь Telegram
+    // нужен только для события изменения высоты фрейма.
     const tg = window.Telegram?.WebApp;
-    tg?.ready();
-    tg?.expand();
-    tg?.disableVerticalSwipes?.(); // вертикальный драг карточки не должен закрывать Mini App
 
     /**
      * Уточняет ширину карточки замером вместо приблизительной формулы в CSS.
@@ -107,24 +117,19 @@ export function CaseDeck() {
       );
     }
 
-    function pick(key: string) {
-      if (picked) return;
-      if (!tg) {
-        // Открыто не из кнопки бота (прямая ссылка/браузер) — sendData недоступен.
-        alert(
-          "Выбор работает только внутри Telegram — откройте бота @comp_design_bot и нажмите «Возможности отдела».",
-        );
-        return;
-      }
-      picked = true;
-      try {
-        tg.sendData(JSON.stringify({ case: key }));
-      } catch {
-        // Нестандартное окружение — sendData кинул исключение вместо тихого
-        // закрытия. Без сброса picked/animating вся колода виснет намертво.
-        picked = false;
-        animating = false;
-      }
+    /**
+     * Сообщает экрану, какая тема сейчас сверху.
+     *
+     * Зовётся из `applyStack()` — единственного места, где видно актуальный
+     * `current` после любого способа листания (жест, стрелки, клавиатура).
+     * Сравнение с `announced` глушит повторы: раскладка стопки пересчитывается
+     * и при недотянутом свайпе, когда тема не менялась.
+     */
+    function announce() {
+      const topic = cases[current];
+      if (!topic || topic.key === announced) return;
+      announced = topic.key;
+      notifyRef.current(topic);
     }
 
     function makeCard(idx: number): HTMLDivElement {
@@ -171,6 +176,7 @@ export function CaseDeck() {
       [...dots!.children].forEach((d, i) => {
         d.className = i === current ? "on" : "";
       });
+      announce();
     }
 
     function fill() {
@@ -280,42 +286,8 @@ export function CaseDeck() {
       // кейс.
       setSecondCard(true);
       applyStack();
-      // Тап без движения = переворот карточки (детали на обратной стороне).
-      // Выбор задачи — только через большую кнопку/Enter (см. chooseCurrent).
+      // Тап без движения = переворот карточки (примеры на обратной стороне).
       if (!drag.moved) el.classList.toggle("flipped");
-    }
-
-    function chooseCurrent() {
-      const top = deck!.lastElementChild as HTMLElement | null;
-      if (!top || animating) return;
-      const key = cases[Number(top.dataset.idx)].key;
-      if (!tg) {
-        pick(key); // вне Telegram — просто подскажем, картой не жертвуем
-        return;
-      }
-      animating = true;
-
-      // Карточки под верхней гаснут вместе со стартом полёта — иначе последний
-      // кадр перед закрытием миниаппа это соседняя карточка стопки, а не пусто.
-      // Инлайн, а не класс: applyStack() сам держит opacity инлайном.
-      ([...deck!.children] as HTMLElement[])
-        .filter((el) => el !== top)
-        .forEach((el) => {
-          el.style.transition = "none";
-          el.style.opacity = "0";
-        });
-
-      // Замах вниз, потом полёт вверх: чат открывается быстро следом, но полёт
-      // успевает прочитаться.
-      top.classList.add("anticipate");
-      top.style.transform = "translateY(14px) scale(.99)";
-      later(() => {
-        top.classList.remove("anticipate");
-        top.classList.add("flying");
-        top.style.transform = "translateY(-150%) scale(.94)";
-      }, ANTICIPATE_MS);
-
-      later(() => pick(key), ANTICIPATE_MS + FLY_UP_MS);
     }
 
     const onNextClick = () => goNext();
@@ -323,7 +295,6 @@ export function CaseDeck() {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
-      if (e.key === "Enter") chooseCurrent();
     }
 
     window.addEventListener("pointerdown", onDown);
@@ -337,7 +308,6 @@ export function CaseDeck() {
     tg?.onEvent?.("viewportChanged", sizeCard);
     arrowRight.addEventListener("click", onNextClick);
     arrowLeft.addEventListener("click", onPrevClick);
-    cta.addEventListener("click", chooseCurrent);
 
     sizeCard();
     // Пока не подхватился Golos, заголовок другой высоты — после подмены шрифта
@@ -382,7 +352,6 @@ export function CaseDeck() {
       tg?.offEvent?.("viewportChanged", sizeCard);
       arrowRight.removeEventListener("click", onNextClick);
       arrowLeft.removeEventListener("click", onPrevClick);
-      cta.removeEventListener("click", chooseCurrent);
       // Возвращаем расчёт ширины к CSS-формуле, иначе замер от размонтированной
       // разметки останется висеть на :root.
       document.documentElement.style.removeProperty("--card-w");
@@ -405,13 +374,6 @@ export function CaseDeck() {
           <ArrowIcon />
         </button>
       </div>
-
-      <button className="cta" ref={ctaRef}>
-        <span className="cta-label">Выбрать задачу и составить ТЗ</span>
-        <span className="cta-arrow" aria-hidden="true">
-          <ArrowIcon />
-        </span>
-      </button>
 
       <p className="swipe-hint">
         Свайпайте карточки, нажимайте на них — увидите примеры

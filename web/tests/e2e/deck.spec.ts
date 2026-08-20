@@ -155,17 +155,26 @@ test.describe("колода кейсов", () => {
     await expect(topCard(page)).toHaveAttribute("data-idx", "0");
   });
 
-  test("выбор задачи отправляет ключ кейса боту", async ({ page }) => {
+  test("листание колоды меняет тему заявки и список под ней", async ({ page }) => {
     await open(page);
 
-    await page.keyboard.press("ArrowRight"); // уедем на второй кейс
+    // Кнопка заявки больше не отправляет данные боту: колода выбирает тему, а
+    // заявка открывается отдельным экраном уже с этой темой в ссылке.
+    await expect(page.locator(".action-note")).toContainText("Кейс 0");
+
+    await page.keyboard.press("ArrowRight");
     await expect(topCard(page)).toHaveAttribute("data-idx", "1");
 
-    await page.locator(".cta").click();
+    await expect(page.locator(".action-note")).toContainText("Кейс 1");
+    await expect(page.locator(".action-bar a")).toHaveAttribute(
+      "href",
+      /\/request\/\?topic=case-1/,
+    );
 
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { __sent: string[] }).__sent))
-      .toEqual([JSON.stringify({ case: "case-1" })]);
+    // Ничего боту не ушло — отправка переехала в форму заявки.
+    expect(
+      await page.evaluate(() => (window as unknown as { __sent: string[] }).__sent),
+    ).toEqual([]);
   });
 
   test("сбой Supabase объясняется текстом, а не пустым экраном", async ({ page }) => {
@@ -193,7 +202,7 @@ test.describe("пропорции карточки", () => {
   ];
 
   for (const frame of FRAMES) {
-    test(`${frame.width}×${frame.height}: пропорция 5:7, CTA по ширине карточки, всё влезает`, async ({
+    test(`${frame.width}×${frame.height}: пропорция 5:7, колода и кнопка заявки в кадре`, async ({
       page,
     }) => {
       await page.setViewportSize(frame);
@@ -202,29 +211,37 @@ test.describe("пропорции карточки", () => {
       const m = await page.evaluate(() => {
         const rect = (s: string) => document.querySelector(s)!.getBoundingClientRect();
         const card = rect(".deck");
-        const cta = rect(".cta");
-        const hint = rect(".swipe-hint");
+        const wrap = rect(".deck-wrap");
+        const dots = rect(".dots-row");
+        const action = rect(".action-bar");
         return {
           ratio: card.width / card.height,
-          cardW: Math.round(card.width),
-          ctaW: Math.round(cta.width),
           cardTop: card.top,
           cardBottom: card.bottom,
-          hintBottom: hint.bottom,
+          wrapTop: wrap.top,
+          wrapBottom: wrap.bottom,
+          dotsBottom: dots.bottom,
+          actionBottom: action.bottom,
+          actionW: Math.round(action.width),
+          viewportW: window.innerWidth,
           viewportH: window.innerHeight,
-          overflowY: document.documentElement.scrollHeight - window.innerHeight,
           overflowX: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
 
       expect(m.ratio).toBeCloseTo(CARD_RATIO, 2);
-      expect(m.ctaW).toBe(m.cardW);
-      // Карточка целиком в кадре, а не обрезана сверху или снизу.
+      // Колода живёт в блоке заданной высоты: карточка и точки обязаны
+      // остаться внутри него, иначе они наезжают на список под колодой.
+      expect(m.cardTop).toBeGreaterThanOrEqual(m.wrapTop - 1);
+      expect(m.cardBottom).toBeLessThanOrEqual(m.wrapBottom + 1);
+      expect(m.dotsBottom).toBeLessThanOrEqual(m.wrapBottom + 1);
+      // Карточка в кадре, а не обрезана сверху.
       expect(m.cardTop).toBeGreaterThanOrEqual(0);
-      expect(m.cardBottom).toBeLessThanOrEqual(m.viewportH);
-      // Подпись под CTA — последний элемент, она замыкает экран.
-      expect(m.hintBottom).toBeLessThanOrEqual(m.viewportH + 1);
-      expect(m.overflowY).toBeLessThanOrEqual(0);
+      // Кнопка заявки стоит на одном месте внизу и не уезжает за кадр:
+      // это единственный вход в заявку, скроллом его искать нельзя.
+      expect(m.actionBottom).toBeLessThanOrEqual(m.viewportH + 1);
+      expect(m.actionW).toBe(m.viewportW);
+      // Горизонтального переполнения быть не должно ни при какой ширине.
       expect(m.overflowX).toBeLessThanOrEqual(0);
     });
   }
@@ -271,8 +288,12 @@ test.describe("пропорции карточки", () => {
     const measure = () =>
       page.evaluate(() => {
         const c = document.querySelector(".deck")!.getBoundingClientRect();
-        const cta = document.querySelector(".cta")!.getBoundingClientRect();
-        return { w: c.width, ratio: c.width / c.height, ctaW: Math.round(cta.width) };
+        const wrap = document.querySelector(".deck-wrap")!.getBoundingClientRect();
+        return {
+          w: c.width,
+          ratio: c.width / c.height,
+          insideWrap: c.bottom <= wrap.bottom + 1,
+        };
       });
 
     const low = await measure();
@@ -282,7 +303,8 @@ test.describe("пропорции карточки", () => {
     const tall = await measure();
     expect(low.ratio).toBeCloseTo(5 / 7, 2);
     expect(tall.ratio).toBeCloseTo(5 / 7, 2);
-    expect(tall.ctaW).toBe(Math.round(tall.w));
+    expect(low.insideWrap).toBe(true);
+    expect(tall.insideWrap).toBe(true);
   });
 });
 

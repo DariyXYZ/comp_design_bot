@@ -1,6 +1,24 @@
 :root{
   --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
   --line:#e4e4e1; --pill:#efefec; --accent:#141416;
+  /* Единственный цвет в монохромной палитре — и только для состояния, которое
+     требует действия от пользователя («требуется уточнение»). Всё остальное
+     различается весом и контрастом: цвет, отданный декору, перестаёт работать
+     сигналом. */
+  --attention:#8a5300;
+
+  /* Шаг отступов. Всё в разделах считается только этими значениями — иначе
+     набегают 13px и 22px, которые по отдельности незаметны, а вместе читаются
+     как неряшливость. */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  /* Радиусы: вложенный элемент всегда на ступень меньше родителя. */
+  --r1:8px; --r2:12px; --r3:16px; --r4:20px;
+  /* Типографика разделов. Шаг ~1.15 — в продуктовом интерфейсе элементов
+     много, и резкий контраст размеров превращается в шум. */
+  --t-title:1.22rem; --t-h2:.95rem; --t-body:.84rem; --t-small:.78rem;
+  --t-caption:.7rem;
+  /* Ease-out — состояние меняется быстро и без отскока. */
+  --ease:cubic-bezier(.22,.61,.36,1);
 
   /* Высота всей обвязки вокруг карточки: паддинги body, заголовок, отступ до
      карточки, точки, CTA с отступом, подпись с отступом. */
@@ -234,4 +252,385 @@ header .brand{
      короткий поворот. Свайпы/перелёт (крупное перемещение по экрану,
      собственно то, ради чего эта настройка существует) по-прежнему гасим. */
   .swipe-card{transition:none}
+}
+
+/* ==========================================================================
+   Разделы Mini App: поток, темы, материалы, профиль, заявки.
+
+   Правила, которым подчинён весь блок:
+   1. Отступы только из шкалы --s1..--s6. Промежуточных значений нет.
+   2. Горизонтальная кромка одна для всех экранов (--s4), включая навигацию:
+      заголовок, список, кнопка и табы стоят на одной вертикали.
+   3. Цвет несёт смысл только в --attention. Остальная иерархия — вес, размер,
+      контраст. Поэтому чёрная заливка на экране одна: главное действие.
+   4. У каждого интерактивного элемента есть hover, active и focus-visible.
+   ========================================================================== */
+
+/* Скроллящееся тело экрана. body держит overflow:hidden и touch-action:none
+   ради жестов колоды, поэтому скролл разрешается точечно здесь. */
+.scroll{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;
+  padding:0 var(--s4) var(--s3);
+}
+.scroll > header{padding:0;text-align:left}
+
+/* Шапка таб-экрана: название раздела и одна строка о том, что внутри. */
+.topics-head{padding-bottom:var(--s4)}
+.topics-head h1{font-size:var(--t-title);line-height:1.2}
+.topics-head .brand{margin-top:var(--s1)}
+
+/* Колода внутри скролла обязана иметь заданную высоту: sizeCard() считает
+   ширину карточки от clientHeight этого блока, и высота по контенту замкнула бы
+   расчёт на самого себя — карточка схлопнулась бы в ноль.
+   54svh подобраны глазами: заголовок «Уже готово по теме» и первая строка
+   списка попадают в первый экран, иначе он читается как «здесь только
+   карточки» и до готовых решений никто не доскроллит. */
+.scroll .deck-wrap{height:min(54svh,470px);flex:none;padding-top:var(--s1)}
+.scroll .swipe-hint{margin:var(--s3) 0 0;padding:0}
+
+/* Секция: заголовок, необязательное пояснение, содержимое. Воздуха между
+   секциями больше, чем внутри — так блоки читаются как отдельные, без линеек
+   и рамок. */
+.section{margin-top:var(--s5)}
+.section-head{
+  display:flex;align-items:baseline;gap:var(--s2);
+  margin-bottom:var(--s3);
+}
+.section-head h2{font-size:var(--t-h2);font-weight:700;letter-spacing:-.01em}
+.count{
+  font-size:var(--t-caption);font-weight:600;color:var(--sub);
+  background:var(--pill);border-radius:999px;padding:2px var(--s2);
+}
+.section-note{
+  font-size:var(--t-small);color:var(--sub);line-height:1.45;
+  margin:calc(var(--s3) * -1 + 2px) 0 var(--s3);
+}
+
+.rows{display:flex;flex-direction:column;gap:var(--s3)}
+
+/* Строка списка: крупное превью слева, текст справа. Одинаковая для материалов
+   и для потока — различает их подпись типа, а не отдельная вёрстка. */
+.row{
+  display:flex;gap:var(--s3);padding:var(--s3);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r3);
+  color:inherit;text-decoration:none;
+  transition:background .16s var(--ease), border-color .16s var(--ease);
+}
+.row:hover{border-color:var(--sub)}
+.row:active{background:var(--pill)}
+.row-static:hover{border-color:var(--line)}
+.row-static:active{background:var(--card)}
+/* Превью крупное: у кейсов и инструментов картинка — главный признак, по
+   которому вещь узнают, текст только подтверждает догадку. */
+.row-thumb{
+  flex:0 0 96px;height:96px;border-radius:var(--r2);
+  background:var(--pill);border:1px solid var(--line);
+}
+/* Текст центрируется по превью: у коротких описаний правая колонка иначе
+   висит вверху, и строка выглядит незаполненной. */
+.row-text{
+  min-width:0;flex:1;
+  display:flex;flex-direction:column;justify-content:center;gap:var(--s1);
+}
+.row-text h3{font-size:var(--t-body);font-weight:600;line-height:1.3}
+.row-text p{font-size:var(--t-small);color:var(--sub);line-height:1.4}
+.row-meta{
+  display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;
+  margin-bottom:2px;
+}
+.row-dim{font-size:var(--t-caption);color:var(--sub);line-height:1.35}
+
+/* Подпись типа. Нейтральная по умолчанию: тип различает текст, а не заливка. */
+.tag{
+  display:inline-flex;align-items:center;height:20px;
+  font-size:var(--t-caption);font-weight:600;line-height:1;
+  padding:0 var(--s2);border-radius:var(--r1);
+  background:var(--pill);color:var(--sub);
+  border:1px solid transparent;white-space:nowrap;
+}
+/* Обводка, а не заливка: «инструмент» и «в работе» надо выделить среди
+   соседей, но не спорить с главной кнопкой за единственное чёрное пятно. */
+.tag-tool,.tag-work,.tag-watch{border-color:var(--ink);color:var(--ink)}
+/* Единственное цветное состояние: заявка стоит и ждёт ответа человека. */
+.tag-flag{border-color:var(--attention);color:var(--attention)}
+
+.empty{
+  border:1.5px dashed var(--line);border-radius:var(--r3);
+  padding:var(--s4);background:var(--pill);
+}
+.empty p{font-size:var(--t-small);color:var(--sub);line-height:1.45}
+
+/* Полоса главного действия: всегда внизу, всегда на одном месте.
+   Градиент над ней показывает, что список продолжается под кнопкой — без него
+   контент обрывается ровной линией и выглядит как конец страницы. */
+.action-bar{
+  position:relative;flex:none;
+  padding:var(--s3) var(--s4) 0;
+  display:flex;flex-direction:column;gap:var(--s2);
+}
+.action-bar::before{
+  content:"";position:absolute;left:0;right:0;top:calc(var(--s5) * -1);
+  height:var(--s5);pointer-events:none;
+  background:linear-gradient(to bottom, transparent, var(--page));
+}
+.action-note{
+  font-size:var(--t-caption);color:var(--sub);text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.btn{
+  display:flex;align-items:center;justify-content:center;
+  height:52px;border-radius:var(--r3);border:none;cursor:pointer;
+  font-family:inherit;font-size:.9rem;font-weight:600;text-decoration:none;
+  transition:transform .12s var(--ease), opacity .16s var(--ease);
+}
+.btn-primary{background:var(--accent);color:var(--card)}
+.btn-primary:hover{opacity:.9}
+.btn-primary:active{transform:scale(.985)}
+
+/* Сегментированный переключатель, а не строка мелких иконок: активный раздел
+   виден как приподнятая плашка на утопленном фоне, и его не приходится искать
+   по оттенку подписи. Кромки совпадают с кромками контента. */
+.tabbar{
+  flex:none;display:flex;gap:var(--s1);
+  margin:var(--s3) var(--s4) 0;padding:var(--s1);
+  background:var(--pill);border-radius:var(--r4);
+}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:var(--s1);
+  padding:var(--s2) 0 7px;border-radius:var(--r3);
+  color:var(--sub);text-decoration:none;
+  font-size:var(--t-caption);font-weight:600;
+  transition:color .16s var(--ease), background .16s var(--ease);
+}
+.tab:hover{color:var(--ink)}
+.tab.on{
+  color:var(--ink);background:var(--card);
+  box-shadow:0 6px 16px -10px rgba(0,0,0,.45);
+}
+
+/* Шапка вложенного экрана. В проде «назад» уедет в BackButton Telegram. */
+.screen-top{
+  flex:none;display:flex;align-items:flex-start;gap:var(--s3);
+  padding:0 var(--s4) var(--s3);border-bottom:1px solid var(--line);
+}
+.back{
+  flex:0 0 auto;width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--line);background:var(--card);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;text-decoration:none;
+  transition:background .16s var(--ease), border-color .16s var(--ease);
+}
+.back:hover{background:var(--pill);border-color:var(--sub)}
+.back:active{transform:scale(.96)}
+/* Оптическое выравнивание: кнопка выше строки заголовка, и без сдвига текст
+   кажется приподнятым относительно круга. */
+.screen-titles{min-width:0;padding-top:2px}
+.screen-titles h1{
+  font-size:1.05rem;font-weight:700;line-height:1.3;letter-spacing:-.01em;
+  text-wrap:balance;
+}
+.screen-titles p{font-size:var(--t-caption);color:var(--sub);margin-top:3px}
+.screen-top + .scroll{padding-top:var(--s4)}
+
+/* Место демо-гифки: в черновике подпись вместо медиа. */
+.media-slot{
+  aspect-ratio:16/10;border-radius:var(--r3);
+  background:var(--pill);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;padding:var(--s4);
+  text-align:center;color:var(--sub);font-size:var(--t-small);line-height:1.4;
+}
+.lead{font-size:var(--t-body);line-height:1.5;margin-top:var(--s4)}
+
+/* Пара «ключ — значение». Разделитель только между строками: рамка вокруг
+   каждой пары превратила бы факты в карточки, чем они не являются. */
+.fact{
+  display:flex;justify-content:space-between;gap:var(--s4);
+  padding:var(--s3) 0;border-bottom:1px solid var(--line);
+}
+.fact-key{font-size:var(--t-small);color:var(--sub);flex:0 0 auto}
+.fact-value{font-size:var(--t-small);text-align:right;min-width:0}
+
+.steps{
+  display:flex;flex-direction:column;gap:var(--s3);
+  counter-reset:step;list-style:none;
+}
+.steps li{
+  position:relative;padding-left:var(--s6);
+  font-size:var(--t-body);line-height:1.45;
+}
+.steps li::before{
+  counter-increment:step;content:counter(step);
+  position:absolute;left:0;top:1px;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--pill);color:var(--sub);
+  font-size:.66rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* Путь на сетевом диске. Иконка вместо слова «Копировать»: подпись занимала
+   полстроки и заставляла путь переноситься, из-за чего блок вырастал в две-три
+   строки. Многоточие тут не годится — по началу пути видно, тот ли это диск,
+   поэтому перенос. */
+.path-field{
+  display:flex;align-items:center;gap:var(--s2);
+  background:var(--pill);border:1px solid var(--line);border-radius:var(--r2);
+  padding:var(--s2) var(--s2) var(--s2) var(--s3);
+}
+.path-field code{
+  flex:1;min-width:0;font-size:var(--t-caption);line-height:1.45;
+  color:var(--ink);word-break:break-all;
+}
+.path-copy{
+  flex:0 0 auto;width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:var(--card);
+  color:var(--ink);border-radius:var(--r1);cursor:pointer;
+  transition:background .16s var(--ease), color .16s var(--ease),
+             border-color .16s var(--ease);
+}
+.path-copy:hover{background:var(--pill);border-color:var(--sub)}
+.path-copy:active{transform:scale(.96)}
+/* Заливка вместо всплывающей подписи: подтверждение видно там же, где был тап,
+   и высота блока не меняется. */
+.path-copy.done{background:var(--accent);border-color:var(--accent);color:var(--card)}
+
+/* Происхождение заявки. Не поле формы и не чип-фильтр: убрать его нельзя,
+   поэтому и выглядит как факт, а не как элемент управления. */
+.origin{
+  display:flex;flex-direction:column;gap:2px;
+  border:1px solid var(--ink);border-radius:var(--r2);
+  padding:var(--s3);
+}
+.origin-key{
+  font-size:.66rem;font-weight:600;color:var(--sub);
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.origin-value{font-size:var(--t-body);font-weight:600;line-height:1.35}
+
+.field{display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s5)}
+.field > span{font-size:var(--t-small);font-weight:600}
+.field > span em{font-style:normal;font-weight:400;color:var(--sub)}
+.field input,.field textarea{
+  font-family:inherit;font-size:var(--t-body);color:var(--ink);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r2);
+  padding:var(--s3);resize:none;
+  -webkit-user-select:text;user-select:text;
+  transition:border-color .16s var(--ease);
+}
+.field input:hover,.field textarea:hover{border-color:var(--sub)}
+.field input::placeholder,.field textarea::placeholder{color:var(--sub)}
+.slots{display:flex;gap:var(--s2)}
+.slot{
+  flex:1;aspect-ratio:1;border:1.5px dashed var(--line);
+  border-radius:var(--r2);background:var(--pill);
+  color:var(--sub);font-size:1.1rem;cursor:pointer;
+  transition:border-color .16s var(--ease), color .16s var(--ease);
+}
+.slot:hover{border-color:var(--sub);color:var(--ink)}
+
+/* Карточка заявки в списке. Плотность выше, чем у строк материалов: тут не
+   узнавание по картинке, а сканирование статусов. */
+.card{
+  display:flex;flex-direction:column;gap:var(--s1);padding:var(--s4);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r3);
+  color:inherit;text-decoration:none;
+  transition:background .16s var(--ease), border-color .16s var(--ease);
+}
+.card h3{font-size:var(--t-body);font-weight:600;line-height:1.3;margin-top:2px}
+.card:hover{border-color:var(--sub)}
+.card:active{background:var(--pill)}
+.card .stages{margin:var(--s3) 0 var(--s2)}
+
+/* Вехи заявки: пройдено, сейчас, впереди. Один индикатор с подписями вместо
+   кружков плюс полосы прогресса — они показывали одно и то же дважды. */
+.stages{display:flex;gap:var(--s1);list-style:none}
+.stage{flex:1;display:flex;flex-direction:column;gap:var(--s1);min-width:0}
+.stage-dot{height:4px;border-radius:999px;background:var(--line)}
+.stage-label{
+  font-size:.65rem;color:var(--sub);line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.stage-done .stage-dot{background:var(--sub)}
+.stage-now .stage-dot{background:var(--accent)}
+.stage-now .stage-label{color:var(--ink);font-weight:600}
+
+/* Состояние, которое возвращает заявку назад. Шкала вех такое показать не
+   может, поэтому баннером над ней. */
+.banner{
+  display:flex;flex-direction:column;gap:2px;
+  border:1px solid var(--attention);border-radius:var(--r2);
+  padding:var(--s3);margin-bottom:var(--s4);
+}
+.banner strong{font-size:var(--t-body);color:var(--attention)}
+.banner span{font-size:var(--t-small);color:var(--sub);line-height:1.4}
+/* Спокойный вариант: сообщение о контексте, а не о требуемом действии. */
+.banner-quiet{border-color:var(--line);background:var(--pill)}
+.banner-quiet strong{color:var(--ink)}
+
+.load-line{
+  display:flex;flex-direction:column;gap:2px;
+  border:1px solid var(--line);border-radius:var(--r2);
+  padding:var(--s3);background:var(--pill);
+}
+.load-line strong{font-size:var(--t-body)}
+.load-line span{font-size:var(--t-small);color:var(--sub)}
+
+.row-action{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  padding:var(--s4);border-radius:var(--r2);
+  background:var(--card);border:1px solid var(--line);color:var(--ink);
+  font-family:inherit;font-size:var(--t-body);font-weight:500;text-align:left;
+  cursor:pointer;
+  transition:background .16s var(--ease), border-color .16s var(--ease);
+}
+.row-action:hover{border-color:var(--sub)}
+.row-action:active{background:var(--pill)}
+.row-action span:last-child{color:var(--sub)}
+
+.feed-foot{
+  font-size:var(--t-small);color:var(--sub);line-height:1.5;
+  margin:var(--s5) 0 var(--s1);
+}
+.feed-foot a{color:var(--ink);font-weight:600}
+
+/* Профиль. Имя и аватар выше цифр: раздел отвечает сначала на «кто я для
+   отдела», и только потом на «что у меня открыто». */
+.profile{display:flex;align-items:center;gap:var(--s3);padding:0 0 var(--s4)}
+.avatar{
+  flex:0 0 auto;width:56px;height:56px;border-radius:50%;
+  background:var(--pill);border:1px solid var(--line);color:var(--sub);
+  display:flex;align-items:center;justify-content:center;
+}
+.profile-who{min-width:0}
+/* Резерв высоты под строку: имя приходит из Telegram после гидратации, и без
+   него заголовок дёргает вёрстку. */
+.profile-who h1{
+  font-size:var(--t-title);font-weight:700;line-height:1.25;
+  letter-spacing:-.01em;min-height:1.25em;
+}
+.profile-who p{font-size:var(--t-small);color:var(--sub);margin-top:2px}
+
+.stat-row{display:flex;gap:var(--s2)}
+.stat{
+  flex:1;display:flex;flex-direction:column;gap:2px;
+  padding:var(--s3);background:var(--pill);border-radius:var(--r2);
+}
+.stat strong{font-size:1.1rem;font-weight:700;line-height:1.1}
+.stat span{font-size:.66rem;color:var(--sub);line-height:1.25}
+/* Ждущие ответа — единственная цифра, требующая действия. */
+.stat-attention strong{color:var(--attention)}
+
+/* Клавиатурная навигация: обводка одна для всех интерактивных элементов
+   раздела, включая ссылки-карточки. */
+.row:focus-visible,.card:focus-visible,.tab:focus-visible,.btn:focus-visible,
+.back:focus-visible,.path-copy:focus-visible,.row-action:focus-visible,
+.slot:focus-visible,.field input:focus-visible,.field textarea:focus-visible,
+.feed-foot a:focus-visible{
+  outline:2px solid var(--ink);outline-offset:2px;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .row,.card,.btn,.back,.path-copy,.row-action,.slot,.tab,
+  .field input,.field textarea{transition:none}
+  .btn-primary:active,.back:active,.path-copy:active{transform:none}
 }

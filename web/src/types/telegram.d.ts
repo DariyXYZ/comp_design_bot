@@ -5,9 +5,23 @@
  * поэтому типы объявляем сами — только те методы, которые реально вызываем.
  * Полный API — https://core.telegram.org/bots/webapps
  */
+/** Пользователь Telegram — приходит внутри `initDataUnsafe`. */
+interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+}
+
 interface TelegramWebApp {
   ready(): void;
   expand(): void;
+  /**
+   * Данные запуска без проверки подписи — годятся только для отображения
+   * (имя в профиле). Ничего доверять этому нельзя: подпись `initData`
+   * проверяется HMAC на сервере, которого у нас пока нет.
+   */
+  initDataUnsafe?: { user?: TelegramUser };
   /** Появился в Bot API 7.7 — в старых клиентах метода нет, вызывать через `?.` */
   disableVerticalSwipes?(): void;
   /** Отправляет данные боту и закрывает Mini App. Работает только внутри Telegram. */

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Golos_Text } from "next/font/google";
 import Script from "next/script";
+import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
 // Раньше шрифт тянулся тремя тегами из fonts.googleapis.com. next/font
@@ -45,7 +46,7 @@ export default function RootLayout({
           src="https://telegram.org/js/telegram-web-app.js"
           strategy="beforeInteractive"
         />
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
