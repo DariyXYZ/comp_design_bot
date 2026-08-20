@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { ActionBar } from "@/components/action-bar";
 import { Screen } from "@/components/screen";
 import { StageTrack } from "@/components/stage-track";
-import { REQUEST_STAGES, myRequestById, type MyRequest } from "@/lib/mock/materials";
+import { myRequestById, type MyRequest } from "@/lib/mock/materials";
 import { routes } from "@/lib/routes";
 
 /**
@@ -55,9 +55,6 @@ export function RequestCard() {
         ) : null}
 
         <StageTrack stage={request.stage} />
-        <p className="section-note">
-          Сейчас: {REQUEST_STAGES[request.stage]}
-        </p>
 
         <div className="fact">
           <span className="fact-key">Заявка по</span>

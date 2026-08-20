@@ -1,6 +1,7 @@
 :root{
-  --ink:#141416; --sub:#77777c; --page:#f2f2f0; --card:#ffffff;
+  --ink:#141416; --sub:#6a6a6f; --page:#f2f2f0; --card:#ffffff;
   --line:#e4e4e1; --pill:#efefec; --accent:#141416;
+  /* 4.8:1 к --page: подписи — это тоже текст, а не декор. */
   /* Единственный цвет в монохромной палитре — и только для состояния, которое
      требует действия от пользователя («требуется уточнение»). Всё остальное
      различается весом и контрастом: цвет, отданный декору, перестаёт работать
@@ -44,7 +45,9 @@
 }
 @media (prefers-color-scheme: dark){
   :root{--ink:#f0f0ee; --sub:#94949a; --page:#101012; --card:#1b1b1e;
-        --line:#2a2a2e; --pill:#26262a; --accent:#f0f0ee}
+        --line:#2a2a2e; --pill:#26262a; --accent:#f0f0ee;
+        /* Тот же смысл, читаемый контраст на тёмном (8.9:1). */
+        --attention:#e5a95c}
 }
 *{box-sizing:border-box;margin:0;min-width:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;width:100%;max-width:100vw;overflow:hidden;overscroll-behavior:none}
@@ -276,9 +279,14 @@ header .brand{
 .scroll > header{padding:0;text-align:left}
 
 /* Шапка таб-экрана: название раздела и одна строка о том, что внутри. */
-.topics-head{padding-bottom:var(--s4)}
-.topics-head h1{font-size:var(--t-title);line-height:1.2}
-.topics-head .brand{margin-top:var(--s1)}
+.topics-head{padding-bottom:var(--s5)}
+/* 700, а не унаследованные от колоды 800: на 1.22rem жирность 800 выглядит
+   плотно и спорит с содержимым за внимание. */
+.topics-head h1{
+  font-size:var(--t-title);font-weight:700;
+  line-height:1.25;letter-spacing:-.015em;
+}
+.topics-head .brand{margin-top:var(--s1);line-height:1.4}
 
 /* Колода внутри скролла обязана иметь заданную высоту: sizeCard() считает
    ширину карточки от clientHeight этого блока, и высота по контенту замкнула бы
@@ -292,11 +300,14 @@ header .brand{
 /* Секция: заголовок, необязательное пояснение, содержимое. Воздуха между
    секциями больше, чем внутри — так блоки читаются как отдельные, без линеек
    и рамок. */
-.section{margin-top:var(--s5)}
+.section{margin-top:var(--s6)}
 .section-head{
   display:flex;align-items:baseline;gap:var(--s2);
   margin-bottom:var(--s3);
 }
+/* Заголовок с пояснением: отступ уходит под пояснение, иначе между ними
+   пусто, а между пояснением и списком тесно. */
+.section-head:has(+ .section-note){margin-bottom:var(--s2)}
 .section-head h2{font-size:var(--t-h2);font-weight:700;letter-spacing:-.01em}
 .count{
   font-size:var(--t-caption);font-weight:600;color:var(--sub);
@@ -304,7 +315,7 @@ header .brand{
 }
 .section-note{
   font-size:var(--t-small);color:var(--sub);line-height:1.45;
-  margin:calc(var(--s3) * -1 + 2px) 0 var(--s3);
+  margin:0 0 var(--s3);
 }
 
 .rows{display:flex;flex-direction:column;gap:var(--s3)}
@@ -323,27 +334,27 @@ header .brand{
 .row-static:active{background:var(--card)}
 /* Превью крупное: у кейсов и инструментов картинка — главный признак, по
    которому вещь узнают, текст только подтверждает догадку. */
+/* Ширина фиксирована, высота тянется по строке: превью, которое ниже текста,
+   оставляет под собой дыру, а вместе они читаются как один блок. */
 .row-thumb{
-  flex:0 0 96px;height:96px;border-radius:var(--r2);
+  flex:0 0 96px;align-self:stretch;min-height:96px;
+  border-radius:var(--r2);
   background:var(--pill);border:1px solid var(--line);
 }
 /* Текст центрируется по превью: у коротких описаний правая колонка иначе
    висит вверху, и строка выглядит незаполненной. */
 .row-text{
   min-width:0;flex:1;
-  display:flex;flex-direction:column;justify-content:center;gap:var(--s1);
+  display:flex;flex-direction:column;justify-content:center;gap:var(--s2);
 }
 .row-text h3{font-size:var(--t-body);font-weight:600;line-height:1.3}
 .row-text p{font-size:var(--t-small);color:var(--sub);line-height:1.4}
-.row-meta{
-  display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;
-  margin-bottom:2px;
-}
+.row-meta{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
 .row-dim{font-size:var(--t-caption);color:var(--sub);line-height:1.35}
 
 /* Подпись типа. Нейтральная по умолчанию: тип различает текст, а не заливка. */
 .tag{
-  display:inline-flex;align-items:center;height:20px;
+  display:inline-flex;align-items:center;height:22px;
   font-size:var(--t-caption);font-weight:600;line-height:1;
   padding:0 var(--s2);border-radius:var(--r1);
   background:var(--pill);color:var(--sub);
@@ -354,6 +365,14 @@ header .brand{
 .tag-tool,.tag-work,.tag-watch{border-color:var(--ink);color:var(--ink)}
 /* Единственное цветное состояние: заявка стоит и ждёт ответа человека. */
 .tag-flag{border-color:var(--attention);color:var(--attention)}
+
+/* Строка потока: превью с текстом сверху, путь к папке отдельной строкой во
+   всю ширину — он тут главная ценность записи, а не подпись к ней. */
+.feed-card{
+  display:flex;flex-direction:column;gap:var(--s3);padding:var(--s3);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r3);
+}
+.feed-top{display:flex;gap:var(--s3)}
 
 .empty{
   border:1.5px dashed var(--line);border-radius:var(--r3);
@@ -372,7 +391,8 @@ header .brand{
 .action-bar::before{
   content:"";position:absolute;left:0;right:0;top:calc(var(--s5) * -1);
   height:var(--s5);pointer-events:none;
-  background:linear-gradient(to bottom, transparent, var(--page));
+  background:linear-gradient(to bottom, transparent,
+    var(--tg-theme-bg-color, var(--page)));
 }
 .action-note{
   font-size:var(--t-caption);color:var(--sub);text-align:center;
@@ -497,9 +517,9 @@ header .brand{
 /* Происхождение заявки. Не поле формы и не чип-фильтр: убрать его нельзя,
    поэтому и выглядит как факт, а не как элемент управления. */
 .origin{
-  display:flex;flex-direction:column;gap:2px;
+  display:flex;flex-direction:column;gap:var(--s1);
   border:1px solid var(--ink);border-radius:var(--r2);
-  padding:var(--s3);
+  padding:var(--s4);
 }
 .origin-key{
   font-size:.66rem;font-weight:600;color:var(--sub);
@@ -520,8 +540,10 @@ header .brand{
 .field input:hover,.field textarea:hover{border-color:var(--sub)}
 .field input::placeholder,.field textarea::placeholder{color:var(--sub)}
 .slots{display:flex;gap:var(--s2)}
+/* 4:3, а не квадрат: три квадратных слота на телефоне отъедают почти треть
+   экрана, хотя это всего лишь место под будущие снимки. */
 .slot{
-  flex:1;aspect-ratio:1;border:1.5px dashed var(--line);
+  flex:1;aspect-ratio:4/3;border:1.5px dashed var(--line);
   border-radius:var(--r2);background:var(--pill);
   color:var(--sub);font-size:1.1rem;cursor:pointer;
   transition:border-color .16s var(--ease), color .16s var(--ease);
@@ -531,7 +553,7 @@ header .brand{
 /* Карточка заявки в списке. Плотность выше, чем у строк материалов: тут не
    узнавание по картинке, а сканирование статусов. */
 .card{
-  display:flex;flex-direction:column;gap:var(--s1);padding:var(--s4);
+  display:flex;flex-direction:column;gap:var(--s2);padding:var(--s4);
   background:var(--card);border:1px solid var(--line);border-radius:var(--r3);
   color:inherit;text-decoration:none;
   transition:background .16s var(--ease), border-color .16s var(--ease);
@@ -544,6 +566,9 @@ header .brand{
 /* Вехи заявки: пройдено, сейчас, впереди. Один индикатор с подписями вместо
    кружков плюс полосы прогресса — они показывали одно и то же дважды. */
 .stages{display:flex;gap:var(--s1);list-style:none}
+/* Шкала первой в экране липнет к разделителю шапки: подписи мелкие, и без
+   отступа блок читается как часть заголовка. */
+.scroll > .stages:first-child{margin-top:var(--s2);margin-bottom:var(--s5)}
 .stage{flex:1;display:flex;flex-direction:column;gap:var(--s1);min-width:0}
 .stage-dot{height:4px;border-radius:999px;background:var(--line)}
 .stage-label{
@@ -557,9 +582,9 @@ header .brand{
 /* Состояние, которое возвращает заявку назад. Шкала вех такое показать не
    может, поэтому баннером над ней. */
 .banner{
-  display:flex;flex-direction:column;gap:2px;
+  display:flex;flex-direction:column;gap:var(--s1);
   border:1px solid var(--attention);border-radius:var(--r2);
-  padding:var(--s3);margin-bottom:var(--s4);
+  padding:var(--s4);margin-bottom:var(--s5);
 }
 .banner strong{font-size:var(--t-body);color:var(--attention)}
 .banner span{font-size:var(--t-small);color:var(--sub);line-height:1.4}
@@ -568,12 +593,12 @@ header .brand{
 .banner-quiet strong{color:var(--ink)}
 
 .load-line{
-  display:flex;flex-direction:column;gap:2px;
+  display:flex;flex-direction:column;gap:var(--s1);
   border:1px solid var(--line);border-radius:var(--r2);
-  padding:var(--s3);background:var(--pill);
+  padding:var(--s4);background:var(--pill);
 }
-.load-line strong{font-size:var(--t-body)}
-.load-line span{font-size:var(--t-small);color:var(--sub)}
+.load-line strong{font-size:var(--t-body);line-height:1.3}
+.load-line span{font-size:var(--t-small);color:var(--sub);line-height:1.4}
 
 .row-action{
   display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
@@ -595,7 +620,7 @@ header .brand{
 
 /* Профиль. Имя и аватар выше цифр: раздел отвечает сначала на «кто я для
    отдела», и только потом на «что у меня открыто». */
-.profile{display:flex;align-items:center;gap:var(--s3);padding:0 0 var(--s4)}
+.profile{display:flex;align-items:center;gap:var(--s4);padding:0 0 var(--s5)}
 .avatar{
   flex:0 0 auto;width:56px;height:56px;border-radius:50%;
   background:var(--pill);border:1px solid var(--line);color:var(--sub);
@@ -612,7 +637,7 @@ header .brand{
 
 .stat-row{display:flex;gap:var(--s2)}
 .stat{
-  flex:1;display:flex;flex-direction:column;gap:2px;
+  flex:1;display:flex;flex-direction:column;gap:var(--s1);
   padding:var(--s3);background:var(--pill);border-radius:var(--r2);
 }
 .stat strong{font-size:1.1rem;font-weight:700;line-height:1.1}

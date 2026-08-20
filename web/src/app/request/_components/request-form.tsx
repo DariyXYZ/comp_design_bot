@@ -87,11 +87,7 @@ export function RequestForm() {
         </label>
       </Screen>
 
-      <ActionBar
-        href={routes.myRequests}
-        label="Отправить заявку"
-        note={origin.kind}
-      />
+      <ActionBar href={routes.myRequests} label="Отправить заявку" />
     </>
   );
 }
