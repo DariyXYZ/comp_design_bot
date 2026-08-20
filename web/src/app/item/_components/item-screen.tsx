@@ -73,7 +73,11 @@ export function ItemScreen() {
       <ActionBar
         href={requestHref({ item: material.id })}
         label="Создать заявку"
-        note={`${typeLabel} · ${material.title}`}
+        note={
+          material.type === "case"
+            ? "«Хочу так же» — ссылка на этот кейс уйдёт в заявку"
+            : "Нужна помощь или адаптация под ваш проект"
+        }
       />
     </>
   );
