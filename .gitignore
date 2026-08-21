@@ -8,3 +8,6 @@ requests.sqlite3-shm
 requests.sqlite3-wal
 bot.log
 bot.err.log
+
+# Разовая выгрузка переменных для вставки в Vercel — секреты, не коммитить.
+vercel-env.txt
