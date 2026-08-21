@@ -121,6 +121,11 @@ class Pyrus:
             fields[name] = field["id"]
             if name == FIELD_TOPIC:
                 for option in (field.get("info") or {}).get("options", []):
+                    # Удалённые варианты Pyrus продолжает отдавать с флагом
+                    # deleted: choice_id не переиспользуются. Брать их нельзя —
+                    # значение уехало бы в вариант, которого в форме уже нет.
+                    if option.get("deleted"):
+                        continue
                     value = (option.get("choice_value") or "").strip()
                     if value:
                         choices[value] = option["choice_id"]
