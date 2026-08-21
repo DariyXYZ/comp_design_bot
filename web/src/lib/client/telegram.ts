@@ -29,17 +29,52 @@ export type Viewer = {
  * сервера, фильтровать их по этим данным будет нельзя — там нужна проверка
  * HMAC, то есть серверный код.
  */
-export function readViewer(): Viewer {
-  const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
-  if (!user) {
-    return { name: "Гость", handle: null, inTelegram: false };
+const VIEWER_CACHE_KEY = "comp-design-bot:viewer";
+
+/** Пользователь из строки `initData`, когда SDK не заполнил `initDataUnsafe`. */
+function parseUserFromInitData(initData: string | undefined): TelegramWebAppUser | null {
+  if (!initData) return null;
+  try {
+    const raw = new URLSearchParams(initData).get("user");
+    return raw ? (JSON.parse(raw) as TelegramWebAppUser) : null;
+  } catch {
+    return null;
   }
+}
+
+function toViewer(user: TelegramWebAppUser): Viewer {
   const name = [user.first_name, user.last_name].filter(Boolean).join(" ");
   return {
     name: name || "Без имени",
     handle: user.username ? `@${user.username}` : null,
     inTelegram: true,
   };
+}
+
+export function readViewer(): Viewer {
+  const tg = window.Telegram?.WebApp;
+  // Три источника по убыванию надёжности. Клиенты Telegram (особенно Desktop)
+  // умеют отдавать пустые данные запуска, когда вебвью восстановили из кеша —
+  // известное поведение без официального фикса, и на нём профиль застревал на
+  // «Гость». Поэтому: разобранный объект → строка `initData` → последнее
+  // known-good значение, сохранённое в браузере.
+  const user = tg?.initDataUnsafe?.user ?? parseUserFromInitData(tg?.initData);
+  if (user) {
+    const viewer = toViewer(user);
+    try {
+      localStorage.setItem(VIEWER_CACHE_KEY, JSON.stringify(viewer));
+    } catch {
+      // Приватный режим или заблокированное хранилище — не повод падать.
+    }
+    return viewer;
+  }
+  try {
+    const cached = localStorage.getItem(VIEWER_CACHE_KEY);
+    if (cached) return JSON.parse(cached) as Viewer;
+  } catch {
+    // См. выше.
+  }
+  return { name: "Гость", handle: null, inTelegram: false };
 }
 
 /** Отклик на действие. Отсутствует в браузере и в старых клиентах. */

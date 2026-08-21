@@ -51,6 +51,9 @@ function refresh() {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
+  // Возврат приложения на передний план — момент, когда клиент часто отдаёт
+  // данные запуска повторно, даже если при первом открытии их не было.
+  window.Telegram?.WebApp?.onEvent?.("activated", refresh);
   if (timer === null && !snapshot?.inTelegram) {
     waitedMs = 0;
     timer = setInterval(() => {
@@ -61,7 +64,10 @@ function subscribe(listener: () => void): () => void {
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0) stopPolling();
+    if (listeners.size === 0) {
+      stopPolling();
+      window.Telegram?.WebApp?.offEvent?.("activated", refresh);
+    }
   };
 }
 

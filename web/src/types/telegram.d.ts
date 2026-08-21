@@ -22,6 +22,12 @@ interface TelegramWebApp {
    * проверяется HMAC на сервере, которого у нас пока нет.
    */
   initDataUnsafe?: { user?: TelegramUser };
+  /**
+   * Те же данные запуска строкой (`user=...&auth_date=...&hash=...`). Нужны
+   * как второй источник: клиенты иногда отдают строку, не заполнив
+   * `initDataUnsafe`. Проверять подпись здесь нельзя — только на сервере.
+   */
+  initData?: string;
   /** Появился в Bot API 7.7 — в старых клиентах метода нет, вызывать через `?.` */
   disableVerticalSwipes?(): void;
   /** Отправляет данные боту и закрывает Mini App. Работает только внутри Telegram. */
@@ -64,6 +70,12 @@ declare global {
   interface Window {
     Telegram?: TelegramNamespace;
   }
+  /**
+   * Пользователь Telegram доступен и в модулях: `readViewer` разбирает его из
+   * строки `initData`, когда клиент не заполнил `initDataUnsafe`. Без этого
+   * псевдонима тип виден только внутри файла объявлений.
+   */
+  type TelegramWebAppUser = TelegramUser;
 }
 
 export {};
