@@ -33,6 +33,11 @@ class Config:
     db_path: Path
     supabase_url: str
     supabase_anon_key: str
+    # Pyrus: пустые значения означают «интеграции нет» — бот работает как
+    # раньше, заявки живут только в чате отдела и в своей базе.
+    pyrus_login: str
+    pyrus_security_key: str
+    pyrus_form_id: int | None
 
     @classmethod
     def load(cls) -> "Config":
@@ -61,6 +66,10 @@ class Config:
         if not supabase_url or not supabase_anon_key:
             raise RuntimeError("SUPABASE_URL / SUPABASE_ANON_KEY не заданы в .env")
 
+        pyrus_login = os.environ.get("PYRUS_LOGIN", "").strip()
+        pyrus_security_key = os.environ.get("PYRUS_SECURITY_KEY", "").strip()
+        pyrus_form_id = _int_or_none("PYRUS_FORM_ID")
+
         return cls(
             token=token,
             dept_chat_id=_int_or_none("DEPT_CHAT_ID"),
@@ -69,6 +78,9 @@ class Config:
             db_path=BASE_DIR / os.environ.get("DB_FILE", "requests.sqlite3"),
             supabase_url=supabase_url,
             supabase_anon_key=supabase_anon_key,
+            pyrus_login=pyrus_login,
+            pyrus_security_key=pyrus_security_key,
+            pyrus_form_id=pyrus_form_id,
         )
 
 

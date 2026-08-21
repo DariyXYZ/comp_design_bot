@@ -59,6 +59,7 @@ _NEW_COLUMNS = {
     "rejection_reason": "TEXT",
     "feedback": "TEXT",  # 'up' / 'down', пусто пока не оценили
     "feedback_comment": "TEXT",
+    "pyrus_task_id": "INTEGER",  # задача в Pyrus, если интеграция включена
 }
 
 # Единственные два префикса, которые когда-либо подставляются в SQL как имена
@@ -76,6 +77,17 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
     for name, coltype in _NEW_COLUMNS.items():
         if name not in existing:
             await db.execute(f"ALTER TABLE requests ADD COLUMN {name} {coltype}")
+
+
+async def set_pyrus_task(request_id: int, task_id: int) -> None:
+    """Запоминает задачу Pyrus, созданную по заявке."""
+    async with _connect() as db:
+        await _setup(db)
+        await db.execute(
+            "UPDATE requests SET pyrus_task_id = ?, updated_at = ? WHERE id = ?",
+            (task_id, _now(), request_id),
+        )
+        await db.commit()
 
 
 async def init_db() -> None:

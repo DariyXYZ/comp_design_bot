@@ -13,7 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message, User
 
-from .. import db
+from .. import db, pyrus
 from ..config import config
 from ..keyboards import (
     BTN_CAPABILITIES,
@@ -379,6 +379,20 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         photo_file_ids=data.get("photos", []),
         source_path=data.get("source_path"),
     )
+
+    # Pyrus — рядом с чатом отдела, а не вместо него: чат остаётся местом
+    # разговора, Pyrus — реестром. Ошибка внешнего сервиса гасится внутри и
+    # не мешает заявке уйти в чат.
+    task_id = await pyrus.send_request(
+        req_id=req_id,
+        case_title=CASES.get(data["case_key"], {}).get("title", data["case_key"]),
+        description=data["description"],
+        author=author,
+        source_path=data.get("source_path"),
+        photos=len(data.get("photos", [])),
+    )
+    if task_id:
+        await db.set_pyrus_task(req_id, task_id)
 
     if config.dept_chat_id is None:
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))
