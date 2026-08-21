@@ -699,6 +699,10 @@ header .brand{
 .row-action:hover{border-color:var(--sub)}
 .row-action:active{background:var(--pill)}
 .row-action span:last-child{color:var(--sub)}
+/* Шеврон тише текста, но не настолько, чтобы пропасть: он единственный знак
+   того, что строка ведёт куда-то дальше. `flex-shrink:0` — иначе длинная
+   подпись сминает его в щепку. */
+.row-action .chevron{color:var(--sub);flex-shrink:0}
 
 .feed-foot{
   font-size:var(--t-small);color:var(--sub);line-height:1.5;

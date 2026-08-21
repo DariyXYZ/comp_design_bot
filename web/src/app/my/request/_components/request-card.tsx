@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { ActionBar } from "@/components/layout/action-bar";
 import { Screen } from "@/components/layout/screen";
+import { Chevron } from "@/components/ui/chevron";
 import { StageTrack, myRequestById, type MyRequest } from "@/features/requests";
 import { routes } from "@/config/navigation";
 
@@ -72,7 +73,7 @@ export function RequestCard() {
             {secondary.map((label) => (
               <button key={label} type="button" className="row-action">
                 <span>{label}</span>
-                <span aria-hidden="true">→</span>
+                <Chevron />
               </button>
             ))}
           </div>

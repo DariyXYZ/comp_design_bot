@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { TAB_ROUTES, isSameRoute } from "@/config/navigation";
-import { initTelegramViewport } from "@/lib/client/telegram";
+import { exchangeSession } from "@/lib/client/api";
+import { cacheViewer, initTelegramViewport, readViewer } from "@/lib/client/telegram";
 import { TabBar } from "./tab-bar";
 
 /**
@@ -20,6 +21,22 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
   useEffect(() => {
     initTelegramViewport();
+    // Вход подтверждается здесь, на старте приложения, а не на экране профиля.
+    // Причина: код входа лежит в адресе кнопки (`?c=`), а бот открывает
+    // приложение на первом экране. Переход по табам — клиентская навигация, и
+    // адрес меняется целиком: и код, и имя из адреса до профиля не доживали.
+    // Отсюда и был симптом «открыто вне Telegram» при живой кнопке.
+    // `readViewer` сам запоминает найденное имя — здесь важен сам вызов,
+    // сделанный на экране, куда пришёл адрес с параметрами.
+    readViewer();
+    void exchangeSession().then((session) => {
+      if (!session) return;
+      cacheViewer({
+        name: session.user.name,
+        handle: session.user.handle,
+        inTelegram: true,
+      });
+    });
   }, []);
 
   // На вложенных экранах «назад» рисует сам Telegram в своей шапке — это

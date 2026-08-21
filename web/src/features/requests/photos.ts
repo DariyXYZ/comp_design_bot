@@ -77,7 +77,7 @@ export async function uploadPhoto(file: File): Promise<UploadResult> {
         body: form,
       });
       if (response.status === 401 && attempt === 1) {
-        token = (await exchangeSession())?.token ?? null;
+        token = (await exchangeSession({ force: true }))?.token ?? null;
         if (!token) return { ok: false, reason: "no-session" };
         continue;
       }

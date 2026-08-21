@@ -31,6 +31,21 @@ export type Viewer = {
  */
 const VIEWER_CACHE_KEY = "comp-design-bot:viewer";
 
+/**
+ * Запоминает, кто смотрит приложение.
+ *
+ * Нужно потому, что имя приходит с адресом кнопки (`?u=`), а адрес живёт только
+ * до первого перехода между табами: дальше экраны знают о человеке лишь то, что
+ * успели сохранить.
+ */
+export function cacheViewer(viewer: Viewer): void {
+  try {
+    localStorage.setItem(VIEWER_CACHE_KEY, JSON.stringify(viewer));
+  } catch {
+    // Приватный режим или заблокированное хранилище — не повод падать.
+  }
+}
+
 /** Пользователь из строки `initData`, когда SDK не заполнил `initDataUnsafe`. */
 function parseUserFromInitData(initData: string | undefined): TelegramWebAppUser | null {
   if (!initData) return null;
@@ -79,11 +94,7 @@ export function readViewer(): Viewer {
   const user = tg?.initDataUnsafe?.user ?? parseUserFromInitData(tg?.initData);
   if (user) {
     const viewer = toViewer(user);
-    try {
-      localStorage.setItem(VIEWER_CACHE_KEY, JSON.stringify(viewer));
-    } catch {
-      // Приватный режим или заблокированное хранилище — не повод падать.
-    }
+    cacheViewer(viewer);
     return viewer;
   }
   // Бот подставляет имя в адрес кнопки — это работает даже когда клиент
@@ -91,11 +102,7 @@ export function readViewer(): Viewer {
   // и ничего не авторизуют.
   const fromUrl = viewerFromUrl();
   if (fromUrl) {
-    try {
-      localStorage.setItem(VIEWER_CACHE_KEY, JSON.stringify(fromUrl));
-    } catch {
-      // См. выше.
-    }
+    cacheViewer(fromUrl);
     return fromUrl;
   }
   try {

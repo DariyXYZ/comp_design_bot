@@ -84,6 +84,26 @@ describe("сессия Mini App", () => {
     expect(replaced).toEqual(["/my/"]);
   });
 
+  it("код обменивается один раз на запуск приложения", async () => {
+    // Вход подтверждается на старте (оболочка) и ещё раз запрашивается на
+    // экране профиля. Второй обмен тем же кодом не нужен и, если сервер начнёт
+    // считать код одноразовым, будет отказом.
+    const { calls } = stubBrowser({ storage: "ok" });
+    respond(calls, [{ status: 200, body: session }]);
+
+    const api = await import("@/lib/client/api");
+    const [first, second] = await Promise.all([
+      api.exchangeSession(),
+      api.exchangeSession(),
+    ]);
+    const third = await api.exchangeSession();
+
+    expect(first?.token).toBe("TOKEN-1");
+    expect(second?.token).toBe("TOKEN-1");
+    expect(third?.token).toBe("TOKEN-1");
+    expect(calls).toHaveLength(1);
+  });
+
   it("при заблокированном хранилище токен живёт в памяти", async () => {
     // Вебвью Telegram и приватный режим умеют бросать на localStorage. Раньше
     // это означало, что вход есть, а картинки грузить нельзя: следующий запрос

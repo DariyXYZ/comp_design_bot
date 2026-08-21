@@ -62,6 +62,9 @@ export function loginTrace(): LoginTrace {
 let memoryToken: string | null = null;
 /** Код из адреса: держим в памяти, чтобы переобменять после истечения токена. */
 let memoryCode: string | null = null;
+/** Готовая сессия и незавершённый обмен — чтобы не менять код дважды. */
+let memorySession: Session | null = null;
+let inflight: Promise<Session | null> | null = null;
 
 function readStoredToken(): string | null {
   if (memoryToken) return memoryToken;
@@ -138,8 +141,7 @@ async function postSession(
   }
 }
 
-/** Получает токен сессии: сначала кодом из кнопки, затем через `initData`. */
-export async function exchangeSession(): Promise<Session | null> {
+async function runExchange(): Promise<Session | null> {
   const code = takeLoginCode();
   if (code) {
     const { session, status } = await postSession("/api/auth/redeem/", { code });
@@ -155,6 +157,32 @@ export async function exchangeSession(): Promise<Session | null> {
   });
   trace.exchangeStatus = status;
   return session;
+}
+
+/**
+ * Получает сессию: сначала кодом из кнопки, затем через `initData`.
+ *
+ * Результат кэшируется, а параллельные вызовы делят один обмен: приложение
+ * зовёт эту функцию и при старте, и на экране профиля, а обменивать один код
+ * дважды незачем. `force` нужен после 401 — токен истёк, код в памяти остался.
+ */
+export async function exchangeSession(
+  options: { force?: boolean } = {},
+): Promise<Session | null> {
+  if (options.force) {
+    memorySession = null;
+    inflight = null;
+  } else if (memorySession) {
+    return memorySession;
+  }
+  if (!inflight) {
+    inflight = runExchange().then((session) => {
+      memorySession = session;
+      inflight = null;
+      return session;
+    });
+  }
+  return inflight;
 }
 
 /** Токен для запросов, требующих подтверждённого входа. */
@@ -177,7 +205,7 @@ export async function fetchMyRequests(): Promise<PyrusRequest[] | null> {
       if (response.status === 401 && attempt === 1) {
         // Токен истёк — обменяем ещё раз (код из кнопки остался в памяти).
         memoryToken = null;
-        token = (await exchangeSession())?.token ?? null;
+        token = (await exchangeSession({ force: true }))?.token ?? null;
         continue;
       }
       if (!response.ok) {

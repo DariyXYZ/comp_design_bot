@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Chevron } from "@/components/ui/chevron";
 import { routes } from "@/config/navigation";
 import { askMyRequests } from "@/features/requests/submit";
 import { useViewer } from "@/hooks/use-viewer";
@@ -178,11 +179,11 @@ export function ProfileScreen() {
               список придёт сообщением в чат. */}
           <button type="button" className="row-action" onClick={askMyRequests}>
             <span>Показать мои заявки в чате</span>
-            <span aria-hidden="true">→</span>
+            <Chevron />
           </button>
           <Link href={routes.feed} className="row-action">
             <span>Посмотреть, что делает отдел</span>
-            <span aria-hidden="true">→</span>
+            <Chevron />
           </Link>
         </div>
 
