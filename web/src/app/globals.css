@@ -437,6 +437,10 @@ header .brand{
 .btn-primary{background:var(--accent);color:var(--card)}
 .btn-primary:hover{opacity:.9}
 .btn-primary:active{transform:scale(.985)}
+/* Кнопка недоступна, пока форма не готова: видно, что действие есть, но ещё
+   не разрешено — это понятнее, чем пустая ошибка после нажатия. */
+.btn:disabled{opacity:.4;cursor:default}
+.btn:disabled:active{transform:none}
 
 /* Сегментированный переключатель, а не строка мелких иконок: активный раздел
    виден как приподнятая плашка на утопленном фоне, и его не приходится искать

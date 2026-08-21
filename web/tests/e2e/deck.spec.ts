@@ -39,6 +39,7 @@ async function open(page: Page, { casesFail = false } = {}) {
         ready() {},
         expand() {},
         disableVerticalSwipes() {},
+        close() {},
         sendData(data: string) {
           sent.push(data);
         },

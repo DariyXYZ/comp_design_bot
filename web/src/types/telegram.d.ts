@@ -34,6 +34,26 @@ interface TelegramWebApp {
    */
   onEvent?(event: string, handler: (...args: unknown[]) => void): void;
   offEvent?(event: string, handler: (...args: unknown[]) => void): void;
+  /**
+   * Кнопка «назад» в шапке клиента. Рисует её сам Telegram, поэтому своя
+   * кнопка в вёрстке нужна только вне Telegram (браузер, отладка).
+   */
+  BackButton?: {
+    show(): void;
+    hide(): void;
+    onClick(handler: () => void): void;
+    offClick(handler: () => void): void;
+  };
+  /** Тактильный отклик. В старых клиентах и в браузере отсутствует. */
+  HapticFeedback?: {
+    impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void;
+    notificationOccurred(type: "error" | "success" | "warning"): void;
+    selectionChanged(): void;
+  };
+  /** Закрывает Mini App. */
+  close(): void;
+  /** Версия Bot API клиента — по ней видно, что метод может отсутствовать. */
+  version?: string;
 }
 
 interface TelegramNamespace {

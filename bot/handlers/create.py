@@ -27,6 +27,7 @@ from ..keyboards import (
 from ..texts import (
     ASK_DESCRIPTION,
     ASK_PHOTOS,
+    ASK_PHOTOS_FROM_WEBAPP,
     ASK_SOURCE,
     CANCELED,
     CASES,
@@ -130,23 +131,99 @@ async def choose_case(message: Message, state: FSMContext) -> None:
     await message.answer("Выберите тип задачи:", reply_markup=case_picker())
 
 
+MAX_MINIAPP_FIELD = 200  # проект, срок, название основы — короткие строки
+
+
+def _field(data: dict, key: str, limit: int) -> str | None:
+    """Строковое поле из Mini App: только строки, обрезанные по лимиту."""
+    value = data.get(key)
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value[:limit] or None
+
+
+def _webapp_description(data: dict) -> str | None:
+    """Собирает описание заявки из полей формы Mini App.
+
+    Проект, основа и срок дописываются в шапку описания, а не в отдельные
+    колонки: карточка заявки в чате отдела рендерится из описания, и при смене
+    статуса эти строки должны остаться на месте. Своих колонок под них в базе
+    нет, а добавлять их ради текста, который всё равно только показывается, —
+    лишняя миграция.
+    """
+    description = _field(data, "description", MAX_DESCRIPTION)
+    if not description:
+        return None
+    head = []
+    project = _field(data, "project", MAX_MINIAPP_FIELD)
+    if project:
+        head.append(f"Проект: {project}")
+    origin = _field(data, "origin", MAX_MINIAPP_FIELD)
+    if origin:
+        head.append(f"Основа: {origin}")
+    deadline = _field(data, "deadline", MAX_MINIAPP_FIELD)
+    if deadline:
+        head.append(f"Срок: {deadline}")
+    if not head:
+        return description
+    return ("\n".join(head) + "\n\n" + description)[:MAX_DESCRIPTION]
+
+
 @router.message(F.web_app_data, F.chat.type == "private")
 async def from_webapp(message: Message, state: FSMContext) -> None:
-    """Клик по карточке в Mini App: sendData -> {'case': key}."""
+    """Данные из Mini App.
+
+    Два вида полезной нагрузки, и оба должны работать:
+
+    * `{'case': key}` — выбрана только тема. Дальше обычный опрос в чате.
+    * `{'case': key, 'description': ..., ...}` — форма Mini App заполнена.
+      Тогда вопросы про описание и исходники уже отвечены, и остаются
+      картинки: файлы через `sendData` Telegram не передаёт.
+    """
     try:
         data = json.loads(message.web_app_data.data)
-        case_key = data["case"]
-    except (json.JSONDecodeError, KeyError, TypeError):
+    except (json.JSONDecodeError, TypeError):
         return
+    if not isinstance(data, dict):
+        return
+    case_key = data.get("case")
     if case_key not in CASES:
         return
+
+    description = _webapp_description(data)
+
     async with _lock(message.from_user.id):
         current = await state.get_state()
         current_data = await state.get_data()
-        # Дубль sendData от двойного тапа в Mini App: тот же кейс уже запущен.
-        if current == NewRequest.description.state and current_data.get("case_key") == case_key:
+        # Дубль sendData от двойного тапа в Mini App: та же заявка уже идёт.
+        if (
+            current in (NewRequest.description.state, NewRequest.photos.state)
+            and current_data.get("case_key") == case_key
+            and current_data.get("description") == description
+        ):
             return
-        await start_request(message, state, case_key)
+
+        if description is None:
+            await start_request(message, state, case_key)
+            return
+
+        # Путь к исходникам: сначала то, что указал человек, иначе папка
+        # решения, из которого заявка родилась.
+        source = _field(data, "source", MAX_SOURCE) or _field(
+            data, "origin_path", MAX_SOURCE
+        )
+        await state.clear()
+        await state.update_data(
+            case_key=case_key,
+            description=description,
+            photos=[],
+            source_path=source,
+            from_webapp=True,
+        )
+        await state.set_state(NewRequest.photos)
+
+    await message.answer(ASK_PHOTOS_FROM_WEBAPP, reply_markup=photos_step())
 
 
 @router.callback_query(F.data.startswith("case:"))
@@ -215,6 +292,12 @@ async def photos_done(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.data == "photos:skip":
         await state.update_data(photos=[])
     await callback.answer()
+    data = await state.get_data()
+    # Заявка из формы Mini App: про исходники там уже спрашивали, второй раз
+    # задавать тот же вопрос — заставлять человека вводить одно и то же дважды.
+    if data.get("from_webapp"):
+        await show_preview(callback.message, state, callback.from_user)
+        return
     await state.set_state(NewRequest.source)
     await callback.message.answer(ASK_SOURCE, reply_markup=source_step())
 

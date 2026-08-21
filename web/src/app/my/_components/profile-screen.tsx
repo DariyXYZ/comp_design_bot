@@ -1,26 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { myRequestHref } from "@/config/navigation";
+import { routes } from "@/config/navigation";
 import { MY_REQUESTS, StageTrack } from "@/features/requests";
 import { useViewer } from "@/hooks/use-viewer";
+import { closeMiniApp } from "@/lib/client/telegram";
+import { myRequestHref } from "@/config/navigation";
 
 /**
  * Профиль: кто ты для отдела и что у тебя открыто.
  *
  * Имя приходит из Telegram только в браузере (см. `useViewer`), поэтому до
- * гидратации его нет — заголовок держит высоту заранее, чтобы не дёргать
- * вёрстку.
+ * гидратации его нет — заголовок держит высоту заранее.
  *
- * Отслеживаемые задачи отдела вынесены в отдельную секцию: это не свои заявки,
- * и мешать их со своими в одном списке — врать про принадлежность.
+ * Списка заявок здесь пока нет по честной причине: чтобы показать заявки
+ * конкретного человека, нужно проверить подпись `initData`, а это серверный
+ * код, которого у статического Mini App не бывает. Пока список живёт в чате
+ * бота, и экран ведёт туда, а не показывает выдуманные карточки.
  */
 export function ProfileScreen() {
   const viewer = useViewer();
-
-  const own = MY_REQUESTS.filter((r) => !r.watching);
-  const watched = MY_REQUESTS.filter((r) => r.watching);
-  const needsAnswer = own.filter((r) => r.flag === "Требуется уточнение").length;
 
   return (
     <div className="scroll">
@@ -37,9 +36,9 @@ export function ProfileScreen() {
           </svg>
         </div>
         <div className="profile-who">
-          {/* До эффекта имени ещё нет — пустая строка держит высоту, чтобы
-              заголовок не прыгал после гидратации. */}
-          <h1>{viewer ? viewer.name : " "}</h1>
+          {/* Пустая строка держит высоту, чтобы заголовок не прыгал после
+              гидратации. */}
+          <h1>{viewer ? viewer.name : " "}</h1>
           <p>{viewer?.handle ?? "Отдел вычислительного проектирования"}</p>
         </div>
       </section>
@@ -47,62 +46,27 @@ export function ProfileScreen() {
       {viewer && !viewer.inTelegram ? (
         <div className="banner banner-quiet">
           <strong>Открыто вне Telegram</strong>
-          <span>Имя и свои заявки видны только при запуске из бота</span>
+          <span>Имя и отправка заявок работают только при запуске из бота</span>
         </div>
       ) : null}
 
-      <div className="stat-row">
-        <div className="stat">
-          <strong>{own.length}</strong>
-          <span>мои заявки</span>
-        </div>
-        {/* Единственная цифра, за которой стоит действие пользователя, — она и
-            единственная цветная. */}
-        <div className={needsAnswer > 0 ? "stat stat-attention" : "stat"}>
-          <strong>{needsAnswer}</strong>
-          <span>ждут ответа</span>
-        </div>
-        <div className="stat">
-          <strong>{watched.length}</strong>
-          <span>отслеживаю</span>
-        </div>
-      </div>
-
-      <section className="section">
-        <div className="section-head">
-          <h2>Мои заявки</h2>
-          <span className="count">{own.length}</span>
-        </div>
-        <div className="rows">
-          {own.map((request) => (
-            <Link key={request.id} href={myRequestHref(request.id)} className="card">
-              <div className="row-meta">
-                <span className="row-dim">№ {request.id.replace("r-", "")}</span>
-                {request.flag ? <span className="tag tag-flag">{request.flag}</span> : null}
-              </div>
-              <h3>{request.title}</h3>
-              <p className="row-dim">{request.originLabel}</p>
-              <p className="row-dim">{request.project}</p>
-              <StageTrack stage={request.stage} />
-              <p className="row-dim">{request.when}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {watched.length > 0 ? (
+      {MY_REQUESTS.length > 0 ? (
         <section className="section">
           <div className="section-head">
-            <h2>Отслеживаю</h2>
-            <span className="count">{watched.length}</span>
+            <h2>Мои заявки</h2>
+            <span className="count">{MY_REQUESTS.length}</span>
           </div>
           <div className="rows">
-            {watched.map((request) => (
+            {MY_REQUESTS.map((request) => (
               <Link key={request.id} href={myRequestHref(request.id)} className="card">
                 <div className="row-meta">
-                  <span className="tag tag-watch">Задача отдела</span>
+                  <span className="row-dim">№ {request.id.replace("r-", "")}</span>
+                  {request.flag ? (
+                    <span className="tag tag-flag">{request.flag}</span>
+                  ) : null}
                 </div>
                 <h3>{request.title}</h3>
+                <p className="row-dim">{request.originLabel}</p>
                 <p className="row-dim">{request.project}</p>
                 <StageTrack stage={request.stage} />
                 <p className="row-dim">{request.when}</p>
@@ -110,7 +74,31 @@ export function ProfileScreen() {
             ))}
           </div>
         </section>
-      ) : null}
+      ) : (
+        <section className="section">
+          <div className="section-head">
+            <h2>Мои заявки</h2>
+          </div>
+          <div className="empty">
+            <p>
+              Список заявок и их статусы — в чате с ботом: команда{" "}
+              <code>/my</code>. Здесь он появится, когда у приложения будет
+              серверная часть: без проверки подписи запуска чужие заявки
+              отличить от своих нельзя.
+            </p>
+          </div>
+          <div className="rows" style={{ marginTop: "var(--s3)" }}>
+            <button type="button" className="row-action" onClick={closeMiniApp}>
+              <span>Открыть чат с ботом</span>
+              <span aria-hidden="true">→</span>
+            </button>
+            <Link href={routes.feed} className="row-action">
+              <span>Посмотреть, что делает отдел</span>
+              <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

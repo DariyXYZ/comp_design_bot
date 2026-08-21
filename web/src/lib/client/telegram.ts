@@ -41,3 +41,49 @@ export function readViewer(): Viewer {
     inTelegram: true,
   };
 }
+
+/** Отклик на действие. Отсутствует в браузере и в старых клиентах. */
+export function haptic(kind: "tap" | "success" | "error"): void {
+  const hf = window.Telegram?.WebApp?.HapticFeedback;
+  if (!hf) return;
+  if (kind === "tap") hf.impactOccurred("light");
+  else hf.notificationOccurred(kind === "success" ? "success" : "error");
+}
+
+/** Закрыть Mini App — например чтобы человек оказался в чате с ботом. */
+export function closeMiniApp(): void {
+  window.Telegram?.WebApp?.close();
+}
+
+/**
+ * Отправка данных боту.
+ *
+ * Единственный канал из статического Mini App к боту: `sendData` кладёт строку
+ * в сообщение `web_app_data` и закрывает приложение. Ограничения, из которых
+ * растёт вся обработка ниже:
+ *
+ * 1. Работает только внутри Telegram и только для кнопки из reply-клавиатуры.
+ * 2. Лимит — 4096 байт, и это байты UTF-8: русский текст занимает по два на
+ *    символ, так что «4096 символов» было бы вдвое оптимистичнее правды.
+ * 3. Файлы отправить нельзя — фото бот докупает отдельным шагом в чате.
+ */
+export type SendResult = "sent" | "outside-telegram" | "too-long" | "failed";
+
+export const SEND_DATA_LIMIT_BYTES = 4096;
+
+export function sendToBot(payload: unknown): SendResult {
+  const tg = window.Telegram?.WebApp;
+  if (!tg?.sendData) return "outside-telegram";
+
+  const data = JSON.stringify(payload);
+  if (new TextEncoder().encode(data).length > SEND_DATA_LIMIT_BYTES) {
+    return "too-long";
+  }
+  try {
+    tg.sendData(data);
+    return "sent";
+  } catch {
+    // Нестандартное окружение: метод есть, но бросает вместо закрытия.
+    return "failed";
+  }
+}
