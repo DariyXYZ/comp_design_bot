@@ -39,7 +39,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     if photo is not None:
         try:
             sent = await message.answer_photo(
-                photo, caption=WELCOME, reply_markup=main_menu()
+                photo, caption=WELCOME, reply_markup=main_menu(message.from_user)
             )
         except Exception:
             # /start — вход в бота, он не имеет права упасть из-за картинки:
@@ -50,7 +50,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
                 _welcome_photo_id = sent.photo[-1].file_id
             return
 
-    await message.answer(WELCOME, reply_markup=main_menu())
+    await message.answer(WELCOME, reply_markup=main_menu(message.from_user))
 
 
 @router.message(Command("id"))

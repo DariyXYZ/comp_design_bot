@@ -1,11 +1,14 @@
 """Клавиатуры: нижнее меню, выбор кейса, шаги заявки, статусы."""
 from __future__ import annotations
 
+from urllib.parse import urlencode, urlsplit, urlunsplit
+
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    User,
     WebAppInfo,
 )
 
@@ -18,10 +21,33 @@ BTN_CREATE = "✚ Создать заявку"
 BTN_INFO = "🅘 Инфо"
 
 
-def main_menu() -> ReplyKeyboardMarkup:
+def webapp_url_for(user: User | None) -> str:
+    """Адрес Mini App с именем человека в параметрах.
+
+    Зачем: клиенты Telegram отдают данные запуска непредсказуемо — после
+    восстановления вебвью из кеша `initData` приходит пустым, и профиль в
+    приложении застревал на «Гость». Кнопку же формирует бот, и в этот момент
+    имя ему известно точно, поэтому он и передаёт его сам.
+
+    Это только для показа: параметры не подписаны, ничего не авторизуют и прав
+    не дают. Всё, что требует доверия (чьи заявки показывать), проверяется по
+    подписи `initData` на сервере.
+    """
+    if not config.webapp_url or user is None:
+        return config.webapp_url
+    parts = urlsplit(config.webapp_url)
+    query = dict(pair.split("=", 1) for pair in parts.query.split("&") if "=" in pair)
+    query["u"] = user.full_name or ""
+    if user.username:
+        query["h"] = user.username
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+def main_menu(user: User | None = None) -> ReplyKeyboardMarkup:
+    url = webapp_url_for(user)
     top = (
-        KeyboardButton(text=BTN_CAPABILITIES, web_app=WebAppInfo(url=config.webapp_url))
-        if config.webapp_url
+        KeyboardButton(text=BTN_CAPABILITIES, web_app=WebAppInfo(url=url))
+        if url
         else KeyboardButton(text=BTN_CAPABILITIES)
     )
     return ReplyKeyboardMarkup(

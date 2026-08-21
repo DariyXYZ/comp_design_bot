@@ -205,6 +205,50 @@ class Pyrus:
         log.info("Pyrus: к задаче %s приложено файлов: %s", task_id, len(guids))
         return len(guids)
 
+    async def list_user_tasks(self, tg_user_id: int) -> list[dict]:
+        """Заявки одного человека из реестра формы.
+
+        Фильтрация — на нашей стороне, а не в запросе: `filters` в
+        `forms/{id}/register` Pyrus молча игнорирует (проверено — фильтр по
+        несуществующему id возвращает весь реестр), и полагаться на него значит
+        однажды показать человеку чужие заявки.
+        """
+        schema = await self._schema()
+        tg_field = schema.get(FIELD_TG_ID)
+        if not tg_field:
+            log.warning("Pyrus: в форме нет поля %r — список заявок недоступен", FIELD_TG_ID)
+            return []
+        body = await self._call(
+            f"/forms/{config.pyrus_form_id}/register", {"include_archived": True}
+        )
+        tasks = (body or {}).get("tasks", [])
+        mine = []
+        for task in tasks:
+            values = {}
+            for field in task.get("fields", []):
+                value = field.get("value")
+                if isinstance(value, dict):
+                    names = value.get("choice_names")
+                    value = names[0] if names else value.get("choice_value")
+                values[field.get("id")] = value
+                values[field.get("name")] = value
+            if str(values.get(tg_field)) != str(tg_user_id):
+                continue
+            mine.append({
+                "task_id": task.get("id"),
+                "number": values.get(FIELD_REQUEST_NO),
+                "topic": values.get(FIELD_TOPIC),
+                "project": values.get(FIELD_PROJECT),
+                "description": values.get(FIELD_DESCRIPTION),
+                "origin": values.get(FIELD_ORIGIN),
+                "deadline": values.get(FIELD_DEADLINE),
+                "created": task.get("create_date"),
+                "closed": bool(task.get("close_date")),
+            })
+        # Свежие сверху: человек ищет последнюю заявку, а не первую.
+        mine.sort(key=lambda item: item.get("created") or "", reverse=True)
+        return mine
+
     async def create_text_task(self, text: str) -> int | None:
         """Обычная задача с текстом — путь на случай, когда формы нет."""
         body = await self._call("/tasks", {"text": text})

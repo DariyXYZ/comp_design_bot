@@ -51,6 +51,24 @@ function toViewer(user: TelegramWebAppUser): Viewer {
   };
 }
 
+/** Имя, переданное ботом в адресе кнопки Mini App. */
+function viewerFromUrl(): Viewer | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get("u")?.trim();
+    if (!name) return null;
+    const username = params.get("h")?.trim();
+    return {
+      name,
+      handle: username ? `@${username}` : null,
+      // Ссылку с именем формирует бот, значит приложение открыто из Telegram.
+      inTelegram: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function readViewer(): Viewer {
   const tg = window.Telegram?.WebApp;
   // Три источника по убыванию надёжности. Клиенты Telegram (особенно Desktop)
@@ -67,6 +85,18 @@ export function readViewer(): Viewer {
       // Приватный режим или заблокированное хранилище — не повод падать.
     }
     return viewer;
+  }
+  // Бот подставляет имя в адрес кнопки — это работает даже когда клиент
+  // вообще не отдал данные запуска. Только для показа: параметры не подписаны
+  // и ничего не авторизуют.
+  const fromUrl = viewerFromUrl();
+  if (fromUrl) {
+    try {
+      localStorage.setItem(VIEWER_CACHE_KEY, JSON.stringify(fromUrl));
+    } catch {
+      // См. выше.
+    }
+    return fromUrl;
   }
   try {
     const cached = localStorage.getItem(VIEWER_CACHE_KEY);
