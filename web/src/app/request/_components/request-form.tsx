@@ -1,11 +1,12 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActionBar } from "@/components/layout/action-bar";
 import { Screen } from "@/components/layout/screen";
 import { itemHref, routes } from "@/config/navigation";
 import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
+import { uploadPhoto, type UploadedPhoto } from "@/features/requests/photos";
 import { submitRequest } from "@/features/requests/submit";
 
 /**
@@ -16,10 +17,13 @@ import { submitRequest } from "@/features/requests/submit";
  * именно он отвечает отделу на вопрос «что человек хочет получить» до чтения
  * описания. У заявки из материала источник приложится сам.
  *
- * Отправка идёт боту через `sendData`: приложение статическое, сервера у него
- * нет, и это единственный канал. Telegram закрывает Mini App сразу после
- * отправки, поэтому дальше разговор продолжается в чате — там бот просит
- * картинки (файлы через `sendData` не проходят) и показывает превью заявки.
+ * Текст заявки уходит боту через `sendData` — Telegram закрывает приложение
+ * сразу после отправки и показывает превью в чате.
+ *
+ * Картинки идут другим путём: `sendData` файлы не передаёт вовсе, поэтому они
+ * сразу загружаются в Pyrus через свой роут, а с заявкой едут только их guid.
+ * Загрузка начинается в момент выбора файла, а не при отправке: так человек
+ * видит, что картинка принята, и не ждёт всё разом на последнем шаге.
  */
 export function RequestForm() {
   const params = useSearchParams();
@@ -32,6 +36,45 @@ export function RequestForm() {
   const [source, setSource] = useState("");
   const [deadline, setDeadline] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function addFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setProblem(null);
+    for (const file of Array.from(files)) {
+      setUploading((count) => count + 1);
+      const preview = URL.createObjectURL(file);
+      const result = await uploadPhoto(file);
+      setUploading((count) => count - 1);
+      if (!result.ok) {
+        URL.revokeObjectURL(preview);
+        setProblem(
+          result.reason === "no-session"
+            ? "Картинки загружаются только при запуске из Telegram — откройте приложение кнопкой в чате бота."
+            : result.reason === "too-large"
+              ? "Картинка слишком большая даже после сжатия — попробуйте другую."
+              : "Картинку не удалось загрузить. Попробуйте ещё раз.",
+        );
+        continue;
+      }
+      setPhotos((current) => [
+        ...current,
+        { id: `${file.name}-${current.length}`, preview, guid: result.guid, name: file.name },
+      ]);
+    }
+  }
+
+  function removePhoto(id: string) {
+    setPhotos((current) => {
+      const photo = current.find((item) => item.id === id);
+      if (photo) URL.revokeObjectURL(photo.preview);
+      // Файл остаётся в хранилище Pyrus, но к задаче не привязывается: удалять
+      // его отдельным запросом незачем — он никуда не попадёт.
+      return current.filter((item) => item.id !== id);
+    });
+  }
 
   const origin = material
     ? {
@@ -58,6 +101,7 @@ export function RequestForm() {
       description,
       source,
       deadline,
+      photoGuids: photos.map((photo) => photo.guid),
     });
     if (result === "sent") return; // Telegram закрывает приложение сам
     setProblem(
@@ -129,10 +173,55 @@ export function RequestForm() {
           />
         </label>
 
-        <p className="section-note">
-          Картинки и референсы попросит бот в чате сразу после отправки —
-          файлы из Mini App не передаются.
-        </p>
+        <div className="field">
+          <span>
+            Изображения и референсы <em>необязательно</em>
+          </span>
+          <div className="slots">
+            {photos.map((photo) => (
+              <div key={photo.id} className="slot slot-filled">
+                {/* Обычный img, а не next/image: это локальный object URL
+                    выбранного файла, оптимизатору его нечего оптимизировать. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.preview} alt="" />
+                <button
+                  type="button"
+                  className="slot-remove"
+                  onClick={() => removePhoto(photo.id)}
+                  aria-label={`Убрать ${photo.name}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {uploading > 0 ? <div className="slot slot-busy">…</div> : null}
+            {photos.length + uploading < 6 ? (
+              <button
+                type="button"
+                className="slot"
+                onClick={() => fileInput.current?.click()}
+                aria-label="Добавить картинку"
+              >
+                +
+              </button>
+            ) : null}
+          </div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              void addFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
+          <p className="section-note" style={{ margin: 0 }}>
+            Отметьте на снимке проблемное место — так отдел поймёт задачу
+            быстрее. Картинки уходят сразу в задачу, до отправки заявки.
+          </p>
+        </div>
 
         {topicKey ? null : (
           <div className="banner">
@@ -154,9 +243,15 @@ export function RequestForm() {
 
       <ActionBar
         label="Отправить заявку"
-        note={ready ? undefined : "Заполните описание задачи"}
+        note={
+          uploading > 0
+            ? "Дождитесь загрузки картинок"
+            : ready
+              ? undefined
+              : "Заполните описание задачи"
+        }
         onClick={send}
-        disabled={!ready}
+        disabled={!ready || uploading > 0}
       />
     </>
   );

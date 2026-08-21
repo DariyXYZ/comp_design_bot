@@ -249,6 +249,25 @@ class Pyrus:
         mine.sort(key=lambda item: item.get("created") or "", reverse=True)
         return mine
 
+    async def attach_uploaded(self, task_id: int, guids: list[str], text: str) -> int:
+        """Прикладывает к задаче файлы, уже загруженные в Pyrus.
+
+        Так приходят картинки из формы Mini App: их загрузил браузер через свой
+        роут, и здесь остаётся только привязать guid к задаче — скачивать и
+        заливать заново нечего.
+        """
+        if not guids:
+            return 0
+        result = await self._call(
+            f"/tasks/{task_id}/comments",
+            {"text": text, "attachments": [{"guid": g} for g in guids]},
+        )
+        if result is None:
+            log.warning("Pyrus: не удалось приложить готовые файлы к %s", task_id)
+            return 0
+        log.info("Pyrus: к задаче %s привязано файлов из Mini App: %s", task_id, len(guids))
+        return len(guids)
+
     async def create_text_task(self, text: str) -> int | None:
         """Обычная задача с текстом — путь на случай, когда формы нет."""
         body = await self._call("/tasks", {"text": text})
@@ -300,6 +319,19 @@ async def attach_photos(
         )
     except Exception:  # noqa: BLE001 — заявка уже создана, падать нельзя
         log.exception("Pyrus: не удалось приложить картинки к задаче %s", task_id)
+        return 0
+
+
+async def attach_uploaded(task_id: int, guids: list[str]) -> int:
+    """Привязывает к задаче картинки, загруженные из формы Mini App."""
+    if not pyrus.enabled or not task_id or not guids:
+        return 0
+    try:
+        return await pyrus.attach_uploaded(
+            task_id, guids, "Картинки из заявки (приложены в Mini App)"
+        )
+    except Exception:  # noqa: BLE001 — заявка уже создана, падать нельзя
+        log.exception("Pyrus: не удалось привязать картинки к задаче %s", task_id)
         return 0
 
 

@@ -8,7 +8,7 @@ import { expect, test, type Page } from "@playwright/test";
  * ровно то, что уйдёт в Telegram.
  */
 
-const APP_PATH = "/comp_design_bot/";
+const APP_PATH = "/";
 
 async function openForm(page: Page, query: string) {
   await page.route("**/telegram-web-app.js", (route) => route.abort());
@@ -34,6 +34,20 @@ async function openForm(page: Page, query: string) {
 const sentPayloads = (page: Page) =>
   page.evaluate(() => (window as unknown as { __sent: string[] }).__sent);
 
+/**
+ * Печатает текст в поле так, как это делает человек.
+ *
+ * Не `fill()`: он ставит значение одним событием, и до состояния React оно в
+ * этой сборке не доходит — значение оказывается в DOM, а форма остаётся
+ * незаполненной (кнопка отправки заблокирована). Посимвольный ввод повторяет
+ * настоящие события и проверяет ровно тот путь, которым идёт человек.
+ */
+async function type(page: Page, placeholder: string, text: string) {
+  const field = page.getByPlaceholder(placeholder);
+  await field.click();
+  await field.pressSequentially(text, { delay: 10 });
+}
+
 test.describe("заявка из Mini App", () => {
   test("без описания отправка заблокирована", async ({ page }) => {
     await openForm(page, "topic=revit&t=Revit");
@@ -50,10 +64,12 @@ test.describe("заявка из Mini App", () => {
   }) => {
     await openForm(page, "item=tool-insolation");
 
-    await page.getByPlaceholder("1-19-2026 МР Верейская БЦ").fill("2-04-2026 МФК Ленинский");
-    await page
-      .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
-      .fill("Посчитать инсоляцию двух вариантов двора");
+    await type(page, "1-19-2026 МР Верейская БЦ", "2-04-2026 МФК Ленинский");
+    await type(
+      page,
+      "Что нужно сделать и что хотите получить на выходе",
+      "Посчитать инсоляцию двух вариантов двора",
+    );
     await page.locator('input[type="date"]').fill("2026-08-28");
 
     await page.locator(".action-bar button").click();
@@ -77,9 +93,7 @@ test.describe("заявка из Mini App", () => {
     await page.route("**/telegram-web-app.js", (route) => route.abort());
     await page.goto(`${APP_PATH}request/?topic=revit&t=Revit`);
 
-    await page
-      .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
-      .fill("Передать фасад в Revit");
+    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад в Revit");
     await page.locator(".action-bar button").click();
 
     await expect(page.locator(".banner")).toContainText("только внутри Telegram");

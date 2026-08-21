@@ -143,6 +143,20 @@ def _field(data: dict, key: str, limit: int) -> str | None:
     return value[:limit] or None
 
 
+def _webapp_photo_guids(data: dict) -> list[str]:
+    """guid картинок, загруженных прямо в форме Mini App.
+
+    Файлы через `sendData` не проходят, поэтому браузер грузит их в Pyrus сам, а
+    боту достаются только идентификаторы — по ним он привязывает картинки к
+    задаче и не спрашивает их повторно в чате.
+    """
+    raw = _field(data, "photos", 1000) or ""
+    guids = [part.strip() for part in raw.split(",") if part.strip()]
+    # Шесть — столько же, сколько разрешает форма; лишнее отбрасываем, чтобы
+    # чужой payload не заставил бота слать десятки запросов.
+    return guids[:6]
+
+
 def _webapp_description(data: dict) -> str | None:
     """Собирает описание заявки из полей формы Mini App.
 
@@ -165,6 +179,9 @@ def _webapp_description(data: dict) -> str | None:
     deadline = _field(data, "deadline", MAX_MINIAPP_FIELD)
     if deadline:
         head.append(f"Срок: {deadline}")
+    photos = _webapp_photo_guids(data)
+    if photos:
+        head.append(f"Картинки: {len(photos)} — приложены в задаче Pyrus")
     if not head:
         return description
     return ("\n".join(head) + "\n\n" + description)[:MAX_DESCRIPTION]
@@ -221,11 +238,13 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
         source = _field(data, "source", MAX_SOURCE) or _field(
             data, "origin_path", MAX_SOURCE
         )
+        guids = _webapp_photo_guids(data)
         await state.clear()
         await state.update_data(
             case_key=case_key,
             description=description,
             photos=[],
+            pyrus_photo_guids=guids,
             source_path=source,
             from_webapp=True,
             # Те же значения, что уже попали в шапку описания, но по
@@ -236,9 +255,16 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
             wa_origin_path=_field(data, "origin_path", MAX_SOURCE),
             wa_deadline=_field(data, "deadline", MAX_MINIAPP_FIELD),
         )
-        await state.set_state(NewRequest.photos)
+        # Картинки уже приложены в приложении — спрашивать их снова значит
+        # просить человека сделать то, что он только что сделал.
+        await state.set_state(
+            NewRequest.preview if guids else NewRequest.photos
+        )
 
-    await message.answer(ASK_PHOTOS_FROM_WEBAPP, reply_markup=photos_step())
+    if guids:
+        await show_preview(message, state, message.from_user)
+    else:
+        await message.answer(ASK_PHOTOS_FROM_WEBAPP, reply_markup=photos_step())
 
 
 @router.callback_query(F.data.startswith("case:"))
@@ -349,7 +375,9 @@ async def show_preview(message: Message, state: FSMContext, user: User) -> None:
         author_line(user),
     )
     photos: list[str] = data.get("photos", [])
-    note = f"\n\n🖼 Картинок: {len(photos)}" if photos else ""
+    uploaded: list[str] = data.get("pyrus_photo_guids", [])
+    total = len(photos) + len(uploaded)
+    note = f"\n\n🖼 Картинок: {total}" if total else ""
     await message.answer(
         f"{PREVIEW_HEADER}\n\n{card}{note}", reply_markup=preview_step()
     )
@@ -434,6 +462,7 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         # который выдаёт `files/upload`, а качать их из Telegram надо по одному.
         # Заявка к этому моменту уже создана, поэтому сбой загрузки её не рушит.
         await _attach_photos_to_pyrus(bot, task_id, data.get("photos", []))
+        await pyrus.attach_uploaded(task_id, data.get("pyrus_photo_guids", []))
 
     if config.dept_chat_id is None:
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))

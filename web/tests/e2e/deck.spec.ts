@@ -13,8 +13,8 @@ const PIXEL =
 
 const TOTAL = 8;
 
-/** Приложение живёт под basePath — открываем путь явно, а не как "/". */
-const APP_PATH = "/comp_design_bot/";
+/** basePath убран вместе с раздачей из подпапки — приложение в корне. */
+const APP_PATH = "/";
 
 const CASES = Array.from({ length: TOTAL }, (_, i) => ({
   key: `case-${i}`,
@@ -47,13 +47,19 @@ async function open(page: Page, { casesFail = false } = {}) {
     };
   });
 
-  await page.route("**/rest/v1/cases**", (route) =>
+  // Карточки приходят из своего роута `/api/topics`, а тот уже ходит в
+  // Supabase на сервере — перехватывать надо именно роут.
+  await page.route("**/api/topics/**", (route) =>
     casesFail
-      ? route.fulfill({ status: 401, contentType: "application/json", body: "[]" })
+      ? route.fulfill({
+          status: 502,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Supabase отказал" }),
+        })
       : route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify(CASES),
+          body: JSON.stringify({ rows: CASES }),
         }),
   );
 

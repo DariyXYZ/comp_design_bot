@@ -587,16 +587,32 @@ header .brand{
 }
 .field input:hover,.field textarea:hover{border-color:var(--sub)}
 .field input::placeholder,.field textarea::placeholder{color:var(--sub)}
-.slots{display:flex;gap:var(--s2)}
-/* 4:3, а не квадрат: три квадратных слота на телефоне отъедают почти треть
-   экрана, хотя это всего лишь место под будущие снимки. */
+/* Слоты картинок: сетка, а не одна строка — снимков может быть до шести, и
+   на телефоне они должны переноситься, а не сжиматься в полоски. */
+.slots{
+  display:grid;grid-template-columns:repeat(3, 1fr);gap:var(--s2);
+}
 .slot{
-  flex:1;aspect-ratio:4/3;border:1.5px dashed var(--line);
+  aspect-ratio:1;border:1.5px dashed var(--line);
   border-radius:var(--r2);background:var(--pill);
-  color:var(--sub);font-size:1.1rem;cursor:pointer;
+  color:var(--sub);font-size:1.3rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;padding:0;
   transition:border-color .16s var(--ease), color .16s var(--ease);
 }
 .slot:hover{border-color:var(--sub);color:var(--ink)}
+/* Загруженный снимок: рамка сплошная — пунктир означает «сюда можно добавить»,
+   и на заполненном слоте он врал бы. */
+.slot-filled{border-style:solid;border-color:var(--line);cursor:default}
+.slot-filled img{width:100%;height:100%;object-fit:cover;display:block}
+.slot-busy{color:var(--sub);letter-spacing:.1em}
+.slot-remove{
+  position:absolute;top:4px;right:4px;
+  width:24px;height:24px;border-radius:50%;
+  border:none;background:var(--accent);color:var(--card);
+  font-size:.9rem;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
 
 /* Карточка заявки в списке. Плотность выше, чем у строк материалов: тут не
    узнавание по картинке, а сканирование статусов. */

@@ -5,9 +5,10 @@ const PORT = 3100;
 // сторонним источником и блокирует раздачу собственных чанков — страница
 // открывается, но не гидратируется.
 const ORIGIN = `http://localhost:${PORT}`;
-// Путь приложения задан basePath — тесты открывают его явно (см. APP_PATH в
-// spec), поэтому baseURL здесь только origin.
-const APP_URL = `${ORIGIN}/comp_design_bot/`;
+// basePath больше нет: на Vercel приложение живёт в корне домена, и
+// проверять готовность сервера нужно по корню — иначе Playwright не увидит
+// уже запущенный dev и попробует поднять второй.
+const APP_URL = `${ORIGIN}/`;
 
 export default defineConfig({
   testDir: "./tests/e2e",

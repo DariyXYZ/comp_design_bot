@@ -61,4 +61,17 @@ describe("payload заявки", () => {
     });
     expect(payload.description).toBe("нужен карниз");
   });
+  it("guid картинок едут строкой через запятую — sendData принимает только текст", () => {
+    const payload = buildRequestPayload({
+      topic: "revit",
+      description: "нужно",
+      photoGuids: ["aaa", "bbb"],
+    });
+    expect(payload.photos).toBe("aaa,bbb");
+  });
+
+  it("пустой список картинок не добавляет поле", () => {
+    const payload = buildRequestPayload({ topic: "revit", description: "нужно", photoGuids: [] });
+    expect(payload.photos).toBeUndefined();
+  });
 });

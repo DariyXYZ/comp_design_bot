@@ -14,6 +14,8 @@ import { sendToBot, haptic, type SendResult } from "@/lib/client/telegram";
  *   статусов, потому что карточка рендерится из него.
  * - `source` — путь к исходникам пользователя, `origin_path` — путь к файлам
  *   решения, из которого заявка родилась.
+ * - `photos` — guid картинок в Pyrus через запятую. Бот по ним прикладывает
+ *   файлы к задаче и не спрашивает картинки в чате.
  *
  * Ключи в snake_case: их читает Python, и переименовывать их на его стороне
  * ради вкусов JS бессмысленно.
@@ -26,6 +28,12 @@ export type RequestDraft = {
   description?: string;
   source?: string;
   deadline?: string;
+  /**
+   * guid картинок, уже загруженных в Pyrus из формы. Сами файлы через
+   * `sendData` не проходят, поэтому едут только их идентификаторы — бот
+   * прикладывает их к задаче, ничего не скачивая.
+   */
+  photoGuids?: readonly string[];
 };
 
 /** Лимиты бота (`MAX_DESCRIPTION`, `MAX_SOURCE`) — обрезаем до отправки. */
@@ -39,6 +47,8 @@ function clean(value: string | undefined, limit: number): string | undefined {
 
 export function buildRequestPayload(draft: RequestDraft): Record<string, string> {
   const payload: Record<string, string> = { case: draft.topic };
+  const guids = (draft.photoGuids ?? []).filter(Boolean);
+  if (guids.length) payload.photos = guids.join(",");
   const fields: ReadonlyArray<[string, string | undefined, number]> = [
     ["description", draft.description, LIMITS.description],
     ["project", draft.project, LIMITS.short],
