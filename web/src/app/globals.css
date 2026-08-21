@@ -656,6 +656,30 @@ header .brand{
 .banner-quiet{border-color:var(--line);background:var(--pill)}
 .banner-quiet strong{color:var(--ink)}
 
+/* Диагностика входа: технические факты для одного случая — когда приложение не
+   смогло подтвердить вход. Свёрнута и намеренно тихая: это не часть интерфейса
+   отдела, а способ не гадать о причине. */
+.diag{
+  margin-top:var(--s5);
+  border:1px solid var(--line);border-radius:var(--r2);
+  background:var(--pill);
+}
+.diag summary{
+  padding:var(--s3) var(--s4);
+  font-size:var(--t-small);color:var(--sub);cursor:pointer;
+}
+.diag summary::marker{color:var(--sub)}
+.diag dl{
+  display:flex;flex-direction:column;gap:var(--s1);
+  margin:0;padding:0 var(--s4) var(--s4);
+}
+.diag dl > div{display:flex;justify-content:space-between;gap:var(--s3)}
+.diag dt{font-size:var(--t-small);color:var(--sub)}
+.diag dd{
+  margin:0;font-size:var(--t-small);color:var(--ink);
+  text-align:right;word-break:break-word;
+}
+
 .load-line{
   display:flex;flex-direction:column;gap:var(--s1);
   border:1px solid var(--line);border-radius:var(--r2);

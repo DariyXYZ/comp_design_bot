@@ -33,7 +33,8 @@ def webapp_url_for(user: User | None) -> str:
 
     `u` и `h` — только для показа (имя и ник, ничего не авторизуют).
     `c` — подписанный код входа: приложение сразу меняет его на свой токен
-    сессии, поэтому в адресе он живёт минуты (см. `webauth.login_code`).
+    сессии. Код живёт столько же, сколько сама кнопка в чате, иначе вход
+    «сгорал» бы раньше неё (см. `webauth.login_code`).
     """
     if not config.webapp_url or user is None:
         return config.webapp_url

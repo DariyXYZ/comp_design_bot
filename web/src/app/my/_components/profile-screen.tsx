@@ -5,21 +5,25 @@ import { useEffect, useState } from "react";
 import { routes } from "@/config/navigation";
 import { askMyRequests } from "@/features/requests/submit";
 import { useViewer } from "@/hooks/use-viewer";
-import { exchangeSession, fetchMyRequests } from "@/lib/client/api";
+import {
+  exchangeSession,
+  fetchMyRequests,
+  loginTrace,
+  type LoginTrace,
+} from "@/lib/client/api";
 import type { PyrusRequest } from "@/lib/server/pyrus";
 
 /**
  * Профиль: кто ты для отдела и что у тебя открыто.
  *
- * Имя приходит из нескольких мест (см. `readViewer`), потому что клиенты
- * Telegram отдают данные запуска непредсказуемо. Заявки — из своего API,
- * который проверяет подпись запуска и читает реестр формы Pyrus по
- * Telegram-id: без проверки любой запросил бы чужие заявки, а ключ Pyrus в
- * браузере жить не может.
+ * Имя может прийти из адреса кнопки (см. `readViewer`), а заявки — только по
+ * подтверждённой сессии. Отсюда неочевидное состояние: имя показано, а список
+ * пуст. Экран его не скрывает: разница между «вход не подтверждён» и «заявок
+ * нет» решается по-разному, и человек должен видеть, какая из двух ситуаций.
  *
- * Если API недоступен (статическая сборка под GitHub Pages, нет сети, клиент
- * не дал данных запуска), экран не ломается: объясняет это словами и оставляет
- * рабочий путь — попросить список у бота в чат.
+ * Заявки идут через своё API, которое проверяет подпись и читает реестр формы
+ * Pyrus по Telegram-id: без проверки любой запросил бы чужие заявки, а ключ
+ * Pyrus в браузере жить не может.
  */
 type State =
   | { kind: "loading" }
@@ -28,12 +32,39 @@ type State =
 
 type SessionUser = { name: string; handle: string | null };
 
+/**
+ * Что сказать человеку, когда вход не подтвердился.
+ *
+ * Причины разные, а действия — тоже разные, поэтому одна фраза «ошибка входа»
+ * здесь бесполезна.
+ */
+function loginProblem(trace: LoginTrace | null): { title: string; hint: string } | null {
+  if (!trace) return null;
+  if (trace.hadCode && trace.redeemStatus === 401) {
+    return {
+      title: "Кнопка в чате устарела",
+      hint: "Отправьте боту /start и откройте приложение свежей кнопкой — вход обновится.",
+    };
+  }
+  if (!trace.hadCode && trace.initDataLength === 0) {
+    return {
+      title: "Открыто вне Telegram",
+      hint: "Заявки и загрузка картинок работают только при запуске кнопкой из бота @comp_design_bot.",
+    };
+  }
+  return {
+    title: "Вход не подтверждён",
+    hint: "Попробуйте закрыть приложение и открыть его кнопкой из чата бота.",
+  };
+}
+
 export function ProfileScreen() {
   const viewer = useViewer();
   const [state, setState] = useState<State>({ kind: "loading" });
   // Имя из подтверждённой сессии — самое достоверное: его подписал бот или
   // Telegram, а не подставил адрес кнопки.
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [trace, setTrace] = useState<LoginTrace | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -47,11 +78,14 @@ export function ProfileScreen() {
       const requests = await fetchMyRequests();
       if (!alive) return;
       setState(requests ? { kind: "ready", requests } : { kind: "unavailable" });
+      setTrace(loginTrace());
     })();
     return () => {
       alive = false;
     };
   }, []);
+
+  const problem = sessionUser ? null : loginProblem(trace);
 
   return (
     <div className="scroll">
@@ -79,10 +113,10 @@ export function ProfileScreen() {
         </div>
       </section>
 
-      {!sessionUser && viewer && !viewer.inTelegram ? (
-        <div className="banner banner-quiet">
-          <strong>Открыто вне Telegram</strong>
-          <span>Имя и отправка заявок работают только при запуске из бота</span>
+      {problem ? (
+        <div className="banner">
+          <strong>{problem.title}</strong>
+          <span>{problem.hint}</span>
         </div>
       ) : null}
 
@@ -151,6 +185,58 @@ export function ProfileScreen() {
             <span aria-hidden="true">→</span>
           </Link>
         </div>
+
+        {/* Диагностика входа. Свёрнута и показывается только когда что-то не
+            сошлось: без этих фактов «приложение меня не видит» неотличимо от
+            «истёк код», «пустой initData» и «заблокировано хранилище», а
+            спрашивать человека об этом словами бессмысленно. */}
+        {trace && (problem || state.kind === "unavailable") ? (
+          <details className="diag">
+            <summary>Почему вход не сработал</summary>
+            <dl>
+              <div>
+                <dt>Код из кнопки</dt>
+                <dd>{trace.hadCode ? "есть" : "нет"}</dd>
+              </div>
+              <div>
+                <dt>Обмен кода</dt>
+                <dd>{trace.redeemStatus ?? "не выполнялся"}</dd>
+              </div>
+              <div>
+                <dt>Данные запуска</dt>
+                <dd>
+                  {trace.initDataLength > 0
+                    ? `${trace.initDataLength} символов`
+                    : "клиент не отдал"}
+                </dd>
+              </div>
+              <div>
+                <dt>Обмен данных запуска</dt>
+                <dd>{trace.exchangeStatus ?? "не выполнялся"}</dd>
+              </div>
+              <div>
+                <dt>Токен</dt>
+                <dd>{trace.tokenPresent ? "получен" : "нет"}</dd>
+              </div>
+              <div>
+                <dt>Хранилище браузера</dt>
+                <dd>
+                  {trace.storageAvailable === null
+                    ? "не проверялось"
+                    : trace.storageAvailable
+                      ? "доступно"
+                      : "заблокировано"}
+                </dd>
+              </div>
+              {trace.error ? (
+                <div>
+                  <dt>Сообщение</dt>
+                  <dd>{trace.error}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </details>
+        ) : null}
       </section>
     </div>
   );
