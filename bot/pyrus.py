@@ -243,7 +243,7 @@ class Pyrus:
                 "origin": values.get(FIELD_ORIGIN),
                 "deadline": values.get(FIELD_DEADLINE),
                 "created": task.get("create_date"),
-                "closed": bool(task.get("close_date")),
+                "closed": bool(task.get("is_closed") or task.get("close_date")),
             })
         # Свежие сверху: человек ищет последнюю заявку, а не первую.
         mine.sort(key=lambda item: item.get("created") or "", reverse=True)

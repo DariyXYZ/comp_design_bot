@@ -1,25 +1,49 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { routes } from "@/config/navigation";
-import { MY_REQUESTS, StageTrack } from "@/features/requests";
-import { useViewer } from "@/hooks/use-viewer";
 import { askMyRequests } from "@/features/requests/submit";
-import { myRequestHref } from "@/config/navigation";
+import { useViewer } from "@/hooks/use-viewer";
+import { exchangeSession, fetchMyRequests } from "@/lib/client/api";
+import type { PyrusRequest } from "@/lib/server/pyrus";
 
 /**
  * Профиль: кто ты для отдела и что у тебя открыто.
  *
- * Имя приходит из Telegram только в браузере (см. `useViewer`), поэтому до
- * гидратации его нет — заголовок держит высоту заранее.
+ * Имя приходит из нескольких мест (см. `readViewer`), потому что клиенты
+ * Telegram отдают данные запуска непредсказуемо. Заявки — из своего API,
+ * который проверяет подпись запуска и читает реестр формы Pyrus по
+ * Telegram-id: без проверки любой запросил бы чужие заявки, а ключ Pyrus в
+ * браузере жить не может.
  *
- * Списка заявок здесь пока нет по честной причине: чтобы показать заявки
- * конкретного человека, нужно проверить подпись `initData`, а это серверный
- * код, которого у статического Mini App не бывает. Пока список живёт в чате
- * бота, и экран ведёт туда, а не показывает выдуманные карточки.
+ * Если API недоступен (статическая сборка под GitHub Pages, нет сети, клиент
+ * не дал данных запуска), экран не ломается: объясняет это словами и оставляет
+ * рабочий путь — попросить список у бота в чат.
  */
+type State =
+  | { kind: "loading" }
+  | { kind: "ready"; requests: PyrusRequest[] }
+  | { kind: "unavailable" };
+
 export function ProfileScreen() {
   const viewer = useViewer();
+  const [state, setState] = useState<State>({ kind: "loading" });
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      // Обмен данных запуска на токен: он и подтверждает вход, и переживает
+      // то, что клиент в следующий раз отдаст пустой initData.
+      await exchangeSession();
+      const requests = await fetchMyRequests();
+      if (!alive) return;
+      setState(requests ? { kind: "ready", requests } : { kind: "unavailable" });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <div className="scroll">
@@ -50,56 +74,72 @@ export function ProfileScreen() {
         </div>
       ) : null}
 
-      {MY_REQUESTS.length > 0 ? (
-        <section className="section">
-          <div className="section-head">
-            <h2>Мои заявки</h2>
-            <span className="count">{MY_REQUESTS.length}</span>
-          </div>
+      <section className="section">
+        <div className="section-head">
+          <h2>Мои заявки</h2>
+          {state.kind === "ready" && state.requests.length > 0 ? (
+            <span className="count">{state.requests.length}</span>
+          ) : null}
+        </div>
+
+        {state.kind === "loading" ? (
+          <p className="section-note">Загружаем заявки из Pyrus…</p>
+        ) : null}
+
+        {state.kind === "ready" && state.requests.length > 0 ? (
           <div className="rows">
-            {MY_REQUESTS.map((request) => (
-              <Link key={request.id} href={myRequestHref(request.id)} className="card">
+            {state.requests.map((request) => (
+              <article key={request.taskId} className="card">
                 <div className="row-meta">
-                  <span className="row-dim">№ {request.id.replace("r-", "")}</span>
-                  {request.flag ? (
-                    <span className="tag tag-flag">{request.flag}</span>
+                  {request.number ? (
+                    <span className="row-dim">№ {request.number}</span>
+                  ) : null}
+                  <span className={request.closed ? "tag" : "tag tag-work"}>
+                    {request.closed ? "Завершена" : "В работе"}
+                  </span>
+                  {request.deadline ? (
+                    <span className="row-dim">срок {request.deadline}</span>
                   ) : null}
                 </div>
-                <h3>{request.title}</h3>
-                <p className="row-dim">{request.originLabel}</p>
-                <p className="row-dim">{request.project}</p>
-                <StageTrack stage={request.stage} />
-                <p className="row-dim">{request.when}</p>
-              </Link>
+                <h3>{request.topic ?? "Заявка"}</h3>
+                {request.project ? <p className="row-dim">{request.project}</p> : null}
+                {request.origin ? <p className="row-dim">{request.origin}</p> : null}
+              </article>
             ))}
           </div>
-        </section>
-      ) : (
-        <section className="section">
-          <div className="section-head">
-            <h2>Мои заявки</h2>
-          </div>
+        ) : null}
+
+        {state.kind === "ready" && state.requests.length === 0 ? (
           <div className="empty">
             <p>
-              Список заявок и статусы присылает бот в чат — здесь их пока нет:
-              чтобы показать заявки именно ваши, нужна проверка подписи
-              запуска, то есть серверная часть.
+              Заявок пока нет. Создайте её из темы или из готового решения — так
+              у отдела сразу будет контекст.
             </p>
           </div>
-          <div className="rows" style={{ marginTop: "var(--s3)" }}>
-            {/* Приложение закроется, и список придёт сообщением в чат — там же,
-                где человек и так общается с ботом. */}
-            <button type="button" className="row-action" onClick={askMyRequests}>
-              <span>Показать мои заявки в чате</span>
-              <span aria-hidden="true">→</span>
-            </button>
-            <Link href={routes.feed} className="row-action">
-              <span>Посмотреть, что делает отдел</span>
-              <span aria-hidden="true">→</span>
-            </Link>
+        ) : null}
+
+        {state.kind === "unavailable" ? (
+          <div className="empty">
+            <p>
+              Список заявок сейчас недоступен: приложение не смогло подтвердить
+              вход. Бот покажет заявки в чате — там та же выборка.
+            </p>
           </div>
-        </section>
-      )}
+        ) : null}
+
+        <div className="rows" style={{ marginTop: "var(--s3)" }}>
+          {/* Запасной путь, он же самый надёжный: приложение закроется, и
+              список придёт сообщением в чат. */}
+          <button type="button" className="row-action" onClick={askMyRequests}>
+            <span>Показать мои заявки в чате</span>
+            <span aria-hidden="true">→</span>
+          </button>
+          <Link href={routes.feed} className="row-action">
+            <span>Посмотреть, что делает отдел</span>
+            <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

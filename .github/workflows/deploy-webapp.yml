@@ -4,15 +4,10 @@ name: Deploy Mini App
 # Источником Pages должен быть выбран «GitHub Actions» (Settings → Pages),
 # иначе job соберётся, но публикация не применится.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
-      - ".github/workflows/deploy-webapp.yml"
-  pull_request:
-    paths:
-      - "web/**"
-      - ".github/workflows/deploy-webapp.yml"
+  # Приложение переехало на Vercel: там API-роуты личного кабинета,
+  # которых статический экспорт не поддерживает. Автотриггер снят —
+  # сборка под Pages больше не проходит. Оставлен ручной запуск,
+  # чтобы историю и возможность откатиться не терять.
   workflow_dispatch:
 
 permissions:
