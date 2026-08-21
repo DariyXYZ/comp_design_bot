@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { MATERIAL_TYPE_LABEL, type Material } from "../data";
 import { itemHref } from "@/config/navigation";
 
@@ -14,7 +15,9 @@ import { itemHref } from "@/config/navigation";
 export function MaterialRow({ material }: Readonly<{ material: Material }>) {
   return (
     <Link href={itemHref(material.id)} className="row">
-      <div className="row-thumb" aria-hidden="true" />
+      <div className="row-thumb">
+        <ScriptGlyph className="glyph" />
+      </div>
       <div className="row-text">
         <div className="row-meta">
           <span className={`tag tag-${material.type}`}>

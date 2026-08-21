@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PathField } from "@/components/ui/path-field";
+import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { FEED, type FeedItem } from "@/features/feed";
 import { plural } from "@/lib/plural";
 import { requestHref } from "@/config/navigation";
@@ -84,7 +85,9 @@ function FeedRow({ item }: Readonly<{ item: FeedItem }>) {
   return (
     <article className="feed-card">
       <div className="feed-top">
-        <div className="row-thumb" aria-hidden="true" />
+        <div className="row-thumb">
+          <ScriptGlyph className="glyph" />
+        </div>
         <div className="row-text">
           <div className="row-meta">
             <span className={inWork ? "tag tag-work" : "tag"}>

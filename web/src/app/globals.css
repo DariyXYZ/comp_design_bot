@@ -370,7 +370,15 @@ header .brand{
   flex:0 0 96px;align-self:stretch;min-height:96px;
   border-radius:var(--r2);
   background:var(--pill);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;color:var(--sub);
 }
+
+/* Условное обозначение скрипта на месте отсутствующей картинки. Приглушён:
+   это подпись к пустому месту, а не содержание строки — в полный контраст он
+   перетягивал бы внимание с названия. */
+.glyph{width:66%;height:auto;opacity:.5;flex:0 0 auto}
+.glyph-lg{width:34%;opacity:.4}
 /* Текст центрируется по превью: у коротких описаний правая колонка иначе
    висит вверху, и строка выглядит незаполненной. */
 .row-text{
@@ -490,7 +498,8 @@ header .brand{
 .media-slot{
   aspect-ratio:16/10;border-radius:var(--r3);
   background:var(--pill);border:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;padding:var(--s4);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:var(--s3);padding:var(--s4);
   text-align:center;color:var(--sub);font-size:var(--t-small);line-height:1.4;
 }
 .lead{font-size:var(--t-body);line-height:1.5;margin-top:var(--s4)}

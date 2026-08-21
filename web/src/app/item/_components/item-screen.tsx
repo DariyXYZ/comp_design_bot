@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { ActionBar } from "@/components/layout/action-bar";
 import { PathField } from "@/components/ui/path-field";
 import { Screen } from "@/components/layout/screen";
+import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
 import { requestHref, routes } from "@/config/navigation";
 
@@ -39,6 +40,7 @@ export function ItemScreen() {
         backHref={routes.topics}
       >
         <div className="media-slot">
+          <ScriptGlyph className="glyph glyph-lg" />
           <span>{material.media}</span>
         </div>
 
