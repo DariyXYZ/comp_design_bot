@@ -4,6 +4,7 @@ import {
   AuthError,
   bearer,
   issueToken,
+  readLoginCode,
   readToken,
   verifyInitData,
 } from "@/lib/server/telegram-auth";
@@ -92,5 +93,55 @@ describe("токен сессии", () => {
   it("заголовок без Bearer отклоняется", () => {
     expect(() => bearer("Token abc")).toThrow(AuthError);
     expect(bearer("Bearer abc")).toBe("abc");
+  });
+});
+
+/**
+ * Код входа подписывает бот на Python, а проверяет этот модуль. Тест повторяет
+ * подпись «как у бота», чтобы расхождение форматов ловилось здесь, а не в
+ * проде на живом человеке.
+ */
+function signLoginCode(
+  payload: Record<string, unknown>,
+  secret = BOT_TOKEN,
+): string {
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = crypto.createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${signature}`;
+}
+
+describe("код входа из адреса кнопки", () => {
+  const fresh = () => ({
+    uid: 469526368,
+    name: "Дарий Назаров",
+    handle: "@dariy",
+    exp: Math.floor(Date.now() / 1000) + 600,
+    kind: "code",
+  });
+
+  it("подписанный код даёт пользователя", () => {
+    expect(readLoginCode(signLoginCode(fresh()), BOT_TOKEN)).toEqual({
+      id: 469526368,
+      name: "Дарий Назаров",
+      handle: "@dariy",
+    });
+  });
+
+  it("чужой секрет не проходит", () => {
+    expect(() => readLoginCode(signLoginCode(fresh(), "другой"), BOT_TOKEN)).toThrow(
+      AuthError,
+    );
+  });
+
+  it("истёкший код отклоняется", () => {
+    const stale = { ...fresh(), exp: Math.floor(Date.now() / 1000) - 60 };
+    expect(() => readLoginCode(signLoginCode(stale), BOT_TOKEN)).toThrow(/истёк/);
+  });
+
+  it("токен сессии не сходит за код входа", () => {
+    // Иначе долгоживущий токен из адреса работал бы как вход, и короткий срок
+    // жизни кода перестал бы что-либо значить.
+    const token = issueToken({ id: 1, name: "Кто-то", handle: null }, BOT_TOKEN);
+    expect(() => readLoginCode(token, BOT_TOKEN)).toThrow(/не код входа/);
   });
 });

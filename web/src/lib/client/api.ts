@@ -41,18 +41,62 @@ function storeToken(token: string): void {
 }
 
 /**
- * Меняет данные запуска на токен сессии.
+ * Забирает код входа из адреса и убирает его оттуда.
  *
- * Возвращает `null`, если API недоступен (статическая сборка) или Telegram не
- * дал данных запуска — вызывающий показывает это состояние словами.
+ * Код кладёт бот в кнопку Mini App. Он живёт минуты и меняется на токен сразу,
+ * поэтому из адреса его лучше вычистить: адрес попадает в историю клиента, а
+ * ссылку человек может переслать.
+ */
+function takeLoginCode(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("c");
+    if (!code) return null;
+    params.delete("c");
+    const rest = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (rest ? `?${rest}` : "") + window.location.hash,
+    );
+    return code;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Получает токен сессии. Два пути, оба рабочие:
+ *
+ * 1. **Код входа из адреса кнопки** — надёжнее, потому что его формирует бот.
+ * 2. **`initData` от клиента Telegram** — работает, когда клиент его отдал.
+ *
+ * Возвращает `null`, если ни то, ни другое не доступно (например, приложение
+ * открыли прямой ссылкой в браузере) — вызывающий говорит об этом словами.
  */
 export async function exchangeSession(): Promise<Session | null> {
+  const code = takeLoginCode();
+  if (code) {
+    const session = await post("/api/auth/redeem/", { code });
+    if (session) return session;
+  }
   const initData = window.Telegram?.WebApp?.initData;
   if (!initData) return null;
+  return post("/api/auth/exchange/", undefined, {
+    "X-Telegram-Init-Data": initData,
+  });
+}
+
+async function post(
+  path: string,
+  body?: unknown,
+  headers: Record<string, string> = {},
+): Promise<Session | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/exchange/`, {
+    const response = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: { "X-Telegram-Init-Data": initData },
+      headers: body === undefined ? headers : { ...headers, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!response.ok) return null;
     const session = (await response.json()) as Session;

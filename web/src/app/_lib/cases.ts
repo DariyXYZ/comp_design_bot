@@ -42,15 +42,32 @@ export function toCases(rows: readonly CaseRow[]): Case[] {
  * Бросает исключение, если сети нет, Supabase ответил не 2xx или таблица
  * пуста — вызывающий показывает запасной экран.
  */
+/**
+ * Карточки, уже полученные в этой сессии.
+ *
+ * Экран тем открывают несколько раз за посещение (туда-обратно из профиля и
+ * потока), и каждый повторный запрос было видно глазом. Данные меняются
+ * редко, поэтому в пределах одной сессии хватает одного похода за ними.
+ */
+let cached: Case[] | null = null;
+
 export async function fetchCases(
   { signal }: { signal?: AbortSignal } = {},
 ): Promise<Case[]> {
-  const res = await fetch("/api/topics/", { signal, cache: "no-store" });
+  if (cached) return cached;
+
+  const res = await fetch("/api/topics/", { signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const body = (await res.json()) as { rows?: CaseRow[] };
   const rows = body.rows ?? [];
   if (!rows.length) throw new Error("Карточки не пришли");
 
-  return toCases(rows);
+  cached = toCases(rows);
+  return cached;
+}
+
+/** Сбрасывает кэш карточек — нужен тестам, чтобы они не влияли друг на друга. */
+export function resetCasesCache(): void {
+  cached = null;
 }

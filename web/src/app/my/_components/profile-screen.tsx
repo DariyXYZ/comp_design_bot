@@ -26,16 +26,24 @@ type State =
   | { kind: "ready"; requests: PyrusRequest[] }
   | { kind: "unavailable" };
 
+type SessionUser = { name: string; handle: string | null };
+
 export function ProfileScreen() {
   const viewer = useViewer();
   const [state, setState] = useState<State>({ kind: "loading" });
+  // Имя из подтверждённой сессии — самое достоверное: его подписал бот или
+  // Telegram, а не подставил адрес кнопки.
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
     let alive = true;
     void (async () => {
       // Обмен данных запуска на токен: он и подтверждает вход, и переживает
       // то, что клиент в следующий раз отдаст пустой initData.
-      await exchangeSession();
+      const session = await exchangeSession();
+      if (alive && session?.user) {
+        setSessionUser({ name: session.user.name, handle: session.user.handle });
+      }
       const requests = await fetchMyRequests();
       if (!alive) return;
       setState(requests ? { kind: "ready", requests } : { kind: "unavailable" });
@@ -62,12 +70,16 @@ export function ProfileScreen() {
         <div className="profile-who">
           {/* Пустая строка держит высоту, чтобы заголовок не прыгал после
               гидратации. */}
-          <h1>{viewer ? viewer.name : " "}</h1>
-          <p>{viewer?.handle ?? "Отдел вычислительного проектирования"}</p>
+          <h1>{sessionUser?.name ?? viewer?.name ?? " "}</h1>
+          <p>
+            {sessionUser?.handle ??
+              viewer?.handle ??
+              "Отдел вычислительного проектирования"}
+          </p>
         </div>
       </section>
 
-      {viewer && !viewer.inTelegram ? (
+      {!sessionUser && viewer && !viewer.inTelegram ? (
         <div className="banner banner-quiet">
           <strong>Открыто вне Telegram</strong>
           <span>Имя и отправка заявок работают только при запуске из бота</span>

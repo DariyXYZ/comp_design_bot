@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchCases, toCases } from "@/app/_lib/cases";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchCases, resetCasesCache, toCases } from "@/app/_lib/cases";
 
 type Row = {
   key: string;
@@ -59,16 +59,15 @@ describe("toCases", () => {
 });
 
 describe("fetchCases", () => {
+  // Кэш живёт в модуле — без сброса второй тест увидел бы данные первого.
+  beforeEach(resetCasesCache);
   it("запрашивает карточки у своего роута и не носит ключей в браузере", async () => {
     const fetchMock = respondWith({ rows: [row()] });
     await fetchCases();
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/topics/");
-    // Кеша нет намеренно: контент правят в дашборде Supabase и ждут увидеть
-    // правку при следующем открытии.
-    expect(init.cache).toBe("no-store");
-    // Ключ Supabase остался на сервере — в запросе из браузера его быть не
+        // Ключ Supabase остался на сервере — в запросе из браузера его быть не
     // должно, иначе он снова попадёт в бандл.
     expect(init.headers).toBeUndefined();
   });

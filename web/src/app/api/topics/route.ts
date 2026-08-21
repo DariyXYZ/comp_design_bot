@@ -9,11 +9,12 @@ import { serverEnv } from "@/config/server-env";
  * `NEXT_PUBLIC_*`, что требовало публичной копии каждой переменной — лишняя
  * сущность и лишний способ ошибиться.
  *
- * Кеширования нет намеренно: контент правят в дашборде Supabase и ждут увидеть
- * правку при следующем открытии приложения.
+ * Ответ кэшируется на пять минут: карточки правят в дашборде Supabase редко, а
+ * без кэша каждое открытие приложения ждало похода в Supabase — это было видно
+ * глазом. Правка появится в приложении в течение этих пяти минут.
  */
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 const QUERY = "cases?select=key,title,hint,eta,image_front,image_back&order=sort_order";
 
@@ -25,7 +26,9 @@ export async function GET() {
         apikey: env.supabaseAnonKey,
         Authorization: `Bearer ${env.supabaseAnonKey}`,
       },
-      cache: "no-store",
+      // Запрос к Supabase тоже кэшируется — иначе revalidate выше не имел бы
+      // смысла: функция ходила бы за данными на каждый запрос.
+      next: { revalidate: 300 },
     });
     if (!response.ok) {
       return NextResponse.json(

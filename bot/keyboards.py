@@ -14,6 +14,7 @@ from aiogram.types import (
 
 from .config import config
 from .texts import CASES, STATUSES
+from .webauth import login_code
 
 BTN_CAPABILITIES = "✦ Возможности отдела"
 BTN_MY = "☰ Мои заявки"
@@ -22,16 +23,17 @@ BTN_INFO = "🅘 Инфо"
 
 
 def webapp_url_for(user: User | None) -> str:
-    """Адрес Mini App с именем человека в параметрах.
+    """Адрес Mini App с именем и подписанным кодом входа.
 
     Зачем: клиенты Telegram отдают данные запуска непредсказуемо — после
-    восстановления вебвью из кеша `initData` приходит пустым, и профиль в
-    приложении застревал на «Гость». Кнопку же формирует бот, и в этот момент
-    имя ему известно точно, поэтому он и передаёт его сам.
+    восстановления вебвью из кеша `initData` приходит пустым, приложение не
+    может опознать человека, и профиль застревает на «Гость», а картинки в
+    заявку не грузятся. Кнопку формирует бот, и в этот момент он точно знает,
+    кто перед ним.
 
-    Это только для показа: параметры не подписаны, ничего не авторизуют и прав
-    не дают. Всё, что требует доверия (чьи заявки показывать), проверяется по
-    подписи `initData` на сервере.
+    `u` и `h` — только для показа (имя и ник, ничего не авторизуют).
+    `c` — подписанный код входа: приложение сразу меняет его на свой токен
+    сессии, поэтому в адресе он живёт минуты (см. `webauth.login_code`).
     """
     if not config.webapp_url or user is None:
         return config.webapp_url
@@ -40,6 +42,7 @@ def webapp_url_for(user: User | None) -> str:
     query["u"] = user.full_name or ""
     if user.username:
         query["h"] = user.username
+    query["c"] = login_code(user.id, user.full_name or "", user.username)
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 

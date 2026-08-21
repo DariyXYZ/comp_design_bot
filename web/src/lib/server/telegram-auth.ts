@@ -108,6 +108,42 @@ export function readToken(token: string, secret: string): Viewer {
   return { id: payload.id, name: payload.name, handle: payload.handle };
 }
 
+/**
+ * Проверяет код входа, который бот положил в адрес кнопки Mini App.
+ *
+ * Тот же формат и тот же секрет, что у токена сессии (`payload.signature`,
+ * HMAC от токена бота) — код отличается полем `kind` и коротким сроком жизни.
+ * Нужен потому, что клиенты Telegram отдают `initData` непредсказуемо: кнопку
+ * формирует бот, и в этот момент он точно знает, кто перед ним.
+ */
+export function readLoginCode(code: string, secret: string): Viewer {
+  const [body, signature] = code.split(".");
+  if (!body || !signature) throw new AuthError("код входа повреждён");
+  const expected = base64url(crypto.createHmac("sha256", secret).update(body).digest());
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    throw new AuthError("подпись кода не совпала");
+  }
+  const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
+    uid?: number;
+    name?: string;
+    handle?: string | null;
+    exp?: number;
+    kind?: string;
+  };
+  // Разделение видов обязательно: иначе долгий токен сессии сошёл бы за код
+  // входа и наоборот, и срок жизни перестал бы что-либо значить.
+  if (payload.kind !== "code") throw new AuthError("это не код входа");
+  if (!payload.uid) throw new AuthError("в коде нет пользователя");
+  if ((payload.exp ?? 0) < Date.now() / 1000) throw new AuthError("код входа истёк");
+  return {
+    id: payload.uid,
+    name: payload.name || "Без имени",
+    handle: payload.handle ?? null,
+  };
+}
+
 /** Достаёт токен из заголовка `Authorization: Bearer …`. */
 export function bearer(header: string | null): string {
   const value = header?.trim() ?? "";
