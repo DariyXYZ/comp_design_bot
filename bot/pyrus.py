@@ -164,6 +164,47 @@ class Pyrus:
             log.info("Pyrus: создана задача %s по форме", task_id)
         return task_id
 
+    async def upload_and_attach(
+        self, task_id: int, files: list[tuple[str, bytes]], text: str
+    ) -> int:
+        """Прикрепляет файлы к задаче комментарием. Возвращает число вложенных.
+
+        Двухшаговый путь — требование Pyrus: сначала `files/upload` отдаёт guid,
+        и только потом guid можно приложить к задаче. Комментарием, а не при
+        создании: заявка уже создана, и потеря картинки не должна её отменять.
+        """
+        if not files:
+            return 0
+        guids = []
+        async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+            token = self._token or await self._authorize(session)
+            if not token:
+                return 0
+            headers = {"Authorization": f"Bearer {token}"}
+            for name, data in files:
+                form = aiohttp.FormData()
+                form.add_field("file", data, filename=name, content_type="image/jpeg")
+                async with session.post(
+                    self._api + "/files/upload", data=form, headers=headers
+                ) as resp:
+                    body = await resp.json(content_type=None)
+                    if resp.status != 200 or not body.get("guid"):
+                        log.warning("Pyrus: файл %s не загрузился (%s) %s",
+                                    name, resp.status, body)
+                        continue
+                    guids.append(body["guid"])
+        if not guids:
+            return 0
+        result = await self._call(
+            f"/tasks/{task_id}/comments",
+            {"text": text, "attachments": [{"guid": g} for g in guids]},
+        )
+        if result is None:
+            log.warning("Pyrus: вложения загружены, но комментарий к %s не создан", task_id)
+            return 0
+        log.info("Pyrus: к задаче %s приложено файлов: %s", task_id, len(guids))
+        return len(guids)
+
     async def create_text_task(self, text: str) -> int | None:
         """Обычная задача с текстом — путь на случай, когда формы нет."""
         body = await self._call("/tasks", {"text": text})
@@ -201,6 +242,21 @@ def request_text(
     if photos:
         lines += ["", f"Картинок в заявке: {photos} (в чате бота)"]
     return "\n".join(lines)
+
+
+async def attach_photos(
+    task_id: int, files: list[tuple[str, bytes]]
+) -> int:
+    """Докладывает картинки заявки в задачу Pyrus. Ошибки только в лог."""
+    if not pyrus.enabled or not task_id or not files:
+        return 0
+    try:
+        return await pyrus.upload_and_attach(
+            task_id, files, "Картинки из заявки (присланы боту в Telegram)"
+        )
+    except Exception:  # noqa: BLE001 — заявка уже создана, падать нельзя
+        log.exception("Pyrus: не удалось приложить картинки к задаче %s", task_id)
+        return 0
 
 
 async def send_request(

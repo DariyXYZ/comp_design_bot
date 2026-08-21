@@ -4,7 +4,7 @@ import Link from "next/link";
 import { routes } from "@/config/navigation";
 import { MY_REQUESTS, StageTrack } from "@/features/requests";
 import { useViewer } from "@/hooks/use-viewer";
-import { closeMiniApp } from "@/lib/client/telegram";
+import { askMyRequests } from "@/features/requests/submit";
 import { myRequestHref } from "@/config/navigation";
 
 /**
@@ -81,15 +81,16 @@ export function ProfileScreen() {
           </div>
           <div className="empty">
             <p>
-              Список заявок и их статусы — в чате с ботом: команда{" "}
-              <code>/my</code>. Здесь он появится, когда у приложения будет
-              серверная часть: без проверки подписи запуска чужие заявки
-              отличить от своих нельзя.
+              Список заявок и статусы присылает бот в чат — здесь их пока нет:
+              чтобы показать заявки именно ваши, нужна проверка подписи
+              запуска, то есть серверная часть.
             </p>
           </div>
           <div className="rows" style={{ marginTop: "var(--s3)" }}>
-            <button type="button" className="row-action" onClick={closeMiniApp}>
-              <span>Открыть чат с ботом</span>
+            {/* Приложение закроется, и список придёт сообщением в чат — там же,
+                где человек и так общается с ботом. */}
+            <button type="button" className="row-action" onClick={askMyRequests}>
+              <span>Показать мои заявки в чате</span>
               <span aria-hidden="true">→</span>
             </button>
             <Link href={routes.feed} className="row-action">

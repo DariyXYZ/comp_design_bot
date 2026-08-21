@@ -71,15 +71,24 @@ async def show_info(message: Message, state: FSMContext) -> None:
 
 @router.message(Command("my"), F.chat.type == "private")
 @router.message(F.text == BTN_MY, F.chat.type == "private")
-async def my_requests(message: Message, state: FSMContext) -> None:
-    await state.clear()  # любая кнопка меню посреди заявки сбрасывает черновик
-    requests = await db.list_user_requests(message.from_user.id)
+async def render_user_requests(user_id: int) -> str:
+    """Список заявок человека одним текстом.
+
+    Вынесено из обработчика: тот же список запрашивает Mini App — там своего
+    списка заявок нет и быть не может, пока у приложения нет серверной части
+    (без проверки подписи запуска чужие заявки от своих не отличить).
+    """
+    requests = await db.list_user_requests(user_id)
     if not requests:
-        await message.answer(NO_REQUESTS)
-        return
+        return NO_REQUESTS
     lines = []
     for r in requests:
         case_title = CASES.get(r["case_key"], {}).get("title", r["case_key"])
         status = STATUSES.get(r["status"], r["status"])
         lines.append(f"№{r['id']} · {case_title}\n{status} · {r['created_at'][:10]}")
-    await message.answer("\n\n".join(lines))
+    return "\n\n".join(lines)
+
+
+async def my_requests(message: Message, state: FSMContext) -> None:
+    await state.clear()  # любая кнопка меню посреди заявки сбрасывает черновик
+    await message.answer(await render_user_requests(message.from_user.id))

@@ -187,6 +187,14 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
         return
     if not isinstance(data, dict):
         return
+    # Mini App просит показать заявки: своего списка у него нет, пока нет
+    # серверной части с проверкой подписи запуска. Отвечаем в чат.
+    if data.get("action") == "my_requests":
+        from .start import render_user_requests
+
+        await message.answer(await render_user_requests(message.from_user.id))
+        return
+
     case_key = data.get("case")
     if case_key not in CASES:
         return
@@ -358,6 +366,23 @@ async def cancel_request(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.message.answer(CANCELED)
 
 
+
+async def _attach_photos_to_pyrus(bot: Bot, task_id: int, file_ids: list[str]) -> None:
+    """Качает картинки заявки из Telegram и прикладывает их к задаче Pyrus."""
+    if not file_ids:
+        return
+    files: list[tuple[str, bytes]] = []
+    for number, file_id in enumerate(file_ids, start=1):
+        try:
+            buffer = await bot.download(file_id)
+        except Exception:  # noqa: BLE001 — одна битая картинка не повод падать
+            log.exception("Не удалось скачать фото %s для Pyrus", file_id)
+            continue
+        if buffer is None:
+            continue
+        files.append((f"photo-{number}.jpg", buffer.read()))
+    await pyrus.attach_photos(task_id, files)
+
 @router.callback_query(NewRequest.preview, F.data == "req:send")
 async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     user = callback.from_user
@@ -405,6 +430,10 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     )
     if task_id:
         await db.set_pyrus_task(req_id, task_id)
+        # Картинки — отдельным шагом: Pyrus принимает файлы только по guid,
+        # который выдаёт `files/upload`, а качать их из Telegram надо по одному.
+        # Заявка к этому моменту уже создана, поэтому сбой загрузки её не рушит.
+        await _attach_photos_to_pyrus(bot, task_id, data.get("photos", []))
 
     if config.dept_chat_id is None:
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))

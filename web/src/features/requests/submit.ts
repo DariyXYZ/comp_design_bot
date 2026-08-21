@@ -60,3 +60,18 @@ export function submitRequest(draft: RequestDraft): SendResult {
   haptic(result === "sent" ? "success" : "error");
   return result;
 }
+
+/**
+ * Просит бота показать заявки этого человека.
+ *
+ * Своего списка у Mini App нет: чтобы отобрать заявки конкретного человека,
+ * нужно проверить подпись запуска, а это серверный код, которого у статического
+ * экспорта не бывает. Бот такую выборку умеет (`/my`), поэтому приложение
+ * просит его ответить в чате — `sendData` закрывает Mini App, и человек
+ * оказывается ровно там, где придёт список.
+ */
+export function askMyRequests(): SendResult {
+  const result = sendToBot({ action: "my_requests" });
+  haptic(result === "sent" ? "success" : "error");
+  return result;
+}
