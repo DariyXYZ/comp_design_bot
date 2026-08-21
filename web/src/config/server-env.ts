@@ -23,5 +23,9 @@ export function serverEnv() {
     pyrusLogin: required("PYRUS_LOGIN"),
     pyrusSecurityKey: required("PYRUS_SECURITY_KEY"),
     pyrusFormId: Number(required("PYRUS_FORM_ID")),
+    // Те же значения, что у бота. Без префикса NEXT_PUBLIC_ они не попадают в
+    // браузер — и это правильно: карточки читает серверный роут, а не клиент.
+    supabaseUrl: required("SUPABASE_URL").replace(/\/$/, ""),
+    supabaseAnonKey: required("SUPABASE_ANON_KEY"),
   };
 }

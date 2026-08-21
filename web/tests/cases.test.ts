@@ -59,41 +59,40 @@ describe("toCases", () => {
 });
 
 describe("fetchCases", () => {
-  it("запрашивает нужные поля с сортировкой и анонимным ключом", async () => {
-    const fetchMock = respondWith([row()]);
+  it("запрашивает карточки у своего роута и не носит ключей в браузере", async () => {
+    const fetchMock = respondWith({ rows: [row()] });
     await fetchCases();
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/rest/v1/cases");
-    expect(url).toContain("order=sort_order");
-    expect(url).toContain("select=key,title,hint,eta,image_front,image_back");
+    expect(url).toBe("/api/topics/");
+    // Кеша нет намеренно: контент правят в дашборде Supabase и ждут увидеть
+    // правку при следующем открытии.
     expect(init.cache).toBe("no-store");
-    expect(init.headers).toMatchObject({
-      apikey: "test-anon-key",
-      Authorization: "Bearer test-anon-key",
-    });
+    // Ключ Supabase остался на сервере — в запросе из браузера его быть не
+    // должно, иначе он снова попадёт в бандл.
+    expect(init.headers).toBeUndefined();
   });
 
   it("возвращает готовые к отрисовке карточки", async () => {
-    respondWith([row({ key: "curved", eta: "2 дня" })]);
+    respondWith({ rows: [row({ key: "curved", eta: "2 дня" })] });
     const cases = await fetchCases();
     expect(cases).toHaveLength(1);
     expect(cases[0]).toMatchObject({ key: "curved", eta: "⏱ 2 дня" });
   });
 
   it("падает с кодом ответа, если Supabase отказал", async () => {
-    respondWith([], false, 401);
+    respondWith({ error: "нет доступа" }, false, 401);
     // 401 здесь не абстрактный: так проявляется таблица без GRANT SELECT для anon.
     await expect(fetchCases()).rejects.toThrow("HTTP 401");
   });
 
   it("падает на пустой таблице — показывать пустую колоду хуже, чем сказать о сбое", async () => {
-    respondWith([]);
-    await expect(fetchCases()).rejects.toThrow(/пуста/);
+    respondWith({ rows: [] });
+    await expect(fetchCases()).rejects.toThrow(/не пришли/);
   });
 
   it("прокидывает signal, чтобы запрос отменялся при размонтировании", async () => {
-    const fetchMock = respondWith([row()]);
+    const fetchMock = respondWith({ rows: [row()] });
     const controller = new AbortController();
     await fetchCases({ signal: controller.signal });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
