@@ -117,13 +117,15 @@ export function RequestForm() {
 
         <label className="field">
           <span>
-            Жёсткий срок <em>необязательно</em>
+            Срок <em>необязательно</em>
           </span>
+          {/* Календарь, а не свободный текст: в Pyrus это поле-дата, по нему
+              работают фильтры реестра и правила SLA. Фразы вроде «зависит от
+              заказчика» пишутся в описании. */}
           <input
-            type="text"
+            type="date"
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}
-            placeholder="Например, к 28 августа"
           />
         </label>
 

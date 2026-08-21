@@ -220,6 +220,13 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
             photos=[],
             source_path=source,
             from_webapp=True,
+            # Те же значения, что уже попали в шапку описания, но по
+            # отдельности: карточке в чате нужен связный текст, а форме
+            # Pyrus — поля, по которым работают фильтры и реестр.
+            wa_project=_field(data, "project", MAX_MINIAPP_FIELD),
+            wa_origin=_field(data, "origin", MAX_MINIAPP_FIELD),
+            wa_origin_path=_field(data, "origin_path", MAX_SOURCE),
+            wa_deadline=_field(data, "deadline", MAX_MINIAPP_FIELD),
         )
         await state.set_state(NewRequest.photos)
 
@@ -390,6 +397,11 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         author=author,
         source_path=data.get("source_path"),
         photos=len(data.get("photos", [])),
+        tg_user_id=user.id,
+        project=data.get("wa_project"),
+        origin=data.get("wa_origin"),
+        origin_path=data.get("wa_origin_path"),
+        deadline=data.get("wa_deadline"),
     )
     if task_id:
         await db.set_pyrus_task(req_id, task_id)

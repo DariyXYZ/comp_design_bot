@@ -54,7 +54,7 @@ test.describe("заявка из Mini App", () => {
     await page
       .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
       .fill("Посчитать инсоляцию двух вариантов двора");
-    await page.getByPlaceholder("Например, к 28 августа").fill("к 28 августа");
+    await page.locator('input[type="date"]').fill("2026-08-28");
 
     await page.locator(".action-bar button").click();
 
@@ -66,7 +66,8 @@ test.describe("заявка из Mini App", () => {
     expect(payload.case).toBe("physics");
     expect(payload.description).toBe("Посчитать инсоляцию двух вариантов двора");
     expect(payload.project).toBe("2-04-2026 МФК Ленинский");
-    expect(payload.deadline).toBe("к 28 августа");
+    // Pyrus принимает дату в ISO — ровно это и отдаёт нативный календарь.
+    expect(payload.deadline).toBe("2026-08-28");
     expect(payload.origin).toContain("IND Solar");
     expect(payload.origin_path).toContain("CompDesign_Projects");
   });
