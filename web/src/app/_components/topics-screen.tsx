@@ -69,10 +69,14 @@ export function TopicsScreen() {
       </div>
 
       {topic ? (
+        // Кнопка называет действие, а не объект: «Создать заявку» стояло и
+        // здесь, и на материале, из-за чего два разных входа выглядели одним
+        // (см. CALL_TO_ACTION в item-screen). Подпись остаётся контекстом —
+        // по какой именно теме уйдёт заявка.
         <ActionBar
           href={requestHref({ topic: topic.key, topicTitle: topic.title })}
-          label="Создать заявку"
-          note={`По теме «${topic.title}»`}
+          label="Попросить помощь по теме"
+          note={`Тема «${topic.title}» · опишете задачу — ответит отдел`}
         />
       ) : null}
     </>

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActionBar } from "@/components/layout/action-bar";
 import { Screen } from "@/components/layout/screen";
 import { itemHref, routes } from "@/config/navigation";
-import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
+import { MATERIAL_TYPE_FORMAL, materialById } from "@/features/materials";
 import { uploadPhoto, type UploadedPhoto } from "@/features/requests/photos";
 import { submitRequest } from "@/features/requests/submit";
 import { setLeaveGuard } from "@/lib/client/leave-guard";
@@ -104,7 +104,7 @@ export function RequestForm() {
 
   const origin = material
     ? {
-        label: `${MATERIAL_TYPE_LABEL[material.type]} · ${material.title}`,
+        label: `${MATERIAL_TYPE_FORMAL[material.type]} · ${material.title}`,
         backHref: itemHref(material.id),
         path: material.files,
       }

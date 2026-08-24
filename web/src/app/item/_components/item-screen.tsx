@@ -5,7 +5,7 @@ import { ActionBar } from "@/components/layout/action-bar";
 import { PathField } from "@/components/ui/path-field";
 import { Screen } from "@/components/layout/screen";
 import { ScriptGlyph } from "@/components/ui/script-glyph";
-import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
+import { MATERIAL_TYPE_LABEL, materialById, type Material } from "@/features/materials";
 import { requestHref, routes } from "@/config/navigation";
 
 /**
@@ -74,13 +74,36 @@ export function ItemScreen() {
 
       <ActionBar
         href={requestHref({ item: material.id })}
-        label="Создать заявку"
-        note={
-          material.type === "case"
-            ? "«Хочу так же» — ссылка на этот кейс уйдёт в заявку"
-            : "Нужна помощь или адаптация под ваш проект"
-        }
+        label={CALL_TO_ACTION[material.type].label}
+        note={CALL_TO_ACTION[material.type].note}
       />
     </>
   );
 }
+
+/**
+ * Что написано на кнопке заявки.
+ *
+ * Раньше везде стояло «Создать заявку» — и на теме, и на материале. Два
+ * разных действия выглядели одним, а разница («что уйдёт в заявку») жила в
+ * подписи под кнопкой, в самом тихом месте экрана. Люди не понимали модель
+ * приложения именно из-за этого, а не из-за отсутствия онбординга.
+ *
+ * Теперь кнопка называет действие, а подпись говорит про альтернативу:
+ * у инструмента и модуля она напоминает, что можно забрать файлы и сделать
+ * самому — ради этого материалы и оформляют.
+ */
+const CALL_TO_ACTION: Record<Material["type"], { label: string; note: string }> = {
+  case: {
+    label: "Хочу так же",
+    note: "Ссылка на этот кейс уйдёт в заявку",
+  },
+  tool: {
+    label: "Настроить под мой проект",
+    note: "Или заберите файлы выше и примените сами",
+  },
+  module: {
+    label: "Помочь с этим модулем",
+    note: "Или заберите файлы выше и вставьте в своё определение",
+  },
+};

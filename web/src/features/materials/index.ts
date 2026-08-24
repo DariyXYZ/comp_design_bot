@@ -1,5 +1,6 @@
 export {
   MATERIALS,
+  MATERIAL_TYPE_FORMAL,
   MATERIAL_TYPE_LABEL,
   materialById,
   materialsByTopic,
