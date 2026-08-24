@@ -3,7 +3,7 @@ import { serverEnv } from "@/config/server-env";
 import { isRequestAction, planAction } from "@/features/requests/actions";
 import { Pyrus } from "@/lib/server/pyrus";
 import { notifyDept } from "@/lib/server/telegram-bot";
-import { AuthError, bearer, readToken } from "@/lib/server/telegram-auth";
+import { AuthError, bearer, readToken, renewalHeaders } from "@/lib/server/telegram-auth";
 
 /**
  * Одна заявка: читать (`GET`) и писать по ней (`POST`).
@@ -20,8 +20,15 @@ type Context = { params: Promise<{ taskId: string }> };
 
 async function viewerAndPyrus(request: Request) {
   const env = serverEnv();
-  const viewer = readToken(bearer(request.headers.get("authorization")), env.botToken);
-  return { env, viewer, pyrus: new Pyrus(env.pyrusLogin, env.pyrusSecurityKey, env.pyrusFormId) };
+  const token = bearer(request.headers.get("authorization"));
+  const viewer = readToken(token, env.botToken);
+  return {
+    env,
+    viewer,
+    pyrus: new Pyrus(env.pyrusLogin, env.pyrusSecurityKey, env.pyrusFormId),
+    // Ответ несёт продлённый токен, когда прежнему осталось меньше недели.
+    headers: renewalHeaders(token, env.botToken),
+  };
 }
 
 export async function GET(request: Request, context: Context) {
@@ -31,7 +38,7 @@ export async function GET(request: Request, context: Context) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Неверный номер задачи" }, { status: 400 });
     }
-    const { viewer, pyrus } = await viewerAndPyrus(request);
+    const { viewer, pyrus, headers } = await viewerAndPyrus(request);
     if (!pyrus.enabled) {
       return NextResponse.json({ error: "Pyrus не подключён" }, { status: 503 });
     }
@@ -41,7 +48,7 @@ export async function GET(request: Request, context: Context) {
       // разнице ответов можно было бы перебором узнать, какие заявки есть.
       return NextResponse.json({ error: "Заявка не найдена" }, { status: 404 });
     }
-    return NextResponse.json({ request: found });
+    return NextResponse.json({ request: found }, { headers });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -67,7 +74,7 @@ export async function POST(request: Request, context: Context) {
     }
     const text = typeof body?.text === "string" ? body.text : "";
 
-    const { env, viewer, pyrus } = await viewerAndPyrus(request);
+    const { env, viewer, pyrus, headers } = await viewerAndPyrus(request);
     if (!pyrus.enabled) {
       return NextResponse.json({ error: "Pyrus не подключён" }, { status: 503 });
     }
@@ -90,7 +97,7 @@ export async function POST(request: Request, context: Context) {
     await pyrus.comment(id, plan.comment, plan.action);
     const delivered = await notifyDept(plan.chat, env);
 
-    return NextResponse.json({ ok: true, delivered });
+    return NextResponse.json({ ok: true, delivered }, { headers });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/config/server-env";
 import { Pyrus } from "@/lib/server/pyrus";
-import { AuthError, bearer, readToken } from "@/lib/server/telegram-auth";
+import { AuthError, bearer, readToken, renewalHeaders } from "@/lib/server/telegram-auth";
 
 /**
  * Заявки этого человека из реестра формы Pyrus.
@@ -16,17 +16,20 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const env = serverEnv();
-    const viewer = readToken(bearer(request.headers.get("authorization")), env.botToken);
+    const token = bearer(request.headers.get("authorization"));
+    const viewer = readToken(token, env.botToken);
+    // Токен на исходе уезжает обратно продлённым — см. renewalHeaders.
+    const headers = renewalHeaders(token, env.botToken);
     const pyrus = new Pyrus(env.pyrusLogin, env.pyrusSecurityKey, env.pyrusFormId);
     if (!pyrus.enabled) {
       // Не ошибка: интеграции может не быть, и приложение показывает пустой
       // список с пояснением, а не экран сбоя.
-      return NextResponse.json({ requests: [], source: "disabled" });
+      return NextResponse.json({ requests: [], source: "disabled" }, { headers });
     }
-    return NextResponse.json({
-      requests: await pyrus.listUserRequests(viewer.id),
-      source: "pyrus",
-    });
+    return NextResponse.json(
+      { requests: await pyrus.listUserRequests(viewer.id), source: "pyrus" },
+      { headers },
+    );
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

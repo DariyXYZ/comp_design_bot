@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/config/server-env";
-import { AuthError, bearer, readToken } from "@/lib/server/telegram-auth";
+import { AuthError, bearer, readToken, renewalHeaders } from "@/lib/server/telegram-auth";
 
 /**
  * Загрузка картинки заявки в Pyrus. Возвращает `guid`, которым файл потом
@@ -28,7 +28,9 @@ const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/heic"])
 export async function POST(request: Request) {
   try {
     const env = serverEnv();
-    readToken(bearer(request.headers.get("authorization")), env.botToken);
+    const token = bearer(request.headers.get("authorization"));
+    readToken(token, env.botToken);
+    const headers = renewalHeaders(token, env.botToken);
 
     const form = await request.formData();
     const file = form.get("file");
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
     if (!response.ok || !body.guid) {
       return NextResponse.json({ error: "Pyrus не принял файл" }, { status: 502 });
     }
-    return NextResponse.json({ guid: body.guid });
+    return NextResponse.json({ guid: body.guid }, { headers });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

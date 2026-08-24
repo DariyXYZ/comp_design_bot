@@ -6,6 +6,7 @@ import {
   issueToken,
   readLoginCode,
   readToken,
+  renewalHeaders,
   verifyInitData,
 } from "@/lib/server/telegram-auth";
 
@@ -143,5 +144,43 @@ describe("код входа из адреса кнопки", () => {
     // жизни кода перестал бы что-либо значить.
     const token = issueToken({ id: 1, name: "Кто-то", handle: null }, BOT_TOKEN);
     expect(() => readLoginCode(token, BOT_TOKEN)).toThrow(/не код входа/);
+  });
+});
+
+describe("продление токена сессии", () => {
+  function sign(exp: number): string {
+    const body = Buffer.from(
+      JSON.stringify({ id: 7, name: "Дарий", handle: "@dariy", exp }),
+      "utf8",
+    ).toString("base64url");
+    const signature = crypto
+      .createHmac("sha256", BOT_TOKEN)
+      .update(body)
+      .digest()
+      .toString("base64url");
+    return `${body}.${signature}`;
+  }
+
+  const now = () => Math.floor(Date.now() / 1000);
+
+  it("токену на исходе выдаётся свежий", () => {
+    const headers = renewalHeaders(sign(now() + 3 * 24 * 3600), BOT_TOKEN);
+    const renewed = headers["X-Session-Token"];
+    expect(renewed).toBeTruthy();
+    // Продлённый токен обязан работать — иначе продление хуже, чем его отсутствие.
+    expect(readToken(renewed, BOT_TOKEN)).toEqual({ id: 7, name: "Дарий", handle: "@dariy" });
+    expect(headers["Access-Control-Expose-Headers"]).toBe("X-Session-Token");
+  });
+
+  it("свежий токен не продлевается", () => {
+    expect(renewalHeaders(sign(now() + 20 * 24 * 3600), BOT_TOKEN)).toEqual({});
+  });
+
+  it("истёкший и подделанный не продлеваются", () => {
+    // Продление не должно оживлять то, что вход уже отверг: иначе им можно
+    // было бы бесконечно тянуть мёртвый токен.
+    expect(renewalHeaders(sign(now() - 60), BOT_TOKEN)).toEqual({});
+    expect(renewalHeaders(sign(now() + 3 * 24 * 3600), "другой секрет")).toEqual({});
+    expect(renewalHeaders("мусор", BOT_TOKEN)).toEqual({});
   });
 });

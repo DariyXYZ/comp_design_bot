@@ -1,3 +1,4 @@
+import { SESSION_TOKEN_HEADER } from "@/lib/session-token-header";
 import type { RequestAction } from "@/features/requests/actions";
 import type { PyrusRequest } from "@/lib/server/pyrus";
 
@@ -210,6 +211,15 @@ async function withSession<T>(path: string, init: RequestInit = {}): Promise<T |
         headers: { ...init.headers, Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
+      // Сервер сам присылает свежий токен, когда прежнему осталось меньше
+      // недели: так вход не упирается в конец месяца, пока приложением
+      // пользуются. Читаем на любом ответе — заголовок приходит и с ошибкой.
+      const renewed = response.headers.get(SESSION_TOKEN_HEADER);
+      if (renewed) {
+        storeToken(renewed);
+        token = renewed;
+        if (memorySession) memorySession = { ...memorySession, token: renewed };
+      }
       if (response.status === 401 && attempt === 1) {
         memoryToken = null;
         token = (await exchangeSession({ force: true }))?.token ?? null;

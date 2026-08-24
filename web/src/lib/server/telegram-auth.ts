@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 
+import { SESSION_TOKEN_HEADER } from "@/lib/session-token-header";
+
 /**
  * Проверка данных запуска Mini App и свои токены сессии. **Только сервер.**
  *
@@ -19,6 +21,14 @@ import crypto from "node:crypto";
 
 /** Месяц: человек не логинится каждый день, но потерянный токен не вечен. */
 const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
+/**
+ * За сколько до конца срока выдавать новый токен.
+ *
+ * Иначе месяц — жёсткая стена: у того, кто не заходил, токен умирает, а взять
+ * новый негде, если клиент Telegram отдаёт пустой `initData` и кнопка в чате
+ * тоже успела остыть. Пока человек пользуется приложением, вход не кончается.
+ */
+const TOKEN_RENEW_BEFORE_SECONDS = 7 * 24 * 3600;
 /** Насколько свежими считаем данные запуска при обмене. */
 const INIT_DATA_MAX_AGE_SECONDS = 24 * 3600;
 
@@ -92,7 +102,7 @@ export function issueToken(viewer: Viewer, secret: string): string {
   return `${body}.${base64url(signature)}`;
 }
 
-export function readToken(token: string, secret: string): Viewer {
+function parseToken(token: string, secret: string): Viewer & { exp: number } {
   const [body, signature] = token.split(".");
   if (!body || !signature) throw new AuthError("токен повреждён");
   const expected = base64url(crypto.createHmac("sha256", secret).update(body).digest());
@@ -105,7 +115,41 @@ export function readToken(token: string, secret: string): Viewer {
     exp: number;
   };
   if (payload.exp < Date.now() / 1000) throw new AuthError("токен истёк");
-  return { id: payload.id, name: payload.name, handle: payload.handle };
+  return { id: payload.id, name: payload.name, handle: payload.handle, exp: payload.exp };
+}
+
+export function readToken(token: string, secret: string): Viewer {
+  const { id, name, handle } = parseToken(token, secret);
+  return { id, name, handle };
+}
+
+/**
+ * Заголовки ответа для токена, которому недолго осталось: в них лежит свежий.
+ *
+ * Продление молчаливое и попутное — отдельного запроса «обнови мне вход» нет,
+ * потому что просить его пришлось бы именно в тот момент, когда вход уже не
+ * работает. Пустой объект означает «продлевать нечего»: токен свежий, или
+ * подпись не сошлась, или срок уже вышел (тогда это забота обмена, а не
+ * продления).
+ */
+export function renewalHeaders(token: string, secret: string): Record<string, string> {
+  let payload: Viewer & { exp: number };
+  try {
+    payload = parseToken(token, secret);
+  } catch {
+    return {};
+  }
+  if (payload.exp - Date.now() / 1000 > TOKEN_RENEW_BEFORE_SECONDS) return {};
+  return {
+    [SESSION_TOKEN_HEADER]: issueToken(
+      { id: payload.id, name: payload.name, handle: payload.handle },
+      secret,
+    ),
+    // На Vercel приложение и его роуты живут на одном домене, и заголовок виден
+    // скрипту без разрешения. Разрешение всё равно ставим: стоит `API_BASE`
+    // указать на другой домен — и без него браузер спрячет продлённый токен.
+    "Access-Control-Expose-Headers": SESSION_TOKEN_HEADER,
+  };
 }
 
 /**

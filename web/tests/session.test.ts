@@ -47,7 +47,10 @@ function stubBrowser({ storage }: { storage: "ok" | "blocked" }) {
   return { calls, replaced, store };
 }
 
-function respond(calls: FetchCall[], plan: Array<{ status: number; body?: unknown }>) {
+function respond(
+  calls: FetchCall[],
+  plan: Array<{ status: number; body?: unknown; renew?: string }>,
+) {
   let index = 0;
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
     calls.push({ url, init });
@@ -55,6 +58,9 @@ function respond(calls: FetchCall[], plan: Array<{ status: number; body?: unknow
     return Promise.resolve({
       ok: step.status >= 200 && step.status < 300,
       status: step.status,
+      // Заголовки настоящий ответ несёт всегда: через них приходит продлённый
+      // токен, и без них стаб перестал бы моделировать fetch.
+      headers: { get: (name: string) => (name === "X-Session-Token" ? step.renew ?? null : null) },
       json: () => Promise.resolve(step.body ?? {}),
     });
   });
@@ -161,5 +167,41 @@ describe("сессия Mini App", () => {
     expect(trace.redeemStatus).toBe(401);
     expect(trace.tokenPresent).toBe(false);
     expect(trace.error).toBe("код входа истёк");
+  });
+
+  it("продлённый токен заменяет старый и уходит в следующий запрос", async () => {
+    const { calls, store } = stubBrowser({ storage: "ok" });
+    respond(calls, [
+      { status: 200, body: session },
+      { status: 200, body: { requests: [] }, renew: "TOKEN-RENEWED" },
+      { status: 200, body: { requests: [] } },
+    ]);
+
+    const api = await import("@/lib/client/api");
+    await api.exchangeSession();
+    await api.fetchMyRequests();
+    await api.fetchMyRequests();
+
+    // Смысл продления: месяц перестаёт быть стеной, и человеку не нужно идти в
+    // чат за свежей кнопкой, пока он приложением пользуется.
+    expect(store.get("comp-design-bot:session-token")).toBe("TOKEN-RENEWED");
+    const authorizations = calls
+      .filter((call) => call.url.includes("/api/requests/"))
+      .map((call) => (call.init?.headers as Record<string, string>)?.Authorization);
+    expect(authorizations).toEqual(["Bearer TOKEN-1", "Bearer TOKEN-RENEWED"]);
+  });
+
+  it("ответ без продления оставляет прежний токен", async () => {
+    const { calls, store } = stubBrowser({ storage: "ok" });
+    respond(calls, [
+      { status: 200, body: session },
+      { status: 200, body: { requests: [] } },
+    ]);
+
+    const api = await import("@/lib/client/api");
+    await api.exchangeSession();
+    await api.fetchMyRequests();
+
+    expect(store.get("comp-design-bot:session-token")).toBe("TOKEN-1");
   });
 });
