@@ -141,12 +141,10 @@ export function ProfileScreen() {
                   {request.number ? (
                     <span className="row-dim">№ {request.number}</span>
                   ) : null}
-                  {/* Подпись статуса берём из формы Pyrus — там она та же,
-                      что на карточке в чате отдела («На паузе», «Принята»,
-                      «В работе», «Готово»). Пока поля в форме нет, остаётся
-                      прежнее деление по признаку закрытия. */}
+                  {/* Статус заявки ведётся в чате отдела, в Pyrus уходит
+                      только закрытие — поэтому здесь ровно два состояния. */}
                   <span className={request.closed ? "tag" : "tag tag-work"}>
-                    {request.status ?? (request.closed ? "Завершена" : "В работе")}
+                    {request.closed ? "Завершена" : "В работе"}
                   </span>
                   {request.deadline ? (
                     <span className="row-dim">срок {request.deadline}</span>

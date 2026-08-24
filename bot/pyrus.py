@@ -46,20 +46,6 @@ FIELD_DEADLINE = "Дата"
 FIELD_AUTHOR = "Автор в Telegram"
 FIELD_TG_ID = "Telegram ID"
 FIELD_REQUEST_NO = "Номер заявки в боте"
-FIELD_STATUS = "Статус"
-
-# Подписи вариантов поля «Статус» в Pyrus. Ключи те же, что в `texts.STATUSES`,
-# а подписи — без эмодзи: в реестре Pyrus по ним строят фильтры и отчёты, и
-# эмодзи там только мешает. Нет такого варианта в форме — статус не уедет, но
-# заявку это не ломает (см. `set_task_status`).
-STATUS_CHOICES: dict[str, str] = {
-    "new": "На паузе",
-    "accepted": "Принята",
-    "in_progress": "В работе",
-    "done": "Готово",
-    "rejected": "Отклонена",
-}
-
 
 class Pyrus:
     """Минимальный клиент: авторизация, схема формы, создание задачи."""
@@ -292,53 +278,29 @@ class Pyrus:
         log.info("Pyrus: к задаче %s привязано файлов из Mini App: %s", task_id, len(guids))
         return len(guids)
 
-    async def set_task_status(
-        self, task_id: int, status_key: str, note: str | None = None
-    ) -> bool:
-        """Переносит статус заявки в поле «Статус» задачи.
+    async def close_task(self, task_id: int, note: str) -> bool:
+        """Закрывает задачу — заявка отработана.
 
-        Смысл — чтобы реестр Pyrus показывал то же, что карточка в чате: там
-        статусы уже есть, и второй источник правды никому не нужен.
+        Единственное, что переносится из чата в Pyrus. Статусы отдел ведёт в
+        Telegram (кнопки под карточкой — с телефона удобнее), а Pyrus
+        остаётся реестром. Закрытие — исключение: незакрытая задача висит в
+        списках и портит отчёты, а «Готово» в чате означает ровно то же, что
+        «закрыта» здесь.
 
-        Значение поля меняется комментарием (`field_updates`) — отдельного
-        метода правки полей в Pyrus нет. Тем же комментарием уходит и заметка
-        (кто принял, причина отклонения): так в задаче остаётся история, а не
-        только последнее значение.
+        Закрывается комментарием с `action: finished` — отдельного метода
+        закрытия у Pyrus нет. `note` уходит текстом того же комментария,
+        чтобы в задаче было видно, кем и почему она закрыта.
 
-        «Готово» и «Отклонена» закрывают задачу: заявка отработана, и висеть
-        в открытых ей незачем. Реестр по-прежнему отдаёт её с
-        `include_archived`, поэтому в личном кабинете она не исчезает.
+        Реестр читается с `include_archived`, поэтому из личного кабинета
+        заявка не исчезает.
         """
-        label = STATUS_CHOICES.get(status_key)
-        if label is None:
-            return False
-        schema = await self._schema()
-        field_id = schema.get(FIELD_STATUS)
-        options = self._choices.get(FIELD_STATUS) or {}
-        choice_id = options.get(label)
-        payload: dict[str, object] = {}
-        if field_id is not None and choice_id is not None:
-            payload["field_updates"] = [
-                {"id": field_id, "value": {"choice_id": choice_id}}
-            ]
-        else:
-            # Поля в форме нет (или в нём нет такого варианта) — статус всё
-            # равно пишем текстом: пусть в задаче будет видно, что произошло.
-            log.warning(
-                "Pyrus: статус %r не записан — нет поля «%s» или варианта",
-                label, FIELD_STATUS,
-            )
-        text = f"Статус: {label}"
-        if note:
-            text += f"{chr(10)}{note}"
-        payload["text"] = text
-        if status_key in ("done", "rejected"):
-            payload["action"] = "finished"
-        result = await self._call(f"/tasks/{task_id}/comments", payload)
+        result = await self._call(
+            f"/tasks/{task_id}/comments", {"text": note, "action": "finished"}
+        )
         if result is None:
-            log.warning("Pyrus: не удалось сменить статус задачи %s", task_id)
+            log.warning("Pyrus: не удалось закрыть задачу %s", task_id)
             return False
-        log.info("Pyrus: задача %s → %s", task_id, label)
+        log.info("Pyrus: задача %s закрыта", task_id)
         return True
     async def create_text_task(self, text: str) -> int | None:
         """Обычная задача с текстом — путь на случай, когда формы нет."""
@@ -407,15 +369,15 @@ async def attach_uploaded(task_id: int, guids: list[str]) -> int:
         return 0
 
 
-async def push_status(task_id: int, status_key: str, note: str | None = None) -> bool:
-    """Смена статуса задачи. Никогда не бросает: статус в своей базе уже
-    поменялся, и падать из-за внешнего сервиса нельзя."""
+async def close_task(task_id: int, note: str) -> bool:
+    """Закрытие задачи. Никогда не бросает: в чате заявка уже переведена, и
+    падать из-за внешнего сервиса нельзя."""
     if not pyrus.enabled or not task_id:
         return False
     try:
-        return await pyrus.set_task_status(task_id, status_key, note)
+        return await pyrus.close_task(task_id, note)
     except Exception:  # noqa: BLE001 — см. docstring
-        log.exception("Pyrus: не удалось сменить статус задачи %s", task_id)
+        log.exception("Pyrus: не удалось закрыть задачу %s", task_id)
         return False
 
 async def send_request(
@@ -454,8 +416,6 @@ async def send_request(
                 FIELD_AUTHOR: author,
                 FIELD_TG_ID: tg_user_id,
                 FIELD_REQUEST_NO: req_id,
-                # Тот же начальный статус, что у карточки в чате отдела.
-                FIELD_STATUS: STATUS_CHOICES["new"],
             })
         text = request_text(req_id, case_title, description, author, source_path, photos)
         return await pyrus.create_text_task(text)

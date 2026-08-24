@@ -152,21 +152,17 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
         req = await db.set_status(req_id, new_status)
         await callback.answer(f"Статус: {STATUSES[new_status]}")
 
-        # Тот же статус — в задачу Pyrus, чтобы реестр не расходился с чатом.
-        # Заметка отвечает на вопрос «почему»: кто принял, кто сдал, за что
-        # отклонили. Ошибки Pyrus гасятся внутри — заявка уже переведена.
-        if req.get("pyrus_task_id"):
-            note = None
-            if new_status == "accepted":
-                actor = req.get("accepted_by_name")
-                note = f"Принял: {actor}" if actor else None
-            elif new_status == "done":
+        # В Pyrus переносим только закрытие: статусы отдел ведёт в чате, а
+        # незакрытая задача висит в списках и портит отчёты. Промежуточные
+        # статусы туда не уходят — второй источник правды никому не нужен.
+        # Ошибки Pyrus гасятся внутри: в чате заявка уже переведена.
+        if new_status in ("done", "rejected") and req.get("pyrus_task_id"):
+            if new_status == "done":
                 actor = req.get("finished_by_name")
-                note = f"Завершил: {actor}" if actor else None
-            elif new_status == "rejected":
-                reason = req.get("rejection_reason")
-                note = f"Причина: {reason}" if reason else None
-            await pyrus.push_status(req["pyrus_task_id"], new_status, note)
+                note = f"Готово (завершил: {actor})" if actor else "Готово"
+            else:
+                note = "Отклонена в чате отдела"
+            await pyrus.close_task(req["pyrus_task_id"], note)
 
         # Перерисовываем тем же рендерером, что и при создании — никакой строковой
         # хирургии. Способ редактирования зависит от того, каким сообщением
@@ -269,11 +265,6 @@ async def capture_rejection_reason(message: Message, state: FSMContext, bot: Bot
     await db.set_rejection_reason(req_id, text)
     await message.reply(REJECTION_REASON_SAVED.format(req_id=req_id))
     req = await db.get_request(req_id)
-    # Причина приходит позже самого отклонения (её спрашивают текстом), так
-    # что в задаче Pyrus её надо дописать отдельным комментарием — иначе
-    # реестр покажет «Отклонена» без объяснения.
-    if req and req.get("pyrus_task_id"):
-        await pyrus.push_status(req["pyrus_task_id"], "rejected", f"Причина: {text}")
     if req:
         try:
             await bot.send_message(req["user_id"], REJECTION_REASON_NOTIFY.format(req_id=req_id, reason=text))
