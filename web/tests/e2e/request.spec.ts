@@ -14,7 +14,18 @@ async function openForm(page: Page, query: string) {
   await page.route("**/telegram-web-app.js", (route) => route.abort());
   await page.addInitScript(() => {
     const sent: string[] = [];
-    (window as unknown as { __sent: string[] }).__sent = sent;
+    const asked: string[] = [];
+    const probe = window as unknown as {
+      __sent: string[];
+      __asked: string[];
+      __answer: boolean;
+      __closingConfirmation: boolean;
+      __back?: () => void;
+    };
+    probe.__sent = sent;
+    probe.__asked = asked;
+    probe.__answer = false;
+    probe.__closingConfirmation = false;
     window.Telegram = {
       WebApp: {
         ready() {},
@@ -23,6 +34,30 @@ async function openForm(page: Page, query: string) {
         close() {},
         sendData(data: string) {
           sent.push(data);
+        },
+        // Нативный вопрос клиента: тест записывает текст и отвечает тем,
+        // что задано в `__answer`.
+        showConfirm(message: string, callback: (confirmed: boolean) => void) {
+          asked.push(message);
+          callback(probe.__answer);
+        },
+        enableClosingConfirmation() {
+          probe.__closingConfirmation = true;
+        },
+        disableClosingConfirmation() {
+          probe.__closingConfirmation = false;
+        },
+        BackButton: {
+          show() {},
+          hide() {},
+          // Обработчик оболочки складываем наружу — тест нажимает кнопку
+          // клиента так же, как это делает Telegram.
+          onClick(handler: () => void) {
+            probe.__back = handler;
+          },
+          offClick() {
+            probe.__back = undefined;
+          },
         },
       },
     };
@@ -97,5 +132,63 @@ test.describe("заявка из Mini App", () => {
     await page.locator(".action-bar button").click();
 
     await expect(page.locator(".banner")).toContainText("только внутри Telegram");
+  });
+  test("«назад» с заполненной формы спрашивает, а пустую отпускает", async ({
+    page,
+  }) => {
+    // Форма живёт только в состоянии React: возврат монтирует её заново и
+    // пустой, поэтому случайный тап по «назад» стирает набранное без следа.
+    await openForm(page, "topic=revit&t=Revit");
+
+    await page.locator(".back").click();
+    expect(await page.evaluate(() => (window as unknown as { __asked: string[] }).__asked)).toEqual([]);
+    await expect(page.locator(".origin-value")).not.toBeVisible();
+
+    await openForm(page, "topic=revit&t=Revit");
+    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад");
+
+    // Отказ: остаёмся на форме, текст на месте.
+    await page.locator(".back").click();
+    expect(await page.evaluate(() => (window as unknown as { __asked: string[] }).__asked)).toHaveLength(1);
+    await expect(page.locator(".origin-value")).toBeVisible();
+    await expect(
+      page.getByPlaceholder("Что нужно сделать и что хотите получить на выходе"),
+    ).toHaveValue("Передать фасад");
+
+    // Согласие: уходим.
+    await page.evaluate(() => {
+      (window as unknown as { __answer: boolean }).__answer = true;
+    });
+    await page.locator(".back").click();
+    await expect(page.locator(".origin-value")).not.toBeVisible();
+  });
+
+  test("кнопка «назад» самого Telegram проходит через тот же вопрос", async ({
+    page,
+  }) => {
+    // В Telegram «назад» рисует клиент, и она стоит рядом с закрытием —
+    // промахнуться легче, чем по своей кнопке в вёрстке.
+    await openForm(page, "topic=revit&t=Revit");
+    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад");
+
+    await page.evaluate(() => (window as unknown as { __back?: () => void }).__back?.());
+    expect(await page.evaluate(() => (window as unknown as { __asked: string[] }).__asked)).toHaveLength(1);
+    await expect(page.locator(".origin-value")).toBeVisible();
+  });
+
+  test("подтверждение закрытия включается вместе с первым введённым словом", async ({
+    page,
+  }) => {
+    // Свайп вниз и крест в шапке идут мимо «назад» — там спросить может
+    // только сам Telegram, и просить его надо ровно пока есть что терять.
+    const flag = () =>
+      page.evaluate(
+        () => (window as unknown as { __closingConfirmation: boolean }).__closingConfirmation,
+      );
+    await openForm(page, "topic=revit&t=Revit");
+    expect(await flag()).toBe(false);
+
+    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад");
+    expect(await flag()).toBe(true);
   });
 });

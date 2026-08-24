@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { TAB_ROUTES, isSameRoute } from "@/config/navigation";
 import { exchangeSession } from "@/lib/client/api";
+import { askLeave } from "@/lib/client/leave-guard";
 import { cacheViewer, initTelegramViewport, readViewer } from "@/lib/client/telegram";
 import { TabBar } from "./tab-bar";
 
@@ -49,7 +50,13 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       back.hide();
       return;
     }
-    const goBack = () => router.back();
+    // Кнопку рисует клиент, и она стоит рядом с закрытием приложения —
+    // промахнуться легко. С заполненной формы уходим только после вопроса.
+    const goBack = () => {
+      void askLeave().then((leave) => {
+        if (leave) router.back();
+      });
+    };
     back.onClick(goBack);
     back.show();
     return () => {

@@ -27,6 +27,7 @@ export const FIELD = {
   author: "Автор в Telegram",
   telegramId: "Telegram ID",
   requestNo: "Номер заявки в боте",
+  status: "Статус",
 } as const;
 
 export type PyrusRequest = {
@@ -37,6 +38,8 @@ export type PyrusRequest = {
   description: string | null;
   origin: string | null;
   deadline: string | null;
+  /** Подпись статуса из формы: «Принята», «В работе», «Готово». */
+  status: string | null;
   created: string | null;
   closed: boolean;
 };
@@ -161,6 +164,7 @@ export class Pyrus {
         description: byName.get(FIELD.description) ?? null,
         origin: byName.get(FIELD.origin) ?? null,
         deadline: byName.get(FIELD.deadline) ?? null,
+        status: byName.get(FIELD.status) ?? null,
         created: task.create_date ?? null,
         closed: task.is_closed ?? Boolean(task.close_date),
       });

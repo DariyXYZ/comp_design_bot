@@ -58,6 +58,18 @@ interface TelegramWebApp {
   };
   /** Закрывает Mini App. */
   close(): void;
+  /**
+   * Нативный вопрос клиента (Bot API 6.2). Нужен перед уходом с заполненной
+   * формы: `window.confirm` в вебвью Telegram выглядит чужеродно, а на части
+   * клиентов его вообще не показывают.
+   */
+  showConfirm?(message: string, callback: (confirmed: boolean) => void): void;
+  /**
+   * Спросить перед закрытием приложения (свайп вниз, крест в шапке). Включаем
+   * только пока в форме есть незаполненное — иначе вопрос надоедает.
+   */
+  enableClosingConfirmation?(): void;
+  disableClosingConfirmation?(): void;
   /** Версия Bot API клиента — по ней видно, что метод может отсутствовать. */
   version?: string;
 }

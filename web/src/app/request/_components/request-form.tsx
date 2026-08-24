@@ -1,13 +1,14 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActionBar } from "@/components/layout/action-bar";
 import { Screen } from "@/components/layout/screen";
 import { itemHref, routes } from "@/config/navigation";
 import { MATERIAL_TYPE_LABEL, materialById } from "@/features/materials";
 import { uploadPhoto, type UploadedPhoto } from "@/features/requests/photos";
 import { submitRequest } from "@/features/requests/submit";
+import { setLeaveGuard } from "@/lib/client/leave-guard";
 
 /**
  * Новая заявка.
@@ -39,6 +40,31 @@ export function RequestForm() {
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [uploading, setUploading] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Есть ли что терять. Через ref, потому что спрашивают снаружи (кнопка
+  // «назад» клиента и ссылка в шапке) в момент, когда рендер уже прошёл.
+  const filled =
+    project.trim().length > 0 ||
+    description.trim().length > 0 ||
+    source.trim().length > 0 ||
+    deadline.length > 0 ||
+    photos.length > 0;
+  const filledRef = useRef(filled);
+
+  useEffect(() => {
+    setLeaveGuard(() => filledRef.current);
+    return () => setLeaveGuard(null);
+  }, []);
+
+  useEffect(() => {
+    filledRef.current = filled;
+    // Закрытие приложения — отдельный путь мимо «назад»: свайп вниз или
+    // крест в шапке. Telegram умеет спросить сам, но только если его
+    // попросить, и просить надо ровно пока есть что терять.
+    const tg = window.Telegram?.WebApp;
+    if (filled) tg?.enableClosingConfirmation?.();
+    else tg?.disableClosingConfirmation?.();
+  }, [filled]);
 
   async function addFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -103,7 +129,12 @@ export function RequestForm() {
       deadline,
       photoGuids: photos.map((photo) => photo.guid),
     });
-    if (result === "sent") return; // Telegram закрывает приложение сам
+    if (result === "sent") {
+      // Приложение закрывается само — спрашивать «выйти?» уже не о чем.
+      setLeaveGuard(null);
+      window.Telegram?.WebApp?.disableClosingConfirmation?.();
+      return;
+    }
     setProblem(
       result === "outside-telegram"
         ? "Отправка работает только внутри Telegram: откройте бота @comp_design_bot и нажмите «Возможности отдела»."

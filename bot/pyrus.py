@@ -46,6 +46,19 @@ FIELD_DEADLINE = "Дата"
 FIELD_AUTHOR = "Автор в Telegram"
 FIELD_TG_ID = "Telegram ID"
 FIELD_REQUEST_NO = "Номер заявки в боте"
+FIELD_STATUS = "Статус"
+
+# Подписи вариантов поля «Статус» в Pyrus. Ключи те же, что в `texts.STATUSES`,
+# а подписи — без эмодзи: в реестре Pyrus по ним строят фильтры и отчёты, и
+# эмодзи там только мешает. Нет такого варианта в форме — статус не уедет, но
+# заявку это не ломает (см. `set_task_status`).
+STATUS_CHOICES: dict[str, str] = {
+    "new": "На паузе",
+    "accepted": "Принята",
+    "in_progress": "В работе",
+    "done": "Готово",
+    "rejected": "Отклонена",
+}
 
 
 class Pyrus:
@@ -59,7 +72,9 @@ class Pyrus:
         self._auth_lock = asyncio.Lock()
         # Схема формы: {название поля: id} и {название темы: choice_id}.
         self._fields: dict[str, int] | None = None
-        self._choices: dict[str, int] = {}
+        # «название поля» → «подпись варианта» → choice_id. Плоского словаря
+        # мало: одна и та же подпись может встретиться в двух полях выбора.
+        self._choices: dict[str, dict[str, int]] = {}
 
     @property
     def enabled(self) -> bool:
@@ -113,22 +128,30 @@ class Pyrus:
             return self._fields
         body = await self._call(f"/forms/{config.pyrus_form_id}")
         fields: dict[str, int] = {}
-        choices: dict[str, int] = {}
+        choices: dict[str, dict[str, int]] = {}
         for field in (body or {}).get("fields", []):
             name = (field.get("name") or "").strip()
             if not name:
                 continue
             fields[name] = field["id"]
-            if name == FIELD_TOPIC:
-                for option in (field.get("info") or {}).get("options", []):
-                    # Удалённые варианты Pyrus продолжает отдавать с флагом
-                    # deleted: choice_id не переиспользуются. Брать их нельзя —
-                    # значение уехало бы в вариант, которого в форме уже нет.
-                    if option.get("deleted"):
-                        continue
-                    value = (option.get("choice_value") or "").strip()
-                    if value:
-                        choices[value] = option["choice_id"]
+            # Варианты нужны у любого поля выбора, а не только у «Темы»:
+            # статус — такое же поле, и особый случай на каждое поле пришлось
+            # бы дописывать заново.
+            options = (field.get("info") or {}).get("options") or []
+            if not options:
+                continue
+            by_value: dict[str, int] = {}
+            for option in options:
+                # Удалённые варианты Pyrus продолжает отдавать с флагом
+                # deleted: choice_id не переиспользуются. Брать их нельзя —
+                # значение уехало бы в вариант, которого в форме уже нет.
+                if option.get("deleted"):
+                    continue
+                value = (option.get("choice_value") or "").strip()
+                if value:
+                    by_value[value] = option["choice_id"]
+            if by_value:
+                choices[name] = by_value
         self._fields = fields
         self._choices = choices
         if fields:
@@ -149,9 +172,10 @@ class Pyrus:
             if field_id is None:
                 log.warning("Pyrus: в форме нет поля %r — значение не отправлено", name)
                 continue
-            if name == FIELD_TOPIC:
+            options = self._choices.get(name)
+            if options is not None:
                 # Поле выбора принимает не текст, а номер варианта.
-                choice_id = self._choices.get(str(value))
+                choice_id = options.get(str(value))
                 if choice_id is None:
                     log.warning("Pyrus: в поле «%s» нет варианта %r", name, value)
                     continue
@@ -268,6 +292,54 @@ class Pyrus:
         log.info("Pyrus: к задаче %s привязано файлов из Mini App: %s", task_id, len(guids))
         return len(guids)
 
+    async def set_task_status(
+        self, task_id: int, status_key: str, note: str | None = None
+    ) -> bool:
+        """Переносит статус заявки в поле «Статус» задачи.
+
+        Смысл — чтобы реестр Pyrus показывал то же, что карточка в чате: там
+        статусы уже есть, и второй источник правды никому не нужен.
+
+        Значение поля меняется комментарием (`field_updates`) — отдельного
+        метода правки полей в Pyrus нет. Тем же комментарием уходит и заметка
+        (кто принял, причина отклонения): так в задаче остаётся история, а не
+        только последнее значение.
+
+        «Готово» и «Отклонена» закрывают задачу: заявка отработана, и висеть
+        в открытых ей незачем. Реестр по-прежнему отдаёт её с
+        `include_archived`, поэтому в личном кабинете она не исчезает.
+        """
+        label = STATUS_CHOICES.get(status_key)
+        if label is None:
+            return False
+        schema = await self._schema()
+        field_id = schema.get(FIELD_STATUS)
+        options = self._choices.get(FIELD_STATUS) or {}
+        choice_id = options.get(label)
+        payload: dict[str, object] = {}
+        if field_id is not None and choice_id is not None:
+            payload["field_updates"] = [
+                {"id": field_id, "value": {"choice_id": choice_id}}
+            ]
+        else:
+            # Поля в форме нет (или в нём нет такого варианта) — статус всё
+            # равно пишем текстом: пусть в задаче будет видно, что произошло.
+            log.warning(
+                "Pyrus: статус %r не записан — нет поля «%s» или варианта",
+                label, FIELD_STATUS,
+            )
+        text = f"Статус: {label}"
+        if note:
+            text += f"{chr(10)}{note}"
+        payload["text"] = text
+        if status_key in ("done", "rejected"):
+            payload["action"] = "finished"
+        result = await self._call(f"/tasks/{task_id}/comments", payload)
+        if result is None:
+            log.warning("Pyrus: не удалось сменить статус задачи %s", task_id)
+            return False
+        log.info("Pyrus: задача %s → %s", task_id, label)
+        return True
     async def create_text_task(self, text: str) -> int | None:
         """Обычная задача с текстом — путь на случай, когда формы нет."""
         body = await self._call("/tasks", {"text": text})
@@ -335,6 +407,17 @@ async def attach_uploaded(task_id: int, guids: list[str]) -> int:
         return 0
 
 
+async def push_status(task_id: int, status_key: str, note: str | None = None) -> bool:
+    """Смена статуса задачи. Никогда не бросает: статус в своей базе уже
+    поменялся, и падать из-за внешнего сервиса нельзя."""
+    if not pyrus.enabled or not task_id:
+        return False
+    try:
+        return await pyrus.set_task_status(task_id, status_key, note)
+    except Exception:  # noqa: BLE001 — см. docstring
+        log.exception("Pyrus: не удалось сменить статус задачи %s", task_id)
+        return False
+
 async def send_request(
     req_id: int,
     case_title: str,
@@ -371,6 +454,8 @@ async def send_request(
                 FIELD_AUTHOR: author,
                 FIELD_TG_ID: tg_user_id,
                 FIELD_REQUEST_NO: req_id,
+                # Тот же начальный статус, что у карточки в чате отдела.
+                FIELD_STATUS: STATUS_CHOICES["new"],
             })
         text = request_text(req_id, case_title, description, author, source_path, photos)
         return await pyrus.create_text_task(text)
