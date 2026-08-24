@@ -625,26 +625,8 @@ header .brand{
 .card h3{font-size:var(--t-body);font-weight:600;line-height:1.3;margin-top:2px}
 .card:hover{border-color:var(--sub)}
 .card:active{background:var(--pill)}
-.card .stages{margin:var(--s3) 0 var(--s2)}
-
-/* Вехи заявки: пройдено, сейчас, впереди. Один индикатор с подписями вместо
-   кружков плюс полосы прогресса — они показывали одно и то же дважды. */
-.stages{display:flex;gap:var(--s1);list-style:none}
-/* Шкала первой в экране липнет к разделителю шапки: подписи мелкие, и без
-   отступа блок читается как часть заголовка. */
-.scroll > .stages:first-child{margin-top:var(--s2);margin-bottom:var(--s5)}
-.stage{flex:1;display:flex;flex-direction:column;gap:var(--s1);min-width:0}
-.stage-dot{height:4px;border-radius:999px;background:var(--line)}
-.stage-label{
-  font-size:.65rem;color:var(--sub);line-height:1.2;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.stage-done .stage-dot{background:var(--sub)}
-.stage-now .stage-dot{background:var(--accent)}
-.stage-now .stage-label{color:var(--ink);font-weight:600}
-
-/* Состояние, которое возвращает заявку назад. Шкала вех такое показать не
-   может, поэтому баннером над ней. */
+/* Состояние, требующее внимания: отказ отправки, устаревшая кнопка входа,
+   подтверждение действия. Всегда над содержимым, к которому относится. */
 .banner{
   display:flex;flex-direction:column;gap:var(--s1);
   border:1px solid var(--attention);border-radius:var(--r2);
@@ -697,6 +679,12 @@ header .brand{
   transition:background .16s var(--ease), border-color .16s var(--ease);
 }
 .row-action:hover{border-color:var(--sub)}
+/* Карточка заявки как ссылка: отклик тот же, что у строк-действий, но без
+   подчёркивания и синевы — это блок, а не текст в абзаце. */
+.card-link{display:block;color:inherit;text-decoration:none}
+/* Строка-действие бывает недоступна, пока уходит запрос: без внешнего
+   признака человек жмёт её повторно. */
+.row-action:disabled{opacity:.5;cursor:default}
 .row-action:active{background:var(--pill)}
 .row-action span:last-child{color:var(--sub)}
 /* Шеврон тише текста, но не настолько, чтобы пропасть: он единственный знак

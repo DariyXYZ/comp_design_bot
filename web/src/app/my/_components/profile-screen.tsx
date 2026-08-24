@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Chevron } from "@/components/ui/chevron";
-import { routes } from "@/config/navigation";
+import { myRequestHref, routes } from "@/config/navigation";
 import { askMyRequests } from "@/features/requests/submit";
 import { useViewer } from "@/hooks/use-viewer";
 import {
@@ -136,7 +136,13 @@ export function ProfileScreen() {
         {state.kind === "ready" && state.requests.length > 0 ? (
           <div className="rows">
             {state.requests.map((request) => (
-              <article key={request.taskId} className="card">
+              // Ссылка, а не карточка: заявка — единственное место, где можно
+              // ответить отделу, и вход в неё должен быть очевидным.
+              <Link
+                key={request.taskId}
+                href={myRequestHref(String(request.taskId))}
+                className="card card-link"
+              >
                 <div className="row-meta">
                   {request.number ? (
                     <span className="row-dim">№ {request.number}</span>
@@ -153,7 +159,7 @@ export function ProfileScreen() {
                 <h3>{request.topic ?? "Заявка"}</h3>
                 {request.project ? <p className="row-dim">{request.project}</p> : null}
                 {request.origin ? <p className="row-dim">{request.origin}</p> : null}
-              </article>
+              </Link>
             ))}
           </div>
         ) : null}

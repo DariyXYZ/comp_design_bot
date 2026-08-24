@@ -27,5 +27,9 @@ export function serverEnv() {
     // браузер — и это правильно: карточки читает серверный роут, а не клиент.
     supabaseUrl: required("SUPABASE_URL").replace(/\/$/, ""),
     supabaseAnonKey: required("SUPABASE_ANON_KEY"),
+    // Чат отдела и ветка заявок. Необязательные: без них действия из кабинета
+    // всё равно попадают в задачу Pyrus, просто в чат сообщение не уходит.
+    deptChatId: process.env.DEPT_CHAT_ID,
+    deptThreadId: process.env.DEPT_THREAD_ID,
   };
 }

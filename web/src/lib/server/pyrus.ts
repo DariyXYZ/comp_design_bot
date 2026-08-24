@@ -122,51 +122,95 @@ export class Pyrus {
     return map;
   }
 
+  private static plain(value: FieldValue | undefined): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "object") {
+      return value.choice_names?.[0] ?? value.choice_value ?? null;
+    }
+    return String(value);
+  }
+
+  /**
+   * Разбирает поля задачи в заявку. `null` — задача не этого человека.
+   *
+   * Проверка владельца живёт здесь, а не в роутах: id заявителя лежит в поле
+   * формы, и знание о том, в каком именно, не должно расползаться. Забыть её
+   * в одном из роутов означало бы дать читать и комментировать чужие заявки.
+   */
+  private toRequest(
+    task: PyrusTask,
+    tgFieldId: number,
+    telegramId: number,
+  ): PyrusRequest | null {
+    const byName = new Map<string, string | null>();
+    let telegram: string | null = null;
+    for (const field of task.fields ?? []) {
+      const value = Pyrus.plain(field.value);
+      if (field.name) byName.set(field.name.trim(), value);
+      if (field.id === tgFieldId) telegram = value;
+    }
+    if (telegram !== String(telegramId)) return null;
+    const number = byName.get(FIELD.requestNo);
+    return {
+      taskId: task.id,
+      number: number ? Number(number) : null,
+      topic: byName.get(FIELD.topic) ?? null,
+      project: byName.get(FIELD.project) ?? null,
+      description: byName.get(FIELD.description) ?? null,
+      origin: byName.get(FIELD.origin) ?? null,
+      deadline: byName.get(FIELD.deadline) ?? null,
+      created: task.create_date ?? null,
+      closed: task.is_closed ?? Boolean(task.close_date),
+    };
+  }
+
+  private async telegramFieldId(): Promise<number> {
+    const fields = await this.fields();
+    const id = fields.get(FIELD.telegramId);
+    if (!id) throw new Error(`Pyrus: в форме нет поля «${FIELD.telegramId}»`);
+    return id;
+  }
+
   /** Заявки одного человека из реестра формы, свежие сверху. */
   async listUserRequests(telegramId: number): Promise<PyrusRequest[]> {
-    const fields = await this.fields();
-    const tgFieldId = fields.get(FIELD.telegramId);
-    if (!tgFieldId) {
-      throw new Error(`Pyrus: в форме нет поля «${FIELD.telegramId}»`);
-    }
+    const tgFieldId = await this.telegramFieldId();
     const body = await this.call<{ tasks?: PyrusTask[] }>(
       `/forms/${this.formId}/register`,
       { include_archived: true },
     );
-
-    const plain = (value: FieldValue | undefined): string | null => {
-      if (value === null || value === undefined) return null;
-      if (typeof value === "object") {
-        return value.choice_names?.[0] ?? value.choice_value ?? null;
-      }
-      return String(value);
-    };
-
     const mine: PyrusRequest[] = [];
     for (const task of body.tasks ?? []) {
-      const byName = new Map<string, string | null>();
-      let telegram: string | null = null;
-      for (const field of task.fields ?? []) {
-        const value = plain(field.value);
-        if (field.name) byName.set(field.name.trim(), value);
-        if (field.id === tgFieldId) telegram = value;
-      }
-      if (telegram !== String(telegramId)) continue;
-      const number = byName.get(FIELD.requestNo);
-      mine.push({
-        taskId: task.id,
-        number: number ? Number(number) : null,
-        topic: byName.get(FIELD.topic) ?? null,
-        project: byName.get(FIELD.project) ?? null,
-        description: byName.get(FIELD.description) ?? null,
-        origin: byName.get(FIELD.origin) ?? null,
-        deadline: byName.get(FIELD.deadline) ?? null,
-        created: task.create_date ?? null,
-        closed: task.is_closed ?? Boolean(task.close_date),
-      });
+      const request = this.toRequest(task, tgFieldId, telegramId);
+      if (request) mine.push(request);
     }
     // Свежие сверху: человек ищет последнюю заявку, а не первую.
     mine.sort((a, b) => (b.created ?? "").localeCompare(a.created ?? ""));
     return mine;
+  }
+
+  /** Одна заявка. `null` — задачи нет или она не этого человека. */
+  async userRequest(taskId: number, telegramId: number): Promise<PyrusRequest | null> {
+    const tgFieldId = await this.telegramFieldId();
+    const body = await this.call<{ task?: PyrusTask }>(`/tasks/${taskId}`);
+    if (!body.task) return null;
+    return this.toRequest(body.task, tgFieldId, telegramId);
+  }
+
+  /**
+   * Пишет комментарий к задаче и, если попросили, меняет её состояние.
+   *
+   * Комментарий — единственный способ что-либо сделать с существующей
+   * задачей: отдельных методов «закрыть» и «переоткрыть» у Pyrus нет,
+   * состояние меняется полем `action` того же комментария.
+   */
+  async comment(
+    taskId: number,
+    text: string,
+    action?: "finished" | "reopened",
+  ): Promise<boolean> {
+    const payload: Record<string, unknown> = { text };
+    if (action) payload.action = action;
+    await this.call(`/tasks/${taskId}/comments`, payload);
+    return true;
   }
 }

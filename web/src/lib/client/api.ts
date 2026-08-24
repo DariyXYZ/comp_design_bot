@@ -1,3 +1,4 @@
+import type { RequestAction } from "@/features/requests/actions";
 import type { PyrusRequest } from "@/lib/server/pyrus";
 
 /**
@@ -192,32 +193,69 @@ export async function sessionToken(): Promise<string | null> {
   return (await exchangeSession())?.token ?? null;
 }
 
-/** Заявки этого человека. `null` — вход не подтверждён или API недоступен. */
-export async function fetchMyRequests(): Promise<PyrusRequest[] | null> {
+/**
+ * Запрос под токеном сессии с одной повторной попыткой.
+ *
+ * Повтор нужен не для надёжности сети, а из-за 401: токен живёт месяц и
+ * может истечь на открытом экране, а код входа остался в памяти — значит
+ * сессию можно получить заново, ничего не спрашивая у человека.
+ */
+async function withSession<T>(path: string, init: RequestInit = {}): Promise<T | null> {
   let token = await sessionToken();
   for (const attempt of [1, 2]) {
     if (!token) return null;
     try {
-      const response = await fetch(`${API_BASE}/api/requests/`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: { ...init.headers, Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
       if (response.status === 401 && attempt === 1) {
-        // Токен истёк — обменяем ещё раз (код из кнопки остался в памяти).
         memoryToken = null;
         token = (await exchangeSession({ force: true }))?.token ?? null;
         continue;
       }
       if (!response.ok) {
-        trace.error = `заявки: HTTP ${response.status}`;
+        trace.error = `${path}: HTTP ${response.status}`;
         return null;
       }
-      const body = (await response.json()) as { requests?: PyrusRequest[] };
-      return body.requests ?? [];
+      return (await response.json()) as T;
     } catch (error) {
       trace.error = error instanceof Error ? error.message : "сеть недоступна";
       return null;
     }
   }
   return null;
+}
+
+/** Заявки этого человека. `null` — вход не подтверждён или API недоступен. */
+export async function fetchMyRequests(): Promise<PyrusRequest[] | null> {
+  const body = await withSession<{ requests?: PyrusRequest[] }>("/api/requests/");
+  return body ? body.requests ?? [] : null;
+}
+/** Одна заявка. `null` — вход не подтверждён, заявка чужая или её нет. */
+export async function fetchRequest(taskId: number): Promise<PyrusRequest | null> {
+  const body = await withSession<{ request?: PyrusRequest }>(
+    `/api/requests/${taskId}/`,
+  );
+  return body?.request ?? null;
+}
+
+/**
+ * Действие по заявке: сообщение отделу, приёмка, доработка, отмена.
+ *
+ * Возвращает `false` при любом отказе — экран показывает это словами, а не
+ * делает вид, что отправил.
+ */
+export async function actOnRequest(
+  taskId: number,
+  action: RequestAction,
+  text = "",
+): Promise<boolean> {
+  const body = await withSession<{ ok?: boolean }>(`/api/requests/${taskId}/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, text }),
+  });
+  return Boolean(body?.ok);
 }
