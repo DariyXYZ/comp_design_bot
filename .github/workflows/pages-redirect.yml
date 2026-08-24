@@ -1,0 +1,50 @@
+name: Redirect Pages to Vercel
+
+# Приложение живёт на Vercel (там серверные роуты личного кабинета), а этот
+# адрес остаётся живым в старых клавиатурах Telegram: reply-клавиатура
+# обновляется только когда бот присылает сообщение с разметкой, поэтому кнопка,
+# полученная месяц назад, открывает то, что лежит здесь. Поэтому здесь лежит
+# перенаправление, а не прошлая сборка приложения: старая кнопка должна
+# приводить в текущее приложение.
+#
+# Источником Pages должен быть выбран «GitHub Actions» (Settings → Pages).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pages-redirect/**"
+      - ".github/workflows/pages-redirect.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Параллельные деплои Pages конфликтуют между собой; cancel-in-progress:false —
+# чтобы уже начатая публикация дособлюдалась, а не обрывалась следующим пушем.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Только рабочий репозиторий: в репозитории черновика ветка main — это
+    # черновик, и публиковать его боевым workflow нельзя.
+    if: github.repository == 'DariyXYZ/comp_design_bot'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # 404.html — копия index.html: старые кнопки ведут на вложенные пути
+      # (/my/, /item/), и каждый из них должен перенаправлять, а не показывать
+      # страницу ошибки Pages.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: pages-redirect
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

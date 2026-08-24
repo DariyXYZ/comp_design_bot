@@ -66,17 +66,43 @@ async def cmd_id(message: Message) -> None:
 @router.message(F.text == BTN_INFO, F.chat.type == "private")
 async def show_info(message: Message, state: FSMContext) -> None:
     await state.clear()  # любая кнопка меню посреди заявки сбрасывает черновик
-    await message.answer(INFO)
+    await message.answer(INFO, reply_markup=main_menu(message.from_user))
 
 
-@router.message(Command("my"), F.chat.type == "private")
-@router.message(F.text == BTN_MY, F.chat.type == "private")
+# Шапка, которую дописывает заявка из Mini App: проект, основа, срок,
+# картинки. В списке она бесполезна — там нужна суть задачи.
+_HEADER_KEYS = ("Проект:", "Основа:", "Срок:", "Картинки:")
+EXCERPT_LIMIT = 70
+
+
+def request_excerpt(description: str | None) -> str:
+    """Короткая суть заявки для списка.
+
+    Без неё список выглядел набором дублей: строка показывала тему, а тем
+    восемь — две разные заявки по «Геометрию нужно передать в Revit» читались
+    как одна, и начальник решил, что видит чужие заявки.
+    """
+    text = (description or "").strip()
+    if not text:
+        return ""
+    lines = [line.strip() for line in text.splitlines()]
+    body = [line for line in lines if line and not line.startswith(_HEADER_KEYS)]
+    first = body[0] if body else ""
+    if len(first) > EXCERPT_LIMIT:
+        first = first[: EXCERPT_LIMIT - 1].rstrip() + "…"
+    return first
+
 async def render_user_requests(user_id: int) -> str:
     """Список заявок человека одним текстом.
 
-    Вынесено из обработчика: тот же список запрашивает Mini App — там своего
-    списка заявок нет и быть не может, пока у приложения нет серверной части
-    (без проверки подписи запуска чужие заявки от своих не отличить).
+    Вынесено из обработчика: тот же список запрашивает Mini App кнопкой
+    «Показать мои заявки в чате».
+
+    Внимание: на эту функцию **не должны** висеть декораторы роутера. Когда
+    её выносили, декораторы `/my` остались сверху — aiogram передавал в
+    `user_id` объект `Message`, запрос падал на `Error binding parameter 1:
+    type 'Message' is not supported`, и кнопка «Мои заявки» в чате молча не
+    отвечала. Регистрация ниже, у `my_requests`.
     """
     requests = await db.list_user_requests(user_id)
     if not requests:
@@ -85,10 +111,23 @@ async def render_user_requests(user_id: int) -> str:
     for r in requests:
         case_title = CASES.get(r["case_key"], {}).get("title", r["case_key"])
         status = STATUSES.get(r["status"], r["status"])
-        lines.append(f"№{r['id']} · {case_title}\n{status} · {r['created_at'][:10]}")
+        excerpt = request_excerpt(r["description"])
+        head = f"№{r['id']} · {case_title}"
+        tail = f"{status} · {r['created_at'][:10]}"
+        lines.append(f"{head}\n{excerpt}\n{tail}" if excerpt else f"{head}\n{tail}")
     return "\n\n".join(lines)
 
 
+@router.message(Command("my"), F.chat.type == "private")
+@router.message(F.text == BTN_MY, F.chat.type == "private")
 async def my_requests(message: Message, state: FSMContext) -> None:
     await state.clear()  # любая кнопка меню посреди заявки сбрасывает черновик
-    await message.answer(await render_user_requests(message.from_user.id))
+    # Клавиатура пересылается вместе с ответом: в кнопке Mini App лежит адрес
+    # приложения и код входа, а Telegram обновляет клавиатуру только когда
+    # приходит сообщение с разметкой. Без этого человек, нажавший /start
+    # месяц назад, открывает старый адрес — ровно так начальник попал на
+    # прошлую версию приложения, где профиль показывает «Гость».
+    await message.answer(
+        await render_user_requests(message.from_user.id),
+        reply_markup=main_menu(message.from_user),
+    )

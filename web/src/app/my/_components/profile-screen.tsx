@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Chevron } from "@/components/ui/chevron";
 import { myRequestHref, routes } from "@/config/navigation";
+import { requestExcerpt } from "@/features/requests/excerpt";
 import { askMyRequests } from "@/features/requests/submit";
 import { useViewer } from "@/hooks/use-viewer";
 import {
@@ -157,8 +158,13 @@ export function ProfileScreen() {
                   ) : null}
                 </div>
                 <h3>{request.topic ?? "Заявка"}</h3>
+                {/* Суть задачи, а не только тема: тем восемь, и две разные
+                    заявки по одной теме выглядели одинаково — люди принимали
+                    их за дубли или за чужие. */}
+                {requestExcerpt(request.description) ? (
+                  <p className="row-excerpt">{requestExcerpt(request.description)}</p>
+                ) : null}
                 {request.project ? <p className="row-dim">{request.project}</p> : null}
-                {request.origin ? <p className="row-dim">{request.origin}</p> : null}
               </Link>
             ))}
           </div>

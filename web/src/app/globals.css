@@ -682,6 +682,13 @@ header .brand{
 /* Карточка заявки как ссылка: отклик тот же, что у строк-действий, но без
    подчёркивания и синевы — это блок, а не текст в абзаце. */
 .card-link{display:block;color:inherit;text-decoration:none}
+/* Суть заявки в списке: две строки максимум — карточка не должна расти от
+   длинного описания, иначе список перестаёт просматриваться. */
+.row-excerpt{
+  font-size:var(--t-small);line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
+}
 /* Строка-действие бывает недоступна, пока уходит запрос: без внешнего
    признака человек жмёт её повторно. */
 .row-action:disabled{opacity:.5;cursor:default}
