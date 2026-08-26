@@ -441,7 +441,7 @@ header .brand{
    не должна ломать полосу действия. */
 .action-context{
   display:flex;align-items:center;gap:var(--s2);
-  padding:var(--s3) var(--s3) 0;color:var(--ink);
+  color:var(--ink);
   font-size:var(--t-body);line-height:1.3;
 }
 .action-context-kind{
@@ -465,11 +465,18 @@ header .brand{
 
 /* Подпись и кнопка — один предмет на общей плашке. Кнопка внутри неё уже на
    padding: видно, что она принадлежит подписи, а не полосе экрана. */
+/* Плашка скруглена так же, как панель разделов внизу: два серых блока стоят
+   друг над другом, и разный радиус читался бы как разные материалы. */
 .action-card{
-  display:flex;flex-direction:column;gap:var(--s4);
-  padding:var(--s2);border-radius:var(--r3);
+  display:flex;flex-direction:column;gap:var(--s2);
+  padding:var(--s2);border-radius:var(--r4);
   background:var(--pill);
 }
+/* Правило вложенных скруглений: радиус внутреннего блока = радиус внешнего
+   минус расстояние между ними. 20 − 8 = 12, и кромки идут эквидистантно —
+   иначе зазор между кнопкой и краем плашки «гуляет» по углам. Тем же
+   правилом живёт панель разделов: 20 − 4 = 16 у .tab. */
+.action-card .btn{border-radius:var(--r2)}
 .action-note{
   font-size:var(--t-caption);color:var(--sub);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
