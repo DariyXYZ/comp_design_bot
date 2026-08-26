@@ -17,7 +17,6 @@ from .. import db, pyrus
 from ..config import config
 from ..keyboards import (
     BTN_CAPABILITIES,
-    BTN_CREATE,
     case_picker,
     dept_status_buttons,
     photos_step,
@@ -121,12 +120,12 @@ async def start_request(message: Message, state: FSMContext, case_key: str) -> N
     await message.answer(text)
 
 
-@router.message(Command("new"), F.chat.type == "private")
-@router.message(F.text == BTN_CREATE, F.chat.type == "private")
 @router.message(F.text == BTN_CAPABILITIES, F.chat.type == "private")
 async def choose_case(message: Message, state: FSMContext) -> None:
-    # BTN_CAPABILITIES приходит текстом только когда WEBAPP_URL не настроен —
-    # тогда показываем выбор задач кнопками, чтобы кнопка не была мёртвой.
+    # Единственный вход в чат-версию заявки — и только на случай, когда
+    # WEBAPP_URL не настроен: тогда кнопка «Возможности отдела» приходит
+    # обычным текстом, и мёртвой она быть не должна. Команда /new и кнопка
+    # «Создать заявку» убраны: заявка живёт в Mini App, где есть контекст.
     await state.clear()
     await message.answer("Выберите тип задачи:", reply_markup=case_picker())
 

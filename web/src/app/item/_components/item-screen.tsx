@@ -75,6 +75,7 @@ export function ItemScreen() {
       <ActionBar
         href={requestHref({ item: material.id })}
         label={CALL_TO_ACTION[material.type].label}
+        context={{ kind: typeLabel, title: material.title }}
         note={CALL_TO_ACTION[material.type].note}
       />
     </>

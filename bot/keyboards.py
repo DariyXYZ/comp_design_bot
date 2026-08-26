@@ -18,7 +18,6 @@ from .webauth import login_code
 
 BTN_CAPABILITIES = "✦ Возможности отдела"
 BTN_MY = "☰ Мои заявки"
-BTN_CREATE = "✚ Создать заявку"
 BTN_INFO = "🅘 Инфо"
 
 
@@ -48,6 +47,13 @@ def webapp_url_for(user: User | None) -> str:
 
 
 def main_menu(user: User | None = None) -> ReplyKeyboardMarkup:
+    """Нижнее меню: приложение, мои заявки, инфо.
+
+    Кнопки «Создать заявку» здесь нет намеренно: заявка оформляется в Mini
+    App, где у неё есть контекст (тема или конкретное решение), проект, срок
+    и картинки. Пока вход в чат-версию оставался, он перетягивал на себя
+    тестирование, а заявки приходили без контекста.
+    """
     url = webapp_url_for(user)
     top = (
         KeyboardButton(text=BTN_CAPABILITIES, web_app=WebAppInfo(url=url))
@@ -59,7 +65,6 @@ def main_menu(user: User | None = None) -> ReplyKeyboardMarkup:
             [top],
             [
                 KeyboardButton(text=BTN_MY),
-                KeyboardButton(text=BTN_CREATE),
                 KeyboardButton(text=BTN_INFO),
             ],
         ],

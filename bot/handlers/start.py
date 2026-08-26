@@ -11,7 +11,7 @@ from aiogram.types import FSInputFile, Message
 
 from .. import db
 from ..keyboards import BTN_INFO, BTN_MY, main_menu
-from ..texts import CASES, INFO, NO_REQUESTS, STATUSES, WELCOME
+from ..texts import CASES, INFO, NO_REQUESTS, OPEN_APP, STATUSES, WELCOME
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +61,22 @@ async def cmd_id(message: Message) -> None:
         lines.append(f"thread_id: <code>{message.message_thread_id}</code>")
     await message.reply("\n".join(lines))
 
+
+@router.message(Command("app"), F.chat.type == "private")
+async def open_app(message: Message, state: FSMContext) -> None:
+    """Присылает свежую кнопку, открывающую Mini App.
+
+    Зачем отдельная команда: адрес приложения и код входа живут внутри
+    кнопки, а Telegram обновляет нижнее меню только когда приходит сообщение
+    с разметкой. `/app` — способ получить рабочую кнопку, не проходя заново
+    через `/start`.
+
+    Кнопка именно в нижнем меню, а не под сообщением: `sendData` (единственный
+    канал из приложения к боту) работает только для Mini App, открытого
+    кнопкой клавиатуры. Из inline-кнопки заявка бы не отправилась.
+    """
+    await state.clear()
+    await message.answer(OPEN_APP, reply_markup=main_menu(message.from_user))
 
 @router.message(Command("info"), F.chat.type == "private")
 @router.message(F.text == BTN_INFO, F.chat.type == "private")

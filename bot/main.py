@@ -22,7 +22,7 @@ logging.basicConfig(
 
 COMMANDS = [
     BotCommand(command="start", description="Главное меню"),
-    BotCommand(command="new", description="Создать заявку"),
+    BotCommand(command="app", description="Открыть приложение отдела"),
     BotCommand(command="my", description="Мои заявки"),
     BotCommand(command="info", description="Как это работает"),
 ]

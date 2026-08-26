@@ -35,19 +35,23 @@ async function stubApp(page: Page) {
 }
 
 test.describe("входы в заявку", () => {
-  test("на теме кнопка просит помощь, на материале — предлагает повторить", async ({
+  test("кнопка называет действие, а плашка — карточку, из которой заявка", async ({
     page,
   }) => {
     await stubApp(page);
 
     await page.goto("/");
     const topicCta = page.locator(".action-bar .btn");
-    await expect(topicCta).toHaveText("Попросить помощь по теме");
-    await expect(page.locator(".action-note")).toContainText("ответит отдел");
+    await expect(topicCta).toHaveText("Создать задачу по теме карточки");
+    // Контекст читается первым и основным размером: подпись caption'ом
+    // серым люди не видели, и заявка уходила «непонятно про что».
+    await expect(page.locator(".action-context-kind")).toHaveText("Карточка");
+    await expect(page.locator(".action-context-title")).toHaveText("Тема physics");
 
     // Кейс: главное действие — «хочу так же», отдел повторит сделанное.
     await page.goto("/item/?id=case-vereyskaya");
     await expect(page.locator(".action-bar .btn")).toHaveText("Хочу так же");
+    await expect(page.locator(".action-context-kind")).toHaveText("Уже делали");
 
     // Инструмент: сначала предлагаем сделать самому, заявка — выход на случай
     // «не справлюсь». Поэтому подпись говорит про файлы.

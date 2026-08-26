@@ -166,13 +166,14 @@ test.describe("колода кейсов", () => {
     await open(page);
 
     // Кнопка заявки больше не отправляет данные боту: колода выбирает тему, а
-    // заявка открывается отдельным экраном уже с этой темой в ссылке.
-    await expect(page.locator(".action-note")).toContainText("Кейс 0");
+    // заявка открывается отдельным экраном уже с этой темой в ссылке. Тема
+    // названа в плашке контекста над кнопкой — по ней и проверяем.
+    await expect(page.locator(".action-context-title")).toHaveText("Кейс 0");
 
     await page.keyboard.press("ArrowRight");
     await expect(topCard(page)).toHaveAttribute("data-idx", "1");
 
-    await expect(page.locator(".action-note")).toContainText("Кейс 1");
+    await expect(page.locator(".action-context-title")).toHaveText("Кейс 1");
     await expect(page.locator(".action-bar a")).toHaveAttribute(
       "href",
       /\/request\/\?topic=case-1/,
