@@ -67,8 +67,11 @@ body{
      обычном потоке внутри .deck-col — не фиксированы, резервировать под них
      нижний паддинг больше не нужно. */
   /* Сверху 12, а не 24: в Mini App над страницей уже стоит шапка клиента с
-     названием бота, и лишний воздух под ней читался как пустой экран. */
-  padding:max(12px,env(safe-area-inset-top)) 0 max(20px,env(safe-area-inset-bottom));
+     названием бота, и лишний воздух под ней читался как пустой экран.
+     Снизу только системный отступ: панель разделов прижата к краю, и лишние
+     двадцать пикселей отнимались у списка, который должен выглядывать
+     из-под плашки заявки. */
+  padding:max(12px,env(safe-area-inset-top)) 0 env(safe-area-inset-bottom);
   user-select:none;-webkit-user-select:none;touch-action:none;
 }
 
@@ -328,7 +331,7 @@ header .brand{
    подсказка на карточке перестаёт помещаться. Ступенька по медиазапросу
    была хуже — на 700px карточка прыгала с 261 до 192 пикселей. */
 .scroll .deck-wrap{
-  height:clamp(240px, min(55svh, calc(100svh - 330px)), 470px);
+  height:clamp(240px, min(55svh, calc(100svh - 320px)), 470px);
   flex:none;padding-top:0;
 }
 .scroll .swipe-hint{margin:var(--s3) 0 0;padding:0}
@@ -508,17 +511,17 @@ header .brand{
 .btn:disabled{opacity:.4;cursor:default}
 .btn:disabled:active{transform:none}
 
-/* Сегментированный переключатель, а не строка мелких иконок: активный раздел
-   виден как приподнятая плашка на утопленном фоне, и его не приходится искать
-   по оттенку подписи. Кромки совпадают с кромками контента. */
+/* Активный раздел — приподнятая плашка, остальное на фоне страницы. Общей
+   подложки у панели нет: два серых блока подряд (плашка заявки и панель)
+   съедали низ экрана, и первая строка списка переставала выглядывать. Панель
+   прижата к нижнему краю — снизу только системный отступ под жест-полоску. */
 .tabbar{
   flex:none;display:flex;gap:var(--s1);
-  margin:var(--s3) var(--s4) 0;padding:var(--s1);
-  background:var(--pill);border-radius:var(--r4);
+  margin:var(--s2) var(--s4) 0;padding:0;
 }
 .tab{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:var(--s1);
-  padding:var(--s2) 0 7px;border-radius:var(--r3);
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:var(--s1) 0;border-radius:var(--r2);
   color:var(--sub);text-decoration:none;
   font-size:var(--t-caption);font-weight:600;
   transition:color .16s var(--ease), background .16s var(--ease);
