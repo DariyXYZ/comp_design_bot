@@ -73,6 +73,27 @@ def main_menu(user: User | None = None) -> ReplyKeyboardMarkup:
     )
 
 
+def app_button(user: User | None) -> InlineKeyboardMarkup | None:
+    """Кнопка запуска приложения прямо в сообщении.
+
+    Reply-клавиатуру на телефоне видно не всегда: в Telegram Desktop она
+    сворачивается в мелкую иконку у поля ввода, и человек решает, что
+    приложения нет. Кнопка внутри сообщения видна одинаково везде.
+
+    Оговорка, которую надо помнить: у Mini App, открытого такой кнопкой,
+    `sendData` недоступен — Telegram разрешает его только для кнопок
+    клавиатуры. Значит отсюда работает всё, кроме отправки заявки, и форма
+    об этом честно предупреждает (см. `submit.ts` в web/).
+    """
+    url = webapp_url_for(user)
+    if not url:
+        return None
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✦ Открыть приложение", web_app=WebAppInfo(url=url))]
+        ]
+    )
+
 def case_picker() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text=case["title"], callback_data=f"case:{key}")]

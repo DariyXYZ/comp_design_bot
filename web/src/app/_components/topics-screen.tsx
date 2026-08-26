@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { ActionBar } from "@/components/layout/action-bar";
 import { requestHref } from "@/config/navigation";
 import { MaterialRow, materialsByTopic } from "@/features/materials";
+import { topicColor } from "@/features/topics/color";
 import type { Case } from "../_lib/deck-math";
 import { CaseDeck } from "./case-deck";
 
@@ -76,7 +77,7 @@ export function TopicsScreen() {
         <ActionBar
           href={requestHref({ topic: topic.key, topicTitle: topic.title })}
           label="Создать задачу по теме карточки"
-          context={{ kind: "Карточка", title: topic.title }}
+          context={{ kind: "Карточка", title: topic.title, color: topicColor(topic.key) }}
         />
       ) : null}
     </>

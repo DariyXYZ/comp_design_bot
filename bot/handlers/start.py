@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile, Message
 
 from .. import db
-from ..keyboards import BTN_INFO, BTN_MY, main_menu
+from ..keyboards import BTN_INFO, BTN_MY, app_button, main_menu
 from ..texts import CASES, INFO, NO_REQUESTS, OPEN_APP, STATUSES, WELCOME
 
 log = logging.getLogger(__name__)
@@ -76,7 +76,10 @@ async def open_app(message: Message, state: FSMContext) -> None:
     кнопкой клавиатуры. Из inline-кнопки заявка бы не отправилась.
     """
     await state.clear()
-    await message.answer(OPEN_APP, reply_markup=main_menu(message.from_user))
+    # Кнопка в самом сообщении — её видно и на телефоне, и в Desktop.
+    # Клавиатуру внизу тут не трогаем: одно сообщение несёт одну разметку, а
+    # она и так обновляется ответами на «Мои заявки» и «Инфо».
+    await message.answer(OPEN_APP, reply_markup=app_button(message.from_user))
 
 @router.message(Command("info"), F.chat.type == "private")
 @router.message(F.text == BTN_INFO, F.chat.type == "private")

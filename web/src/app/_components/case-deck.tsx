@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { topicColor } from "@/features/topics/color";
 import { fetchCases } from "../_lib/cases";
 import {
   STACK_SIZE,
@@ -142,6 +143,7 @@ export function CaseDeck({
           <div class="card-face card-front">
             <div class="media">
               <img src="${c.frontImg}" alt="" draggable="false" loading="lazy">
+              <span class="topic-dot" style="background:${topicColor(c.key)}"></span>
             </div>
             <div class="body">
               <h3>${c.title}</h3>

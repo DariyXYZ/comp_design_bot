@@ -6,6 +6,7 @@ import { PathField } from "@/components/ui/path-field";
 import { Screen } from "@/components/layout/screen";
 import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { MATERIAL_TYPE_LABEL, materialById, type Material } from "@/features/materials";
+import { topicColor } from "@/features/topics/color";
 import { requestHref, routes } from "@/config/navigation";
 
 /**
@@ -75,7 +76,7 @@ export function ItemScreen() {
       <ActionBar
         href={requestHref({ item: material.id })}
         label={CALL_TO_ACTION[material.type].label}
-        context={{ kind: typeLabel, title: material.title }}
+        context={{ kind: typeLabel, title: material.title, color: topicColor(material.topic) }}
         note={CALL_TO_ACTION[material.type].note}
       />
     </>

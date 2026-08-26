@@ -21,11 +21,11 @@ type Common = {
    * и люди её попросту не видели — заявку отправляли, не понимая, что у неё уже
    * есть контекст.
    *
-   * Плашка идёт последней перед кнопкой, вплотную: соседство и означает, что
-   * кнопка сработает именно для этой карточки. Подсказка отодвинута выше —
-   * она про действие, а не про контекст.
+   * Подпись и кнопка стоят на общей серой плашке — так это один предмет, а не
+   * два соседних. Цвет — тот же, что у кружка на карточке в колоде: связь
+   * «кнопка про эту карточку» читается до того, как прочитан текст.
    */
-  context?: { kind: string; title: string };
+  context?: { kind: string; title: string; color: string };
   /** Короткая подсказка про само действие. Второстепенна и может отсутствовать. */
   note?: string;
 };
@@ -39,45 +39,39 @@ export function ActionBar(
   return (
     <div className="action-bar">
       {props.note ? <p className="action-note">{props.note}</p> : null}
-      {props.context ? (
-        <div className="action-context">
-          {/* Знак карточки: он же стоит на строках материалов, поэтому связь
-              «плашка — карточка, из которой я пришёл» читается без слов. */}
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect
-              x="6.5"
-              y="3.5"
-              width="11"
-              height="17"
-              rx="2.6"
-              stroke="currentColor"
-              strokeWidth="1.8"
+      {/* Подпись и кнопка — один блок на общей плашке: раньше подпись стояла
+          отдельной карточкой, и связь «эта кнопка про эту карточку» держалась
+          только на близости. Кнопка внутри плашки уже её на padding — видно,
+          что она принадлежит подписи, а не полосе экрана. */}
+      <div className={props.context ? "action-card" : undefined}>
+        {props.context ? (
+          <div className="action-context">
+            {/* Кружок того же цвета, что на карточке в колоде: по нему видно,
+                к какой именно карточке относится кнопка. */}
+            <span
+              className="topic-dot topic-dot-inline"
+              style={{ background: props.context.color }}
+              aria-hidden="true"
             />
-            <path
-              d="M3.5 7.5v9M20.5 7.5v9"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-          <span className="action-context-kind">{props.context.kind}</span>
-          <span className="action-context-title">{props.context.title}</span>
-        </div>
-      ) : null}
-      {"href" in props ? (
-        <Link href={props.href} className="btn btn-primary">
-          {props.label}
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={props.onClick}
-          disabled={props.disabled}
-          className="btn btn-primary"
-        >
-          {props.label}
-        </button>
-      )}
+            <span className="action-context-kind">{props.context.kind}</span>
+            <span className="action-context-title">{props.context.title}</span>
+          </div>
+        ) : null}
+        {"href" in props ? (
+          <Link href={props.href} className="btn btn-primary">
+            {props.label}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={props.onClick}
+            disabled={props.disabled}
+            className="btn btn-primary"
+          >
+            {props.label}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
