@@ -104,7 +104,7 @@ const CALL_TO_ACTION: Record<Material["type"], { label: string; note: string }> 
     note: "Или заберите файлы выше и примените сами",
   },
   module: {
-    label: "Помочь с этим модулем",
+    label: "Помочь с этим скриптом",
     note: "Или заберите файлы выше и вставьте в своё определение",
   },
 };
