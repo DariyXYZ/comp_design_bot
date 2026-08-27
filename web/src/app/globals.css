@@ -229,20 +229,39 @@ header .brand{
   width:32px;height:32px;color:#9a9a9e;
 }
 
+/* Стрелки листания. На телефоне они не заменяют свайп, а подсказывают, что
+   колода листается вообще: свайп невидим, и человек, не тронувший карточку,
+   не узнает о соседних. Поэтому мелкие и серые — знак, а не орган
+   управления. */
 .arrow{
   position:absolute;top:50%;transform:translateY(-50%);z-index:30;
-  width:38px;height:38px;border-radius:50%;border:1px solid var(--line);
-  background:var(--card);color:var(--ink);cursor:pointer;
-  display:none;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;border:none;
+  background:none;color:var(--sub);cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  opacity:.55;transition:opacity .16s var(--ease);
 }
-.arrow svg{display:block}
+.arrow svg{display:block;width:18px;height:18px}
 .arrow.left svg{transform:scaleX(-1)}
-.arrow:hover{background:var(--pill)}
+.arrow:hover{opacity:1}
+.arrow:active{opacity:1}
 /* Отступ от края карточки, а не от фиксированной доли экрана — иначе при
-   уменьшенной карточке стрелки остаются висеть в стороне. */
-.arrow.left{left:calc(50% - var(--card-w) / 2 - 58px)}
-.arrow.right{right:calc(50% - var(--card-w) / 2 - 58px)}
-@media (hover:hover) and (min-width:640px){.arrow{display:flex}}
+   уменьшенной карточке стрелки остаются висеть в стороне. На телефоне между
+   карточкой и краем экрана около полусотни пикселей, поэтому зазор
+   небольшой. */
+.arrow.left{left:calc(50% - var(--card-w) / 2 - 30px)}
+.arrow.right{right:calc(50% - var(--card-w) / 2 - 30px)}
+/* На широком экране места больше: кнопки крупнее и с кромкой, как обычные
+   органы управления. */
+@media (hover:hover) and (min-width:640px){
+  .arrow{
+    width:38px;height:38px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);opacity:1;
+  }
+  .arrow svg{width:20px;height:20px}
+  .arrow:hover{background:var(--pill)}
+  .arrow.left{left:calc(50% - var(--card-w) / 2 - 58px)}
+  .arrow.right{right:calc(50% - var(--card-w) / 2 - 58px)}
+}
 
 /* Заглушка на время загрузки карточек: та же пропорция и радиус, что у
    карточки, поэтому вёрстка не дёргается, когда данные приходят. */
@@ -529,15 +548,15 @@ header .brand{
 /* Неактивные разделы приглушены иконкой, а не подписью: подпись набрана
    мелким кеглем, и осветлять её — значит ронять контраст текста ниже
    читаемого. Иконка же чистая графика, ей приглушение ничего не стоит. */
-.tab svg{opacity:.5;transition:opacity .16s var(--ease)}
+.tab svg{opacity:.42;transition:opacity .16s var(--ease)}
 .tab:hover{color:var(--ink)}
 .tab:hover svg{opacity:.8}
-/* Активный раздел: белая плашка плюс волосяная кромка. Одной тени мало —
-   на светлой странице белое на почти белом почти не видно. Кромка сделана
-   тенью, а не border: иначе панель подрастала бы на два пикселя. */
+/* Активный раздел различается только яркостью: белая плашка и полная
+   непрозрачность иконки против приглушённых соседей. Кромки нет намеренно —
+   она читалась как рамка кнопки и спорила с плашкой заявки над панелью. */
 .tab.on{
   color:var(--ink);background:var(--raised);
-  box-shadow:0 0 0 1px var(--line), 0 6px 16px -10px rgba(0,0,0,.45);
+  box-shadow:0 6px 16px -10px rgba(0,0,0,.45);
 }
 .tab.on svg{opacity:1}
 
