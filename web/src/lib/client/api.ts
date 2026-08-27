@@ -143,6 +143,48 @@ async function postSession(
   }
 }
 
+/**
+ * Достаёт человека из уже полученного токена.
+ *
+ * Токен — это `payload.подпись`, и payload читается без сервера. Подпись тут
+ * не проверяется и не должна: клиент берёт отсюда только имя для заголовка, а
+ * доступ к заявкам всё равно решает сервер, который подпись проверяет.
+ *
+ * Зачем: без этого приложение с рабочим токеном считало, что входа нет.
+ * Заявки грузились (их запрашивают по токену), имя показывалось из кеша, а
+ * экран профиля при этом писал «Открыто вне Telegram» — потому что обмен
+ * действительно не выполнялся, он был не нужен.
+ */
+function sessionFromToken(token: string): Session | null {
+  try {
+    const [body] = token.split(".");
+    if (!body) return null;
+    const base64 = body.replace(/-/g, "+").replace(/_/g, "/");
+    const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+    // Через байты, а не String.fromCharCode: имена русские, а atob отдаёт
+    // строку байтов, где кириллица разложена на пары.
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as {
+      id?: number;
+      name?: string;
+      handle?: string | null;
+      exp?: number;
+    };
+    if (!payload.id) return null;
+    if ((payload.exp ?? 0) < Date.now() / 1000) return null;
+    return {
+      token,
+      user: {
+        id: payload.id,
+        name: payload.name || "Без имени",
+        handle: payload.handle ?? null,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function runExchange(): Promise<Session | null> {
   const code = takeLoginCode();
   if (code) {
@@ -172,10 +214,24 @@ export async function exchangeSession(
   options: { force?: boolean } = {},
 ): Promise<Session | null> {
   if (options.force) {
+    // Токен признан негодным — стираем и в памяти, и в хранилище, иначе
+    // повторный обмен вернёт тот же протухший.
     memorySession = null;
+    memoryToken = null;
     inflight = null;
-  } else if (memorySession) {
-    return memorySession;
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // Хранилище недоступно — достаточно памяти.
+    }
+  } else {
+    if (memorySession) return memorySession;
+    const stored = readStoredToken();
+    const restored = stored ? sessionFromToken(stored) : null;
+    if (restored) {
+      memorySession = restored;
+      return restored;
+    }
   }
   if (!inflight) {
     inflight = runExchange().then((session) => {

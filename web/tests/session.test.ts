@@ -33,6 +33,7 @@ function stubBrowser({ storage }: { storage: "ok" | "blocked" }) {
       ? {
           getItem: (key: string) => store.get(key) ?? null,
           setItem: (key: string, value: string) => void store.set(key, value),
+          removeItem: (key: string) => void store.delete(key),
         }
       : {
           getItem() {
@@ -110,6 +111,51 @@ describe("сессия Mini App", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("сохранённый токен даёт сессию без единого запроса", async () => {
+    // Живой случай: приложение открыли второй раз, кода в адресе нет, клиент
+    // не отдал данные запуска. Токен в хранилище рабочий — заявки грузились,
+    // но экран профиля писал «Открыто вне Telegram», потому что обмен не
+    // выполнялся. Он и не нужен: человек уже известен из самого токена.
+    const { calls, store } = stubBrowser({ storage: "ok" });
+    const payload = Buffer.from(
+      JSON.stringify({
+        id: 469526368,
+        name: "Дарий Назаров",
+        handle: "@dariy",
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      }),
+      "utf8",
+    ).toString("base64url");
+    store.set("comp-design-bot:session-token", `${payload}.signature`);
+    respond(calls, [{ status: 500 }]);
+
+    const api = await import("@/lib/client/api");
+    const session = await api.exchangeSession();
+
+    expect(session?.user).toEqual({
+      id: 469526368,
+      name: "Дарий Назаров",
+      handle: "@dariy",
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("истёкший токен из хранилища не считается сессией", async () => {
+    const { calls, store } = stubBrowser({ storage: "ok" });
+    const payload = Buffer.from(
+      JSON.stringify({ id: 1, name: "Кто-то", exp: Math.floor(Date.now() / 1000) - 60 }),
+      "utf8",
+    ).toString("base64url");
+    store.set("comp-design-bot:session-token", `${payload}.signature`);
+    respond(calls, [{ status: 200, body: session }]);
+
+    const api = await import("@/lib/client/api");
+    // Кода в адресе нет только у initData-пути, а здесь код есть — значит
+    // приложение честно идёт менять его заново.
+    expect((await api.exchangeSession())?.token).toBe("TOKEN-1");
+    expect(calls[0].url).toContain("/api/auth/redeem/");
+  });
+
   it("при заблокированном хранилище токен живёт в памяти", async () => {
     // Вебвью Telegram и приватный режим умеют бросать на localStorage. Раньше
     // это означало, что вход есть, а картинки грузить нельзя: следующий запрос
@@ -132,7 +178,7 @@ describe("сессия Mini App", () => {
   });
 
   it("истёкший токен обменивается заново кодом из памяти", async () => {
-    const { calls } = stubBrowser({ storage: "ok" });
+    const { calls, store } = stubBrowser({ storage: "ok" });
     respond(calls, [
       { status: 200, body: session },
       { status: 401 },
@@ -145,6 +191,9 @@ describe("сессия Mini App", () => {
     const requests = await api.fetchMyRequests();
 
     expect(requests).toEqual([{ taskId: 1 }]);
+    // Протухший токен стёрт из хранилища: иначе следующий запуск снова
+    // восстановил бы сессию из него и снова получил 401.
+    expect(store.get("comp-design-bot:session-token")).toBe("TOKEN-2");
     // Второй обмен идёт тем же кодом: человек не должен возвращаться в чат за
     // свежей кнопкой из-за истёкшего токена.
     expect(calls.map((call) => call.url.replace(/^.*\/api/, "/api"))).toEqual([

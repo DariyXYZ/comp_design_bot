@@ -87,7 +87,10 @@ export function ProfileScreen() {
     };
   }, []);
 
-  const problem = sessionUser ? null : loginProblem(trace);
+  // Заявки пришли — значит сервер принял токен, и разговаривать о входе не о
+  // чем. Это подстраховка к `exchangeSession`: жалоба на вход при работающем
+  // входе хуже, чем отсутствие жалобы.
+  const problem = sessionUser || state.kind === "ready" ? null : loginProblem(trace);
 
   return (
     <div className="scroll">
