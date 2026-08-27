@@ -8,6 +8,7 @@ import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { MATERIAL_TYPE_LABEL, materialById, type Material } from "@/features/materials";
 import { topicColor } from "@/features/topics/color";
 import { requestHref, routes } from "@/config/navigation";
+import { RESTART_HINT } from "@/config/copy";
 
 /**
  * Оформленный материал: кейс, инструмент или модуль.
@@ -25,7 +26,7 @@ export function ItemScreen() {
     return (
       <Screen title="Материал не найден" backHref={routes.topics}>
         <p className="section-note">
-          Ссылка устарела — вернитесь к темам и выберите заново.
+          Ссылка устарела — вернитесь к темам и выберите заново. {RESTART_HINT}
         </p>
       </Screen>
     );

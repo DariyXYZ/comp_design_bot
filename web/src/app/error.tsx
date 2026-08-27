@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { RESTART_HINT } from "@/config/copy";
 
 /**
  * Ловит падение рендера оболочки. Сбой загрузки карточек сюда НЕ попадает —
@@ -24,8 +25,8 @@ export default function ErrorScreen({
     <div className="fallback">
       <h1>Что-то сломалось</h1>
       <p>
-        Экран не открылся. Попробуйте ещё раз — если повторится, напишите в
-        отдел вычислительного проектирования.
+        Экран не открылся. Попробуйте ещё раз. {RESTART_HINT} Если повторится
+        — напишите в отдел вычислительного проектирования.
       </p>
       <button className="cta" onClick={reset}>
         <span className="cta-label">Попробовать снова</span>

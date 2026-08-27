@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionBar } from "@/components/layout/action-bar";
 import { Screen } from "@/components/layout/screen";
 import { routes } from "@/config/navigation";
+import { RESTART_HINT } from "@/config/copy";
 import { MESSAGE_LIMIT, type RequestAction } from "@/features/requests/actions";
 import { actOnRequest, fetchRequest } from "@/lib/client/api";
 import { askLeave, setLeaveGuard } from "@/lib/client/leave-guard";
@@ -79,7 +80,7 @@ export function RequestCard() {
     setBusy(false);
     if (!ok) {
       setProblem(
-        "Не отправилось. Проверьте связь и попробуйте ещё раз — или напишите боту в чат.",
+        `Не отправилось. Проверьте связь и попробуйте ещё раз. ${RESTART_HINT}`,
       );
       return;
     }
@@ -104,7 +105,7 @@ export function RequestCard() {
       <Screen title="Заявка не найдена" backHref={routes.myRequests}>
         <p className="section-note">
           Заявка не открылась: ссылка устарела, заявка чужая или вход не
-          подтверждён. Вернитесь к списку и откройте её заново.
+          подтверждён. Вернитесь к списку и откройте её заново. {RESTART_HINT}
         </p>
       </Screen>
     );

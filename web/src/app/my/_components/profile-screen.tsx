@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Chevron } from "@/components/ui/chevron";
 import { myRequestHref, routes } from "@/config/navigation";
+import { RESTART_HINT } from "@/config/copy";
 import { requestExcerpt } from "@/features/requests/excerpt";
 import { askMyRequests } from "@/features/requests/submit";
 import { useViewer } from "@/hooks/use-viewer";
@@ -51,12 +52,12 @@ function loginProblem(trace: LoginTrace | null): { title: string; hint: string }
   if (!trace.hadCode && trace.initDataLength === 0) {
     return {
       title: "Открыто вне Telegram",
-      hint: "Заявки и загрузка картинок работают только при запуске кнопкой из бота @comp_design_bot.",
+      hint: `Заявки и загрузка картинок работают только при запуске кнопкой из бота @comp_design_bot. ${RESTART_HINT}`,
     };
   }
   return {
     title: "Вход не подтверждён",
-    hint: "Попробуйте закрыть приложение и открыть его кнопкой из чата бота.",
+    hint: `Попробуйте закрыть приложение и открыть его кнопкой из чата бота. ${RESTART_HINT}`,
   };
 }
 
@@ -182,6 +183,8 @@ export function ProfileScreen() {
           </div>
         ) : null}
 
+        {/* Без совета про /start: он уже стоит в баннере выше, а два
+            одинаковых совета на одном экране читаются как шум. */}
         {state.kind === "unavailable" ? (
           <div className="empty">
             <p>

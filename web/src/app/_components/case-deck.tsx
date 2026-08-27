@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { topicColor } from "@/features/topics/color";
+import { RESTART_HINT } from "@/config/copy";
 import { fetchCases } from "../_lib/cases";
 import {
   STACK_SIZE,
@@ -329,7 +330,7 @@ export function CaseDeck({
         rows = await fetchCases({ signal: abort.signal });
       } catch {
         if (disposed) return;
-        deck.innerHTML = `<div class="deck-error">Не получилось загрузить карточки — проверьте интернет и откройте ещё раз.</div>`;
+        deck.innerHTML = `<div class="deck-error">Не получилось загрузить карточки — проверьте интернет и откройте ещё раз.<br>${RESTART_HINT}</div>`;
         return;
       }
       if (disposed) return;

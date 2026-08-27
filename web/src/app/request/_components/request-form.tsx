@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActionBar } from "@/components/layout/action-bar";
 import { Screen } from "@/components/layout/screen";
 import { itemHref, routes } from "@/config/navigation";
+import { RESTART_HINT } from "@/config/copy";
 import { MATERIAL_TYPE_FORMAL, materialById } from "@/features/materials";
 import { uploadPhoto, type UploadedPhoto } from "@/features/requests/photos";
 import { submitRequest } from "@/features/requests/submit";
@@ -78,10 +79,10 @@ export function RequestForm() {
         URL.revokeObjectURL(preview);
         setProblem(
           result.reason === "no-session"
-            ? "Картинки загружаются только при запуске из Telegram — откройте приложение кнопкой в чате бота."
+            ? `Картинки загружаются только при запуске из Telegram — откройте приложение кнопкой в чате бота. ${RESTART_HINT}`
             : result.reason === "too-large"
               ? "Картинка слишком большая даже после сжатия — попробуйте другую."
-              : "Картинку не удалось загрузить. Попробуйте ещё раз.",
+              : `Картинку не удалось загрузить. Попробуйте ещё раз. ${RESTART_HINT}`,
         );
         continue;
       }
@@ -137,15 +138,15 @@ export function RequestForm() {
     }
     setProblem(
       result === "outside-telegram"
-        ? "Отправка работает только внутри Telegram: откройте бота @comp_design_bot и нажмите «Возможности отдела»."
+        ? `Отправка работает только внутри Telegram: откройте бота @comp_design_bot и нажмите «Возможности отдела». ${RESTART_HINT}`
         : result === "wrong-launch"
           // Telegram разрешает отправку боту только из приложения, открытого
           // кнопкой клавиатуры. Кнопка в сообщении (/app) для этого не
           // годится — говорим об этом прямо, а не «попробуйте ещё раз».
-          ? "Приложение открыто кнопкой из сообщения — из неё Telegram не разрешает отправку. Откройте его кнопкой «✦ Возможности отдела» внизу чата и отправьте заявку оттуда."
+          ? `Приложение открыто кнопкой из сообщения — из неё Telegram не разрешает отправку. Откройте его кнопкой «✦ Возможности отдела» внизу чата и отправьте заявку оттуда. ${RESTART_HINT}`
         : result === "too-long"
           ? "Текст слишком длинный для отправки — сократите описание, детали можно дописать в чате."
-          : "Не получилось отправить. Попробуйте ещё раз или напишите в чат боту.",
+          : `Не получилось отправить. Попробуйте ещё раз. ${RESTART_HINT}`,
     );
   }
 
