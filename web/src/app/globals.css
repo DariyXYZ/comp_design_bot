@@ -71,7 +71,7 @@ body{
      Снизу только системный отступ: панель разделов прижата к краю, и лишние
      двадцать пикселей отнимались у списка, который должен выглядывать
      из-под плашки заявки. */
-  padding:max(12px,env(safe-area-inset-top)) 0 env(safe-area-inset-bottom);
+  padding:max(12px,env(safe-area-inset-top)) 0 calc(var(--s2) + env(safe-area-inset-bottom));
   user-select:none;-webkit-user-select:none;touch-action:none;
 }
 
@@ -526,11 +526,20 @@ header .brand{
   font-size:var(--t-caption);font-weight:600;
   transition:color .16s var(--ease), background .16s var(--ease);
 }
+/* Неактивные разделы приглушены иконкой, а не подписью: подпись набрана
+   мелким кеглем, и осветлять её — значит ронять контраст текста ниже
+   читаемого. Иконка же чистая графика, ей приглушение ничего не стоит. */
+.tab svg{opacity:.5;transition:opacity .16s var(--ease)}
 .tab:hover{color:var(--ink)}
+.tab:hover svg{opacity:.8}
+/* Активный раздел: белая плашка плюс волосяная кромка. Одной тени мало —
+   на светлой странице белое на почти белом почти не видно. Кромка сделана
+   тенью, а не border: иначе панель подрастала бы на два пикселя. */
 .tab.on{
   color:var(--ink);background:var(--raised);
-  box-shadow:0 6px 16px -10px rgba(0,0,0,.45);
+  box-shadow:0 0 0 1px var(--line), 0 6px 16px -10px rgba(0,0,0,.45);
 }
+.tab.on svg{opacity:1}
 
 /* Шапка вложенного экрана. В проде «назад» уедет в BackButton Telegram. */
 .screen-top{
