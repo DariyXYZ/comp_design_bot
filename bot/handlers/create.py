@@ -123,7 +123,7 @@ async def start_request(message: Message, state: FSMContext, case_key: str) -> N
 @router.message(F.text == BTN_CAPABILITIES, F.chat.type == "private")
 async def choose_case(message: Message, state: FSMContext) -> None:
     # Единственный вход в чат-версию заявки — и только на случай, когда
-    # WEBAPP_URL не настроен: тогда кнопка «Возможности отдела» приходит
+    # WEBAPP_URL не настроен: тогда кнопка «Решения и заявки» приходит
     # обычным текстом, и мёртвой она быть не должна. Команда /new и кнопка
     # «Создать заявку» убраны: заявка живёт в Mini App, где есть контекст.
     await state.clear()

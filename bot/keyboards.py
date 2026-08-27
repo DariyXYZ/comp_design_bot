@@ -16,7 +16,11 @@ from .config import config
 from .texts import CASES, STATUSES
 from .webauth import login_code
 
-BTN_CAPABILITIES = "✦ Возможности отдела"
+# Название кнопки приложения. «Возможности отдела» описывало прежнюю витрину
+# компетенций; теперь внутри ещё готовые решения с файлами, поток работ и
+# свои заявки, и старое имя обещало меньше, чем есть. «Решения и заявки» —
+# две причины, по которым туда заходят.
+BTN_CAPABILITIES = "✦ Решения и заявки"
 BTN_MY = "☰ Мои заявки"
 BTN_INFO = "🅘 Инфо"
 
@@ -90,7 +94,9 @@ def app_button(user: User | None) -> InlineKeyboardMarkup | None:
         return None
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✦ Открыть приложение", web_app=WebAppInfo(url=url))]
+            # Та же подпись, что у кнопки в меню: два имени одного места
+            # заставляли бы догадываться, одно ли это приложение.
+            [InlineKeyboardButton(text=BTN_CAPABILITIES, web_app=WebAppInfo(url=url))]
         ]
     )
 
