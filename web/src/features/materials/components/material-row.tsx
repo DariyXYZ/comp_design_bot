@@ -20,7 +20,14 @@ export function MaterialRow({ material }: Readonly<{ material: Material }>) {
   return (
     <Link href={itemHref(material.id)} className="row">
       <div className="row-thumb">
-        <ScriptGlyph className="glyph" />
+        {material.cover ? (
+          // Обычный img, а не next/image: оптимизатор в проекте выключен
+          // (см. next.config.ts), а превью уже сжато под этот размер.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="thumb-cover" src={material.cover} alt="" loading="lazy" decoding="async" />
+        ) : (
+          <ScriptGlyph className="glyph" />
+        )}
       </div>
       <div className="row-text">
         <div className="row-meta">

@@ -55,10 +55,20 @@ export function ItemScreen() {
       subtitle={`${typeLabel} · обновлён ${material.updated}`}
       backHref={routes.topics}
     >
-      <div className="media-slot">
-        <ScriptGlyph className="glyph glyph-lg" />
-        <span>{material.media}</span>
-      </div>
+      {/* Превью из папки решения, если оно там есть. Где нет — знак скрипта и
+          подпись о том, что тут будет: обещать картинку, которой нет, хуже,
+          чем честно показать место под неё. */}
+      {material.cover ? (
+        <div className="media-slot media-slot-cover">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="media-cover" src={material.cover} alt="" decoding="async" />
+        </div>
+      ) : (
+        <div className="media-slot">
+          <ScriptGlyph className="glyph glyph-lg" />
+          <span>{material.media}</span>
+        </div>
+      )}
 
       <p className="lead">{material.summary}</p>
 

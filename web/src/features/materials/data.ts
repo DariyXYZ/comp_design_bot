@@ -5,10 +5,14 @@
  * (пространство Computational Design). Настоящие и темы карточек — они
  * приходят из Supabase, как в проде.
  *
- * Дописаны руками и требуют проверки: описания «чем полезно», шаги «как
- * применить» и пути к папкам. Пути собраны по общему шаблону
- * `X:\CompDesign_Projects\<проект>\...` (из ClickUp достоверно известен
- * только путь к библиотеке ветра), поэтому перед публикацией их надо сверить.
+ * Сверено с сетевым диском 3 сентября 2026. Скрипты под типом «Готовый
+ * скрипт» — это реальное содержимое `Library\gh_definitions`: у каждого есть
+ * определение, описание и превью, и всё перечисленное взято оттуда, а не
+ * придумано. Прежние записи этого типа ссылались на папки, которых на диске
+ * нет, и заменены.
+ *
+ * Пути к проектам сверены выборочно: те, где папка нашлась, ведут в неё
+ * целиком; остальные (ЦентрЛаб, «Барка») остались прежними и требуют сверки.
  *
  * Данные лежат в модуле рядом с типами: когда появится таблица, экспортируемые
  * функции станут запросом, а форма ответа не изменится.
@@ -33,6 +37,15 @@ export type Material = {
   /** Где лежат файлы. Это путь на сетевом диске, а не ссылка. */
   files: string;
   updated: string;
+  /**
+   * Обложка из папки решения, уже сжатая и положенная в `public/materials`.
+   *
+   * Есть там, где в папке лежит превью: у скриптов библиотеки это `image.jpg`
+   * рядом с определением, у кейсов — вид из папки проекта. Где превью нет,
+   * остаётся знак скрипта: рисовать картинку ради единообразия значило бы
+   * показывать не то, что человек получит.
+   */
+  cover?: string;
 };
 
 /**
@@ -86,7 +99,7 @@ export const MATERIALS: readonly Material[] = [
       "Проверить окна — их можно добавить вручную, если геометрия сложная",
       "Выгрузить тепловую карту в отчёт",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
+    files: "X:\\CompDesign_Projects\\Library\\insolation_beta",
     updated: "11 февраля",
   },
   {
@@ -118,7 +131,7 @@ export const MATERIALS: readonly Material[] = [
       "Смотреть метрики Clearance Time, Travel Time, Exit Split — не только картинку",
       "Presentation mode и легенда — для выдачи заказчику",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\tools\\crowdflow",
+    files: "X:\\CompDesign_Projects\\Library\\crowd_flow",
     updated: "24 июня",
   },
   {
@@ -134,7 +147,7 @@ export const MATERIALS: readonly Material[] = [
       "Взять регламент по зонам ветровой активности",
       "Заявка «Хочу так же» — соберём под ваш участок",
     ],
-    files: "X:\\CompDesign_Projects\\1-72-2025\\wind",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2025\\1-72-2025 НПС БЦ Шелепиха",
     updated: "19 декабря",
   },
   {
@@ -150,7 +163,7 @@ export const MATERIALS: readonly Material[] = [
       "Взять шаблон отчёта",
       "Заявка «Хочу так же» с номером своего проекта",
     ],
-    files: "X:\\CompDesign_Projects\\1-52-2025\\wind",
+    files: "X:\\CompDesign_Projects\\Exchange\\1-52-2025 АЛЬФА Маши Порываевой\\Ветровой комфорт",
     updated: "24 июня",
   },
 
@@ -170,7 +183,7 @@ export const MATERIALS: readonly Material[] = [
       "Подать панели — маппинг параметров и позиционирование экземпляров идёт скриптом",
       "Сверить количество экземпляров до записи в модель",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\rhino_inside_revit",
+    files: "X:\\CompDesign_Projects\\Library\\rhino_inside",
     updated: "10 августа",
   },
   {
@@ -186,7 +199,7 @@ export const MATERIALS: readonly Material[] = [
       "Взять определение из папки проекта",
       "Заявка «Хочу так же» — настроим под ваш шаблон семейств",
     ],
-    files: "X:\\CompDesign_Projects\\1-76-2025\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2025\\1-76-2025 ФСК Измайлово БЦ",
     updated: "10 августа",
   },
 
@@ -194,49 +207,20 @@ export const MATERIALS: readonly Material[] = [
   // unique — «Много уникальных элементов»
   // ──────────────────────────────────────────────────────────────────────
   {
-    id: "module-panel-marking",
+    id: "module-facade-gap-fill",
     topic: "unique",
     type: "module",
-    title: "Маркировка панелей по расположению в здании",
-    summary: "Марка каждой панели считается из её места на фасаде, а не вручную",
-    media: "Гифка: марки проступают на панелях фасада",
+    title: "Раскладка фасада на элементы с промежутками",
+    summary: "Считает, сколько элементов и с каким шагом встанет на заданную длину фасада",
+    media: "Интервалы заполнения и промежутков по длине фасада",
     steps: [
-      "Подать панели и оси/этажи как систему координат маркировки",
-      "Выбрать правило марки (фасад, ярус, позиция в ряду)",
-      "Проверить уникальность марок перед выгрузкой ведомости",
+      "Задать общую длину фасада, минимальную длину элемента и длину промежутка",
+      "Забрать интервалы заполнения и промежутков, количество элементов и фактическую занятую длину",
+      "Нормализованные интервалы отдаются отдельно — их удобно подавать дальше по определению",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\panel_marking",
-    updated: "19 августа",
-  },
-  {
-    id: "module-panel-typing",
-    topic: "unique",
-    type: "module",
-    title: "Типизация и разбивка на стандартные панели",
-    summary: "Сводит уникальные элементы к набору типов — меньше позиций в заказе",
-    media: "Гифка: панели раскрашиваются по типам",
-    steps: [
-      "Задать допуск, в пределах которого панели считаются одинаковыми",
-      "Посмотреть распределение по типам и подкрутить допуск",
-      "Выгрузить ведомость типов и уникальных позиций",
-    ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\panel_typing",
-    updated: "24 июня",
-  },
-  {
-    id: "module-louvers-cutouts",
-    topic: "unique",
-    type: "module",
-    title: "Параметрический скрипт ламелей с вырезами",
-    summary: "Ламели по фасаду с вырезами под проёмы и переменным шагом",
-    media: "Гифка: ламели обходят проёмы фасада",
-    steps: [
-      "Подать линию фасада, проёмы и шаг ламелей",
-      "Задать правило разрыва у проёма",
-      "Проверить стыки на изломах фасада",
-    ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\louvers",
-    updated: "24 июня",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\facade_gap_fill_pattern",
+    updated: "12 марта",
+    cover: "/materials/facade-gap-fill-pattern.jpg",
   },
   {
     id: "case-vereyskaya",
@@ -251,8 +235,9 @@ export const MATERIALS: readonly Material[] = [
       "Взять определение из папки проекта",
       "Заявка «Хочу так же» — соберём под геометрию вашего фасада",
     ],
-    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2026\\1-19-2026 МР Верейская БЦ",
     updated: "24 июня",
+    cover: "/materials/case-vereyskaya.jpg",
   },
   {
     id: "case-centrlab",
@@ -283,7 +268,7 @@ export const MATERIALS: readonly Material[] = [
       "Проверить правило маркировки на своём фасаде",
       "Заявка «Хочу так же»",
     ],
-    files: "X:\\CompDesign_Projects\\1-36-2025\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2025\\1-36-2025 Сoldy Красносельская БЦ",
     updated: "31 марта",
   },
 
@@ -302,8 +287,24 @@ export const MATERIALS: readonly Material[] = [
       "Задать целевое число полигонов",
       "Проверить сетку перед расчётом инсоляции — гайд лежит рядом",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\tools\\remesh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\Tools\\202512_T_UD_Remesher",
     updated: "25 декабря",
+  },
+  {
+    id: "module-developable-surface",
+    topic: "curved",
+    type: "module",
+    title: "Меш из кривой вертикальными полосами",
+    summary: "Разворачиваемая поверхность вдоль изгиба, плотность и форма полос настраиваются",
+    media: "Волнообразная структура из вертикальных полос",
+    steps: [
+      "Подать кривую изгиба",
+      "Задать плотность и форму полос",
+      "Забрать меш — он собран из полос, а не из произвольных треугольников",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\developable_surface_to_mesh",
+    updated: "12 марта",
+    cover: "/materials/developable-surface-to-mesh.jpg",
   },
   {
     id: "case-bishkek",
@@ -318,8 +319,9 @@ export const MATERIALS: readonly Material[] = [
       "Открыть раскладку: линии реза, сгибов, отверстий и швов",
       "Заявка «Хочу так же» — под другую геометрию это собирается заново, готового определения нет",
     ],
-    files: "X:\\CompDesign_Projects\\1-69-2024\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2024\\1-69-2024 Western Bus Station Bishkek",
     updated: "19 августа",
+    cover: "/materials/case-bishkek.jpg",
   },
   {
     id: "case-concrete-bowls",
@@ -333,8 +335,9 @@ export const MATERIALS: readonly Material[] = [
       "Открыть контуры слоёв для раскроя",
       "Заявка «Хочу так же» — под другую форму алгоритм собирается заново",
     ],
-    files: "X:\\CompDesign_Projects\\landscape\\bowls",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\02_LandscapeArchitecture\\1-8-2025 Sarabi Residential Al Satwa\\concrete_bowls",
     updated: "6 марта",
+    cover: "/materials/case-concrete-bowls.jpg",
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -352,57 +355,93 @@ export const MATERIALS: readonly Material[] = [
       "Подать mesh — VSA-скрипт даёт упрощённую геометрию",
       "Для острых кромок смотреть ShrinkWrap/AlphaWrap",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\tools\\ai_geometry_workflows",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\Research\\LLM to CAD\\Презентация\\ai_geometry_toolkit",
     updated: "24 июня",
   },
   {
-    id: "module-barcode-gradient",
+    id: "module-truchet-pattern",
     topic: "reference",
     type: "module",
-    title: "Алгоритм штрихкод-градиента",
-    summary: "Рисунок фасада меняется по правилу, а не рисуется руками",
-    media: "Гифка: градиент штрихкода по фасаду",
+    title: "Орнамент Труше по полю шума",
+    summary: "Квадратная сетка, в каждой ячейке элемент узора со случайной ориентацией",
+    media: "Плавный органический орнамент из элементов Труше",
     steps: [
-      "Подать поверхность фасада и сетку модулей",
-      "Задать кривую распределения плотности",
-      "Проверить, читается ли рисунок с уровня улицы",
+      "Задать размер сетки и дробность рисунка",
+      "Настроить масштаб, смещение и поворот поля шума Simplex/Perlin",
+      "Порогом задать плотность и то, как элементы соединяются между собой",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\barcode_gradient",
-    updated: "24 июня",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\truchet_pattern",
+    updated: "3 сентября",
+    cover: "/materials/truchet-pattern.jpg",
   },
   {
-    id: "module-metaballs",
+    id: "module-voxels",
     topic: "reference",
     type: "module",
-    title: "Метаболлы — плавные объёмы",
-    summary: "Скульптурная форма из набора центров, для МАФов и ландшафта",
-    media: "Гифка: метаболлы сливаются в объём",
+    title: "Воксельный объём с трёхмерным шумом",
+    summary: "Объём разъедается от боковых граней внутрь, глубина задаётся порогом",
+    media: "Воксельная масса, разъеденная шумом с боковых граней",
     steps: [
-      "Расставить центры и радиусы влияния",
-      "Подобрать порог слияния",
-      "Перестроить в mesh под производство",
+      "Задать габариты объёма и размер вокселя",
+      "Указать, в скольких слоях от боковых граней работает удаление",
+      "Порогом шума задать глубину разъедания — к внутренним слоям оно слабеет",
+      "Забрать единую полигональную сетку из оставшихся вокселей",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\metaballs",
-    updated: "25 декабря",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\voxels",
+    updated: "3 сентября",
+    cover: "/materials/voxels.jpg",
+  },
+  {
+    id: "module-wave-surface",
+    topic: "reference",
+    type: "module",
+    title: "Волновая поверхность по косинусам",
+    summary: "Z для сетки точек: амплитуда, число волн и фаза задаются отдельно по X и Y",
+    media: "Поверхность с волнами разной частоты по осям",
+    steps: [
+      "Подать списки координат X и Y",
+      "Задать амплитуду, число волн и фазу по каждой оси",
+      "Забрать значения Z — координаты нормализуются внутри скрипта",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\wave_surface",
+    updated: "12 марта",
+    cover: "/materials/wave-surface.jpg",
   },
 
   // ──────────────────────────────────────────────────────────────────────
   // variants — «Нужно перебрать много вариантов»
   // ──────────────────────────────────────────────────────────────────────
   {
-    id: "module-pattern-variants",
+    id: "module-gradient-reduce",
     topic: "variants",
     type: "module",
-    title: "Перебор вариантов паттерна",
-    summary: "Восемь вариантов одним прогоном — так подбирали фасад Верейской и карниз Бишкека",
-    media: "Гифка: сетка вариантов паттерна",
+    title: "Панель с градиентом плотности квадратов",
+    summary: "Регулярная сетка ячеек, где к верху квадратов больше, а к низу меньше",
+    media: "Панель с растворяющимся книзу узором",
     steps: [
-      "Задать параметры паттерна и их диапазоны",
-      "Запустить перебор, получить рендер каждого варианта",
-      "Сравнить варианты таблицей, а не на глаз",
+      "Задать размеры панели, отступы, размер ячейки и квадрата",
+      "Настроить градиент вероятности заполнения по высоте",
+      "Подкрутить степень случайного перемешивания узора",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\pattern_variants",
-    updated: "24 июня",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\gradient_reduce",
+    updated: "3 сентября",
+    cover: "/materials/gradient-reduce.jpg",
+  },
+  {
+    id: "module-random-tiling",
+    topic: "variants",
+    type: "module",
+    title: "Случайная раскладка плиток в объёме",
+    summary: "Поле Nx × Ny заполняется плитками разных размеров, высота тоже случайная",
+    media: "Объёмная раскладка из коробок разного размера",
+    steps: [
+      "Задать размер поля и список размеров плиток",
+      "Весами задать, каких размеров должно быть больше",
+      "Забрать прямоугольники, их контуры и 3D-коробки",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\random_square_tiling",
+    updated: "12 марта",
+    cover: "/materials/random-square-tiling.jpg",
   },
   {
     id: "case-krasnopresnenskaya",
@@ -417,7 +456,7 @@ export const MATERIALS: readonly Material[] = [
       "Взять определение из папки проекта",
       "Заявка «Хочу так же»",
     ],
-    files: "X:\\CompDesign_Projects\\1-5-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Exchange\\1-5-2026 Capital Краснопресненская МФК",
     updated: "24 июня",
   },
   {
@@ -441,49 +480,52 @@ export const MATERIALS: readonly Material[] = [
   // repeat — «Действие повторяется по всему проекту»
   // ──────────────────────────────────────────────────────────────────────
   {
-    id: "module-rod-modeling",
+    id: "module-smart-fillet",
     topic: "repeat",
     type: "module",
-    title: "Стержневой моделинг из блоков",
-    summary: "Стержни расставляются по правилу — от осей до кровли",
-    media: "Гифка: стержни разбегаются по каркасу",
+    title: "Скругление углов полилинии с проверкой",
+    summary: "Дуги на углах, контроль перекрытия рёбер и самопересечения итоговой кривой",
+    media: "Полилиния с острыми углами и её скруглённая копия",
     steps: [
-      "Подать блоки-заготовки и сетку осей",
-      "Задать правило расстановки и подрезки",
-      "Проверить узлы на пересечениях",
+      "Подать полилинию — незамкнутая замкнётся сама",
+      "Задать список радиусов по углам",
+      "Прочитать info: там сообщения о перекрытии рёбер и самопересечении",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\rod_modeling",
-    updated: "24 июня",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\smart_fillet",
+    updated: "12 марта",
+    cover: "/materials/smart-fillet.jpg",
   },
   {
-    id: "module-facade-split",
+    id: "module-floor-fillet",
     topic: "repeat",
     type: "module",
-    title: "Фасадная разбивка по модулю",
-    summary: "Модуль, высокий первый этаж и кровля с парапетом одним определением",
-    media: "Гифка: разбивка фасада по этажам",
+    title: "Контур перекрытия в полилинию со скруглениями",
+    summary: "Хаотичная кривизна превращается в полилинию с радиусными углами, на том же месте",
+    media: "Сложный контур перекрытия и его сглаженная копия",
     steps: [
-      "Задать модуль и высоты этажей",
-      "Отметить первый этаж и парапет отдельными правилами",
-      "Проверить стыки разбивки на углах",
+      "Подать контур перекрытия или модель с хаотичной кривизной",
+      "Скрипт подберёт полилинию по форме и сгладит углы радиусами",
+      "Результат встаёт в то же место сцены с той же ориентацией",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\facade_split",
-    updated: "24 июня",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\floor_to_fillet_curve",
+    updated: "12 марта",
+    cover: "/materials/floor-to-fillet-curve.jpg",
   },
   {
-    id: "module-sketchup-blocks",
+    id: "module-plots-division",
     topic: "repeat",
     type: "module",
-    title: "Интеграция блоков в модель SketchUp",
-    summary: "Готовые блоки уезжают в SketchUp без ручной пересборки",
-    media: "Гифка: блоки появляются в SketchUp",
+    title: "Деление территории на проезды и участки",
+    summary: "Главная дорога от въезда, проезды ко всем частям, участки заданных габаритов",
+    media: "Территория, разбитая дорогами на участки",
     steps: [
-      "Собрать блоки в Rhino по правилу",
-      "Экспортировать через определение — имена и слои сохраняются",
-      "Проверить масштаб и точку вставки",
+      "Подать границы территории и точку въезда",
+      "Задать нужное количество поворотов главной дороги",
+      "Задать габариты участков — проезды дотянутся до всех частей территории",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\sketchup_blocks",
-    updated: "24 июня",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\divide_into_driveways_and_plots",
+    updated: "12 марта",
+    cover: "/materials/divide-into-driveways-and-plots.jpg",
   },
   {
     id: "case-mosfilm",
@@ -498,8 +540,9 @@ export const MATERIALS: readonly Material[] = [
       "Взять определение разбивки из папки проекта",
       "Заявка «Хочу так же»",
     ],
-    files: "X:\\CompDesign_Projects\\1-24-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2026\\1-24-2026 MR Мосфильмовская ЖК",
     updated: "24 июня",
+    cover: "/materials/case-mosfilm.jpg",
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -509,16 +552,98 @@ export const MATERIALS: readonly Material[] = [
     id: "module-logo-import",
     topic: "custom",
     type: "module",
-    title: "Импорт логотипа и графики в Grasshopper",
-    summary: "Растр или вектор становится геометрией для фасада и графики",
-    media: "Гифка: логотип превращается в геометрию",
+    title: "Логотип из Rhino в Grasshopper с заливкой",
+    summary: "Контур получает заливку и подменяет собой произвольный Sketch Object",
+    media: "Контур логотипа с заливкой в сцене Rhino",
     steps: [
-      "Подать файл логотипа",
-      "Задать порог и плотность трассировки",
-      "Получить кривые для дальнейшей работы",
+      "Подготовить контур логотипа в сцене Rhino",
+      "Передать контур в Grasshopper — заливка строится внутри него",
+      "Запечь контур с заливкой обратно в сцену",
+      "Подменить Sketch Object на линию логотипа",
     ],
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\logo_import",
-    updated: "10 февраля",
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\logo_import_to_grass",
+    updated: "12 марта",
+    cover: "/materials/logo-import-to-grass.jpg",
+  },
+  {
+    id: "module-curve-to-json",
+    topic: "custom",
+    type: "module",
+    title: "Curve в JSON и обратно",
+    summary: "Минимальный набор данных, чтобы передать кривую между сценами и сервисами",
+    media: "Кривая и её JSON-представление",
+    steps: [
+      "Подать кривую — на выходе JSON, в котором только геометрия",
+      "Обратный ход собирает кривую из того же JSON",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\curve_to_json",
+    updated: "11 августа",
+    cover: "/materials/curve-to-json.jpg",
+  },
+  {
+    id: "module-explode-curve",
+    topic: "custom",
+    type: "module",
+    title: "Разбивка кривой на сегменты с доменами",
+    summary: "Сегменты плюс их домены по длине и нормализованные от нуля до единицы",
+    media: "Кривая, разложенная на сегменты",
+    steps: [
+      "Подать кривую любого типа",
+      "Полилинии режутся по сегментам, остальные — по точкам разрыва непрерывности",
+      "Забрать сегменты, домены по длине и нормализованные домены",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\explode_curve_with_dom",
+    updated: "12 марта",
+    cover: "/materials/explode-curve-with-dom.jpg",
+  },
+  {
+    id: "module-reparameterize-segments",
+    topic: "custom",
+    type: "module",
+    title: "Переопределение доменов сегментов по длине",
+    summary: "Сегменты выстраиваются подряд, домены идут от нуля до общей длины кривой",
+    media: "Сегменты кривой, выстроенные последовательно",
+    steps: [
+      "Подать кривую — полилиния разберётся на сегменты",
+      "Забрать новую кривую, где сегменты идут по длине",
+      "Исходные и переопределённые домены отдаются отдельными выходами",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\reparameterize_segments_by_length",
+    updated: "12 марта",
+    cover: "/materials/reparameterize-segments-by-length.jpg",
+  },
+  {
+    id: "module-random-parameters",
+    topic: "custom",
+    type: "module",
+    title: "Случайные параметры для распределения точек",
+    summary: "Набор значений от нуля до единицы с управляемой неравномерностью шага",
+    media: "Точки, распределённые с разным шагом",
+    steps: [
+      "Задать количество точек",
+      "MaxStepRatio: единица — шаги равномерные, больше — гуляют",
+      "Seed фиксирует конкретный вариант распределения",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\random_parameters",
+    updated: "12 марта",
+    cover: "/materials/random-parameters.jpg",
+  },
+  {
+    id: "module-remesh-wip",
+    topic: "custom",
+    type: "module",
+    title: "Сборка разбитых кривых в единую сетку",
+    summary: "Из разрозненных частей одна модель под 3D-печать или анализ. Черновик",
+    media: "Разрозненные части, собранные в единую модель",
+    steps: [
+      "Выбрать тип сетки: треугольная и квадратная по частям дают острые углы",
+      "Квадратная с объединением в единую модель даёт мягкие переходы",
+      "Задать размер полигонов итоговой сетки",
+      "Через плагин Dendro быстрее, но острых углов не будет",
+    ],
+    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\remesh_wip",
+    updated: "30 марта",
+    cover: "/materials/remesh-wip.jpg",
   },
 ];
 
