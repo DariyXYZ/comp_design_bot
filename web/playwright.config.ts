@@ -21,15 +21,22 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: ORIGIN,
-    // Размер под телефон: колода считает ширину от vw, а высоту ограничивает
-    // 62vh — на «настольном» окне пропорция карточки другая.
-    viewport: { width: 390, height: 844 },
     trace: "on-first-retry",
   },
   projects: [
     {
       name: "mobile-chromium",
-      use: { ...devices["Desktop Chrome"], hasTouch: true },
+      // Размер под телефон стоит ПОСЛЕ пресета устройства и это важно:
+      // `devices["Desktop Chrome"]` несёт собственный viewport 1280×720, и
+      // раньше он перебивал размер из общего `use` — весь «телефонный» набор
+      // проверок много месяцев гонялся в настольном окне. Колода считает
+      // ширину карточки от высоты экрана, так что на широком окне проверялась
+      // не та раскладка, которую видит человек.
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+      },
     },
   ],
   // dev-сервер, а не собранная статика: он сам знает про basePath, иначе

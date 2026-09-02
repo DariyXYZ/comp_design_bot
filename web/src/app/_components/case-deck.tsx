@@ -24,12 +24,20 @@ import {
 const SWIPE_OUT_MS = 460;
 
 /**
- * Полоса по бокам карточки под стрелки листания.
+ * Экранирование для карточек, которые собираются строкой HTML.
  *
- * Держится вместе с отступом стрелок в `globals.css` (`.arrow.left/right`):
- * 26 пикселей самой кнопки плюс воздух до края экрана.
+ * Названия и подсказки правят в дашборде Supabase, то есть это текст, а не
+ * разметка. Одна угловая скобка в нём — и карточка рисуется наполовину. У
+ * бота эта же грабля уже была (`<` в тексте ронял разбор HTML), поэтому здесь
+ * она закрыта до того, как кто-нибудь напишет «ширина < 3 м».
  */
-const ARROW_GUTTER_PX = 32;
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 /**
  * Свайп-колода кейсов.
@@ -139,10 +147,10 @@ export function CaseDeck({
         (parseFloat(wrapStyle.paddingTop) || 0) +
         (parseFloat(wrapStyle.paddingBottom) || 0);
       const availableH = deckWrap!.clientHeight - insets - dots!.offsetHeight;
-      // По бокам остаётся ровно столько, сколько нужно стрелкам листания: они
-      // стоят снаружи карточки, и на прежних 88% ширины при большой карточке
-      // их срезало краем экрана.
-      const maxByWidth = Math.min(window.innerWidth - ARROW_GUTTER_PX * 2, 400);
+      // 88% ширины экрана: на телефоне стрелок листания нет (см. `.arrow` в
+      // globals.css), и полосу под них резервировать не нужно — остаются поля,
+      // за которые карточку берут пальцем.
+      const maxByWidth = Math.min(window.innerWidth * 0.88, 400);
       const width = Math.min(maxByWidth, (availableH * 5) / 7);
       document.documentElement.style.setProperty(
         "--card-w",
@@ -174,25 +182,46 @@ export function CaseDeck({
         <div class="card-inner">
           <div class="card-face card-front">
             <div class="media">
-              <img src="${c.frontImg}" alt="" draggable="false" loading="lazy">
+              <img src="${escapeHtml(c.frontImg)}" alt="" draggable="false" loading="lazy" decoding="async">
               <span class="topic-dot" style="background:${topicColor(c.key)}"></span>
             </div>
             <div class="body">
-              <h3>${c.title}</h3>
-              <p>${c.hint}</p>
-              <span class="eta">${c.eta}</span>
+              <h3>${escapeHtml(c.title)}</h3>
+              <p>${escapeHtml(c.hint)}</p>
+              <span class="eta">${escapeHtml(c.eta)}</span>
               <span class="num">${counterLabel(idx % cases.length, cases.length)}</span>
             </div>
           </div>
           <div class="card-face card-back">
             ${
               c.backImg
-                ? `<img class="back-photo" src="${c.backImg}" alt="" draggable="false" loading="lazy">`
+                // Адрес лежит в data-атрибуте, а не в src: обратная сторона
+                // загружается, только когда карточка становится верхней (см.
+                // `loadBackImage`). Атрибут loading="lazy" тут бесполезен —
+                // задняя грань лежит в кадре, просто повёрнута, и браузер
+                // считает её видимой. На восьми карточках это было 230 КБ
+                // картинок, которых почти никто не открывает.
+                ? `<img class="back-photo" data-src="${escapeHtml(c.backImg)}" alt="" draggable="false" decoding="async">`
                 : `<div class="back-placeholder">Примеры такой геометрии</div>`
             }
           </div>
         </div>`;
       return el;
+    }
+
+    /**
+     * Подтягивает обратную сторону верхней карточки.
+     *
+     * Ровно одна лишняя картинка в любой момент: пока человек смотрит на
+     * карточку, её примеры уже готовы к тапу, а примеры семи остальных не
+     * скачиваются. Повторный вызов ничего не делает — адрес снимается с
+     * атрибута вместе с загрузкой.
+     */
+    function loadBackImage(card: HTMLElement | null) {
+      const img = card?.querySelector<HTMLImageElement>(".back-photo[data-src]");
+      if (!img?.dataset.src) return;
+      img.src = img.dataset.src;
+      delete img.dataset.src;
     }
 
     /** Раскладывает стопку: последний ребёнок — верхняя карточка. */
@@ -210,6 +239,7 @@ export function CaseDeck({
       [...dots!.children].forEach((d, i) => {
         d.className = i === current ? "on" : "";
       });
+      loadBackImage(deck!.lastElementChild as HTMLElement | null);
       announce();
     }
 

@@ -258,6 +258,23 @@ test.describe("колода кейсов", () => {
     expect(await scrollTop()).toBe(0);
   });
 
+  test("на телефоне стрелок листания нет — полоса по бокам достаётся карточке", async ({
+    page,
+  }) => {
+    await open(page);
+    // Карточка занимает почти всю ширину экрана: стрелки снаружи неё либо
+    // липли к её краю, либо срезались краем экрана. О том, что колода
+    // листается, здесь говорят точки и подсказка под ними.
+    await expect(page.locator(".arrow.left")).toBeHidden();
+    await expect(page.locator(".arrow.right")).toBeHidden();
+    // Освободившаяся полоса достаётся карточке: она занимает почти всю ширину.
+    const { card, screen } = await page.evaluate(() => ({
+      card: Math.round(document.querySelector(".deck")!.getBoundingClientRect().width),
+      screen: window.innerWidth,
+    }));
+    expect(card).toBeGreaterThan(Math.round(screen * 0.85));
+  });
+
   test("сбой Supabase объясняется текстом, а не пустым экраном", async ({ page }) => {
     await open(page, { casesFail: true });
 

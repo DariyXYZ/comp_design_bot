@@ -36,7 +36,7 @@
      Значение приблизительное (заголовок может перенестись на две строки) и
      уточняется замером из JS — см. sizeCard() в case-deck.tsx. */
   --card-w:min(
-    calc(100vw - 64px),
+    88vw,
     400px,
     calc((var(--tg-viewport-stable-height, 100dvh) - var(--chrome-h)) * 5 / 7)
   );
@@ -216,41 +216,33 @@ body{
 .swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
 .cta-label{text-align:left}
 
-/* Стрелки листания. На телефоне они не заменяют свайп, а подсказывают, что
-   колода листается вообще: свайп невидим, и человек, не тронувший карточку,
-   не узнает о соседних. Поэтому мелкие и серые — знак, а не орган
-   управления. */
+/* Стрелки листания — только для мыши. На телефоне их нет: карточка занимает
+   почти всю ширину экрана, и стрелки либо липли к её краю, либо срезались
+   краем экрана. О том, что колода листается, там говорят точки под карточкой и
+   подсказка под ними — этого достаточно, а полоса по бокам достаётся самой
+   карточке. */
 .arrow{
+  display:none;
   position:absolute;top:50%;transform:translateY(-50%);z-index:30;
-  width:26px;height:26px;border-radius:50%;border:none;
-  background:none;color:var(--sub);cursor:pointer;padding:0;
-  display:flex;align-items:center;justify-content:center;
-  opacity:.55;transition:opacity .16s var(--ease);
+  align-items:center;justify-content:center;
+  border-radius:50%;cursor:pointer;padding:0;
+  transition:background .16s var(--ease);
 }
-.arrow svg{display:block;width:18px;height:18px}
+.arrow svg{display:block;width:20px;height:20px}
 .arrow.left svg{transform:scaleX(-1)}
-.arrow:hover{opacity:1}
-.arrow:active{opacity:1}
-/* Отступ от края карточки, а не от фиксированной доли экрана — иначе при
-   уменьшенной карточке стрелки остаются висеть в стороне. На телефоне между
-   карточкой и краем экрана около полусотни пикселей, поэтому зазор
-   небольшой. */
-/* Прижаты к краю экрана, если карточка выросла до предела: `max` не даёт им
-   уехать за кадр. Ширина карточки при этом уже оставляет им место — см.
-   ARROW_GUTTER_PX в case-deck.tsx. */
-.arrow.left{left:max(2px, calc(50% - var(--card-w) / 2 - 30px))}
-.arrow.right{right:max(2px, calc(50% - var(--card-w) / 2 - 30px))}
-/* На широком экране места больше: кнопки крупнее и с кромкой, как обычные
-   органы управления. */
+/* Отступ считается от края карточки, а не от доли экрана: иначе при
+   уменьшенной карточке стрелки остаются висеть в стороне. */
+.arrow.left{left:calc(50% - var(--card-w) / 2 - 58px)}
+.arrow.right{right:calc(50% - var(--card-w) / 2 - 58px)}
+/* Появляются там, где есть мышь и место: кнопки с кромкой, как обычные органы
+   управления. */
 @media (hover:hover) and (min-width:640px){
   .arrow{
+    display:flex;
     width:38px;height:38px;border:1px solid var(--line);
-    background:var(--card);color:var(--ink);opacity:1;
+    background:var(--card);color:var(--ink);
   }
-  .arrow svg{width:20px;height:20px}
   .arrow:hover{background:var(--pill)}
-  .arrow.left{left:calc(50% - var(--card-w) / 2 - 58px)}
-  .arrow.right{right:calc(50% - var(--card-w) / 2 - 58px)}
 }
 
 /* Заглушка на время загрузки карточек: та же пропорция и радиус, что у
