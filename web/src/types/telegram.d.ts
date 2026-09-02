@@ -39,6 +39,12 @@ interface TelegramWebApp {
    * приходит, поэтому одного window-слушателя мало.
    */
   onEvent?(event: string, handler: (...args: unknown[]) => void): void;
+  /**
+   * Текущая высота фрейма Mini App, в отличие от `window.innerHeight`,
+   * учитывающая открытую клавиатуру. Нужна шторке: без неё развёрнутая форма
+   * уезжает кнопкой отправки под клавиатуру.
+   */
+  viewportHeight?: number;
   offEvent?(event: string, handler: (...args: unknown[]) => void): void;
   /**
    * Кнопка «назад» в шапке клиента. Рисует её сам Telegram, поэтому своя

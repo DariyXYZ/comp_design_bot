@@ -5,6 +5,7 @@ import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { RESTART_HINT } from "@/config/copy";
 import { MATERIAL_TYPE_FORMAL, materialById } from "@/features/materials";
 import { topicColor } from "@/features/topics/color";
+import { haptic } from "@/lib/client/telegram";
 import { useRequestDraft } from "../draft-store";
 import { uploadPhoto } from "../photos";
 import { submitRequest } from "../submit";
@@ -144,10 +145,33 @@ export function RequestSheet() {
   // предлагает не отправку, а раскрытие.
   const collapsedEntry = snap === "peek" && !ready;
 
+  const note = uploading > 0
+    ? "Дождитесь загрузки картинок"
+    : !topicKey
+      // Тема — не поле формы, её выбирает колода. Если её нет, дело не в том,
+      // что человек чего-то не заполнил, а в том, что карточки не пришли.
+      ? "Карточки не загрузились — заявку не к чему привязать"
+      : snap === "peek"
+        // В сложенном виде подписи нет вообще, даже когда форма готова: иначе
+        // её появление меняло бы высоту сложенной шторки, а от этой высоты
+        // считается размер карточки — карточка дёргалась бы от набранного
+        // текста.
+        ? null
+        : ready
+          ? origin.path
+            ? "Ссылка на решение уйдёт в заявку"
+            : "Заявка уйдёт по карточке из шапки"
+          : "Опишите задачу — это единственное обязательное поле";
+
   return (
     <BottomSheet
       snap={snap}
-      onSnapChange={setSnap}
+      onSnapChange={(next) => {
+        // Щелчок на каждом положении: у жеста без отклика нет ощущения
+        // фиксации, и человек продолжает тянуть уже вставшую шторку.
+        if (next !== snap) haptic("tap");
+        setSnap(next);
+      }}
       label="Заявка в отдел"
       head={
         <div className="sheet-origin">
@@ -198,15 +222,11 @@ export function RequestSheet() {
               <span>{problem}</span>
             </div>
           ) : null}
-          <p className="action-note">
-            {uploading > 0
-              ? "Дождитесь загрузки картинок"
-              : ready
-                ? origin.path
-                  ? "Ссылка на решение уйдёт в заявку"
-                  : "Заявка уйдёт по карточке из шапки"
-                : "Опишите задачу — это единственное обязательное поле"}
-          </p>
+          {/* В сложенном виде подписи нет: кнопка называет действие сама, а
+              каждая её строка — это высота, отнятая у карточки под шторкой.
+              Про загрузку картинок и про пропавшую тему говорим всегда: это
+              не подсказка, а причина, по которой кнопка не сработает. */}
+          {note ? <p className="action-note">{note}</p> : null}
           {collapsedEntry ? (
             <button
               type="button"
@@ -327,7 +347,7 @@ export function RequestSheet() {
           />
           <p className="sheet-note">
             Отметьте на снимке проблемное место — так отдел поймёт задачу
-            быстрее. Картинки уходят сразу в задачу, до отправки заявки.
+            быстрее. До шести штук; уходят сразу в задачу, до отправки заявки.
           </p>
         </div>
       </div>

@@ -49,9 +49,14 @@ test.describe("из чего заявка", () => {
     await expect(page.locator(".origin-row")).toHaveCount(1);
     await expect(originTitle(page, 0)).toHaveText("Тема physics");
 
-    // Шторка стоит на среднем положении: описание уже видно, поэтому кнопка
-    // предлагает отправку — и объясняет, чего для неё не хватает.
+    // Сложенная шторка не показывает форму, поэтому и не блокирует кнопку:
+    // заблокированная кнопка объясняла бы отказ текстом, который негде
+    // прочитать. Она предлагает раскрыть заявку.
     const send = page.locator(".sheet-foot .btn");
+    await expect(send).toHaveText("Заполнить заявку");
+    await expect(page.locator(".sheet-foot .action-note")).toHaveCount(0);
+
+    await send.click();
     await expect(send).toHaveText("Отправить заявку");
     await expect(send).toBeDisabled();
     await expect(page.locator(".sheet-foot .action-note")).toContainText(
@@ -74,7 +79,7 @@ test.describe("из чего заявка", () => {
     await expect(originTitle(page, 0)).toHaveText("Тема physics");
     await expect(originTitle(page, 1)).toHaveText("IND Solar — инсоляция и КЕО");
     // Шторка та же самая и на том же месте — это один предмет на обоих экранах.
-    await expect(page.locator(".sheet-foot .btn")).toHaveText("Отправить заявку");
+    await expect(page.locator(".sheet-foot .btn")).toHaveText("Заполнить заявку");
 
     await page.locator(".back").click();
     await expect(page).toHaveURL(/\/$/);

@@ -10,6 +10,7 @@ import {
   dragTransform,
   flyOutTransform,
   isDragged,
+  isScrollGesture,
   nextIndex,
   prevIndex,
   secondCardIndex,
@@ -21,6 +22,14 @@ import {
 
 /** Длительности анимаций, подобранные эмпирически — не «круглые» числа наугад. */
 const SWIPE_OUT_MS = 460;
+
+/**
+ * Полоса по бокам карточки под стрелки листания.
+ *
+ * Держится вместе с отступом стрелок в `globals.css` (`.arrow.left/right`):
+ * 26 пикселей самой кнопки плюс воздух до края экрана.
+ */
+const ARROW_GUTTER_PX = 32;
 
 /**
  * Свайп-колода кейсов.
@@ -130,7 +139,10 @@ export function CaseDeck({
         (parseFloat(wrapStyle.paddingTop) || 0) +
         (parseFloat(wrapStyle.paddingBottom) || 0);
       const availableH = deckWrap!.clientHeight - insets - dots!.offsetHeight;
-      const maxByWidth = Math.min(window.innerWidth * 0.88, 400);
+      // По бокам остаётся ровно столько, сколько нужно стрелкам листания: они
+      // стоят снаружи карточки, и на прежних 88% ширины при большой карточке
+      // их срезало краем экрана.
+      const maxByWidth = Math.min(window.innerWidth - ARROW_GUTTER_PX * 2, 400);
       const width = Math.min(maxByWidth, (availableH * 5) / 7);
       document.documentElement.style.setProperty(
         "--card-w",
@@ -275,6 +287,19 @@ export function CaseDeck({
       if (!drag.el) return;
       drag.dx = e.clientX - drag.startX;
       const dy = e.clientY - drag.startY;
+
+      // Жест явно вертикальный — это прокрутка к списку под колодой, а не
+      // свайп карточки. Отпускаем карточку и возвращаем стопку на место:
+      // браузер докрутит страницу сам, ему мы ничего не запрещали.
+      if (!drag.moved && isScrollGesture(drag.dx, dy)) {
+        const el = drag.el;
+        drag.el = null;
+        el.classList.remove("dragging");
+        setSecondCard(true);
+        applyStack();
+        return;
+      }
+
       if (isDragged(drag.dx, dy)) drag.moved = true;
       if (shouldSwapSecondCard(drag.dx)) setSecondCard(drag.dx < 0);
       drag.el.style.transform = dragTransform(drag.dx, dy);

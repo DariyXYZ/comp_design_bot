@@ -5,6 +5,7 @@ import {
   dragTransform,
   flyOutTransform,
   isDragged,
+  isScrollGesture,
   nextIndex,
   prevIndex,
   secondCardIndex,
@@ -117,5 +118,26 @@ describe("счётчик карточек", () => {
 
   it("не ломается на двузначном количестве", () => {
     expect(counterLabel(9, 12)).toBe("10 / 12");
+  });
+});
+
+// Карточка занимает почти всю ширину экрана, а под колодой лежит список
+// готового по теме. Пока любое движение по карточке считалось её свайпом, до
+// списка было не долистать: палец попадал в карточку, она чуть съезжала и
+// возвращалась, а страница стояла.
+describe("вертикальный жест отдаётся прокрутке", () => {
+  it("явно вертикальное движение — это скролл", () => {
+    expect(isScrollGesture(0, 30)).toBe(true);
+    expect(isScrollGesture(5, -30)).toBe(true);
+  });
+
+  it("свайп карточки скроллом не считается даже с наклоном", () => {
+    expect(isScrollGesture(40, 20)).toBe(false);
+    expect(isScrollGesture(-60, 30)).toBe(false);
+  });
+
+  it("мелкое дрожание пальца не считается ничем", () => {
+    expect(isScrollGesture(0, 8)).toBe(false);
+    expect(isScrollGesture(2, 5)).toBe(false);
   });
 });

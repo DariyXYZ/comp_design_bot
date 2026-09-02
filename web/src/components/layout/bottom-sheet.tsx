@@ -13,9 +13,11 @@ import type { SheetSnap } from "@/features/requests/draft-store";
  *
  * Три положения:
  *
- * - `peek` — видна только основа заявки и кнопка. Колода открыта целиком.
- * - `half` — плюс поле описания. Положение по умолчанию: человек должен
- *   видеть, что заявку можно начать писать прямо здесь.
+ * - `peek` — видна только основа заявки и кнопка. Положение по умолчанию: под
+ *   шторкой при этом целиком помещается карточка колоды, и её размер считается
+ *   именно от этой высоты.
+ * - `half` — ровно половина экрана: поля заявки, карточка наполовину закрыта.
+ *   В этот момент человек уже пишет, а не выбирает.
  * - `full` — вся форма. Верхняя полоска экрана остаётся видна, чтобы шторка
  *   читалась шторкой, а не экраном.
  *
@@ -32,19 +34,11 @@ import type { SheetSnap } from "@/features/requests/draft-store";
 /** Сколько экрана остаётся видно над развёрнутой шторкой. */
 const TOP_GAP_PX = 56;
 
-/**
- * Среднее положение: доля экрана, но не меньше, чем нужно на первое поле.
- *
- * Доля намеренно маленькая. Всё, что шторка забирает сверх необходимого, —
- * это отнятая ширина карточки: колода считает своё место от этой же величины.
- */
-const HALF_RATIO = 0.3;
+/** Среднее положение — ровно половина экрана. */
+const HALF_RATIO = 0.5;
 
 /** Сколько тела шторки обязано быть видно в среднем положении: первое поле. */
 const HALF_MIN_BODY_PX = 96;
-
-/** Выше половины экрана среднее положение не поднимается ни при каком фрейме. */
-const HALF_MAX_RATIO = 0.5;
 
 /** Скорость, после которой отпускание считается броском, а не установкой. */
 const FLING_PX_PER_MS = 0.5;
@@ -55,9 +49,41 @@ const TAP_SLOP_PX = 6;
 /** Насколько надо потянуть тело вниз, чтобы жест перешёл к шторке. */
 const BODY_TAKEOVER_PX = 8;
 
+/**
+ * Глушит клик, который браузер дошлёт после перетаскивания.
+ *
+ * Шторку тянут за шапку, а в шапке живёт кнопка — строка основы заявки. Если
+ * жест начался и закончился на ней (а он на ней и заканчивается: шторка едет
+ * вниз вместе с пальцем, и шапка догоняет), браузер после `pointerup`
+ * присылает обычный `click`. Кнопка честно срабатывает и поднимает шторку
+ * обратно — выглядит как «шторка не сворачивается».
+ */
+function swallowNextClick() {
+  const stop = (event: MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+  };
+  window.addEventListener("click", stop, { capture: true, once: true });
+  // Клика может не быть вовсе (палец ушёл за пределы элемента) — тогда
+  // слушатель нужно снять, иначе он съест следующий настоящий клик.
+  setTimeout(() => window.removeEventListener("click", stop, true), 0);
+}
+
 const ORDER: readonly SheetSnap[] = ["peek", "half", "full"];
 
 type Sizes = { peek: number; half: number; full: number };
+
+/**
+ * Высота фрейма.
+ *
+ * У клиента Telegram она своя и меняется вместе с клавиатурой, а
+ * `window.innerHeight` про клавиатуру не знает — на его значении развёрнутая
+ * форма уезжала бы кнопкой отправки под клавиатуру.
+ */
+function frameHeight(): number {
+  const reported = window.Telegram?.WebApp?.viewportHeight;
+  return typeof reported === "number" && reported > 0 ? reported : window.innerHeight;
+}
 
 export function BottomSheet({
   snap,
@@ -89,7 +115,24 @@ export function BottomSheet({
     notifyRef.current = onSnapChange;
   }, [onSnapChange]);
 
+  /**
+  * Положение, в котором шторка сейчас стоит.
+  *
+  * Обновляется СРАЗУ, до того как React закоммитит состояние. Иначе гонка:
+  * жест ставит новую высоту, тело шторки меняет размер, ResizeObserver
+  * просыпается раньше коммита и восстанавливает ПРЕЖНЕЕ положение — шторка
+  * отпрыгивает назад после отпускания.
+  */
   const snapRef = useRef(snap);
+
+  /** Ставит положение и себе, и наружу — порядок здесь важен, см. выше. */
+  const commitSnap = useCallback(
+    (next: SheetSnap) => {
+      snapRef.current = next;
+      notifyRef.current(next);
+    },
+    [],
+  );
   /**
    * Идёт ли жест прямо сейчас.
    *
@@ -121,12 +164,12 @@ export function BottomSheet({
     // поэтому его нужно прибавить, иначе `peek` срежет кнопку.
     const padBottom = parseFloat(getComputedStyle(sheet).paddingBottom) || 0;
     const peek = grab.offsetHeight + head.offsetHeight + foot.offsetHeight + padBottom;
-    const limit = Math.max(peek, window.innerHeight - TOP_GAP_PX);
+    const frame = frameHeight();
+    const limit = Math.max(peek, frame - TOP_GAP_PX);
     const full = Math.min(limit, peek + body.scrollHeight);
     const half = Math.min(
       full,
-      Math.round(window.innerHeight * HALF_MAX_RATIO),
-      Math.max(peek + HALF_MIN_BODY_PX, Math.round(window.innerHeight * HALF_RATIO)),
+      Math.max(peek + HALF_MIN_BODY_PX, Math.round(frame * HALF_RATIO)),
     );
     return { peek, half: Math.max(peek, half), full };
   }, []);
@@ -141,12 +184,12 @@ export function BottomSheet({
       // величины запускала бы наблюдателя по кругу.
       const height = `${sizes[next]}px`;
       if (sheet.style.height !== height) sheet.style.height = height;
-      // Экран под шторкой считает своё место от её СРЕДНЕГО положения, а не от
-      // нижнего. Карточка — предмет, а не карта: наполовину закрытая, она
-      // теряет ровно то, ради чего её показывают (название, подсказку, срок).
-      // Поэтому она умещается целиком в положении, в котором шторка стоит по
-      // умолчанию, а в нижнем под ней просто остаётся воздух.
-      document.documentElement.style.setProperty("--sheet-rest", `${sizes.half}px`);
+      // Экран под шторкой считает своё место от её НИЖНЕГО положения — того, в
+      // котором она стоит по умолчанию. Карточка колоды помещается под ней
+      // целиком и получает всю ширину, какую разрешает экран. Поднятая шторка
+      // карточку закрывает, и это правильно: в этот момент человек пишет
+      // заявку, а не выбирает тему.
+      document.documentElement.style.setProperty("--sheet-peek", `${sizes.peek}px`);
     },
     [measure],
   );
@@ -176,7 +219,7 @@ export function BottomSheet({
       observer.disconnect();
       window.removeEventListener("resize", relayout);
       tg?.offEvent?.("viewportChanged", relayout);
-      document.documentElement.style.removeProperty("--sheet-rest");
+      document.documentElement.style.removeProperty("--sheet-peek");
     };
   }, [applySnap]);
 
@@ -272,13 +315,15 @@ export function BottomSheet({
         // по кругу от одного тапа читались случайными.
         if (fromGrab) {
           const next: SheetSnap = current === "peek" ? "half" : "peek";
-          notifyRef.current(next);
+          commitSnap(next);
           applySnap(next);
         } else {
           applySnap(current);
         }
         return;
       }
+
+      swallowNextClick();
 
       let target: SheetSnap;
       if (Math.abs(velocity) > FLING_PX_PER_MS) {
@@ -297,7 +342,7 @@ export function BottomSheet({
             : best,
         );
       }
-      notifyRef.current(target);
+      commitSnap(target);
       applySnap(target);
     }
 
@@ -312,7 +357,7 @@ export function BottomSheet({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [measure, applySnap]);
+  }, [measure, applySnap, commitSnap]);
 
   return (
     <section className="sheet" aria-label={label} ref={sheetRef}>

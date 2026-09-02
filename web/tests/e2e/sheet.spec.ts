@@ -55,16 +55,23 @@ const height = (page: Page) =>
  */
 async function settled(page: Page): Promise<number> {
   let last = -1;
-  for (let attempt = 0; attempt < 25; attempt += 1) {
+  let stable = 0;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
     const now = await height(page);
-    if (now === last) return now;
+    // Три одинаковых замера подряд, а не два: высота меняется дважды — по
+    // первому кадру и по подхваченному шрифту, — и между этими правками легко
+    // застать пару одинаковых значений.
+    stable = now === last ? stable + 1 : 0;
+    if (stable >= 2) return now;
     last = now;
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(150);
   }
   return last;
 }
 
-const fullHeight = (page: Page) => page.evaluate(() => window.innerHeight - 56);
+/** Среднее положение: ровно половина экрана. */
+const halfHeight = (page: Page) =>
+  page.evaluate(() => Math.round(window.innerHeight * 0.5));
 
 /** Точка на шапке шторки — за неё её и тянут. */
 const headGrip = (page: Page) =>
@@ -98,17 +105,20 @@ test.describe("жест шторки", () => {
     expect(seen[seen.length - 1]).toBeGreaterThan(start + 200);
 
     await page.mouse.up();
-    // Отпустили за серединой между средним и верхним — магнитится к верхнему.
-    await expect.poll(() => height(page)).toBe(await fullHeight(page));
+    // Отпустили рядом со средним положением — магнитится ровно к половине
+    // экрана, а не остаётся там, где отпустили.
+    await expect.poll(() => height(page)).toBe(await halfHeight(page));
   });
 
-  test("смахивание вниз сворачивает шторку и открывает список под колодой", async ({
-    page,
-  }) => {
+  test("смахивание вниз возвращает шторку в сложенный вид", async ({ page }) => {
     await open(page);
-    const start = await settled(page);
-    const y = await headGrip(page);
+    const peek = await settled(page);
 
+    // Сначала поднимаем: сворачивать из сложенного нечего.
+    await page.locator(".sheet-grab").click();
+    await expect.poll(() => height(page)).toBe(await halfHeight(page));
+
+    const y = await headGrip(page);
     await page.mouse.move(195, y);
     await page.mouse.down();
     for (let step = 1; step <= 10; step += 1) {
@@ -117,22 +127,22 @@ test.describe("жест шторки", () => {
     }
     await page.mouse.up();
 
-    await expect.poll(async () => (await height(page)) < start).toBe(true);
-    // В нижнем положении под шторкой видно готовое по теме — ради этого её и
-    // сворачивают.
+    await expect.poll(() => height(page)).toBe(peek);
+    // В сложенном виде под шторкой видно готовое по теме — ради этого она и
+    // стоит внизу по умолчанию.
     await expect(page.locator(".rows .row").first()).toBeInViewport();
   });
 
-  test("тап по ручке переключает между нижним и средним положением", async ({
+  test("тап по ручке переключает между сложенным и средним положением", async ({
     page,
   }) => {
     await open(page);
-    const half = await settled(page);
+    const peek = await settled(page);
 
     await page.locator(".sheet-grab").click();
-    await expect.poll(async () => (await height(page)) < half).toBe(true);
+    await expect.poll(() => height(page)).toBe(await halfHeight(page));
 
     await page.locator(".sheet-grab").click();
-    await expect.poll(() => height(page)).toBe(half);
+    await expect.poll(() => height(page)).toBe(peek);
   });
 });

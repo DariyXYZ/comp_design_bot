@@ -73,6 +73,24 @@ export function isDragged(dx: number, dy: number): boolean {
   return Math.abs(dx) > TAP_SLOP_PX || Math.abs(dy) > TAP_SLOP_PX;
 }
 
+/**
+ * Насколько вертикальное движение должно превосходить горизонтальное, чтобы
+ * считаться прокруткой страницы, а не свайпом карточки.
+ */
+const SCROLL_BIAS = 1.4;
+
+/**
+ * Уводит ли жест в прокрутку страницы.
+ *
+ * Карточка занимает почти всю ширину экрана, и под ней лежит список готового
+ * по теме. Пока любое движение по карточке считалось её свайпом, до списка
+ * было не долистать: палец попадал в карточку, она чуть съезжала и
+ * возвращалась, а страница стояла. Явно вертикальный жест отдаём скроллу.
+ */
+export function isScrollGesture(dx: number, dy: number): boolean {
+  return Math.abs(dy) > TAP_SLOP_PX && Math.abs(dy) > Math.abs(dx) * SCROLL_BIAS;
+}
+
 export function shouldSwapSecondCard(dx: number): boolean {
   return Math.abs(dx) > SECOND_CARD_SWAP_PX;
 }

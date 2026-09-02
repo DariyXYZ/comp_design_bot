@@ -195,12 +195,67 @@ test.describe("колода кейсов", () => {
     await expect(topCard(page)).toHaveAttribute("data-idx", "1");
 
     // А в описании каретка важнее: иначе правка текста молча меняет предмет
-    // заявки.
+    // заявки. Шторку для этого надо раскрыть — по умолчанию она сложена.
+    await page.locator(".sheet-foot .btn").click();
     await page
       .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
       .click();
     await page.keyboard.press("ArrowRight");
     await expect(topCard(page)).toHaveAttribute("data-idx", "1");
+  });
+
+  test("вертикальный жест по карточке листает страницу, а не колоду", async ({
+    page,
+  }) => {
+    // Карточка занимает почти всю ширину экрана, а под колодой лежит список
+    // готового по теме. Пока любое движение по карточке считалось её свайпом,
+    // до списка было не долистать: палец попадал в карточку, она чуть съезжала
+    // и возвращалась, а страница стояла.
+    //
+    // Настоящие касания, а не мышь: `page.mouse` страницу не прокручивает
+    // вовсе, и на нём эта проверка была бы зелёной при любом поведении.
+    // Отсюда CDP — Playwright свайпа пальцем не умеет.
+    await open(page);
+    const cdp = await page.context().newCDPSession(page);
+    const box = (await page.locator(".deck").boundingBox())!;
+    const x = Math.round(box.x + box.width / 2);
+    const y = Math.round(box.y + box.height / 2);
+
+    async function touchDrag(dx: number, dy: number) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x, y }],
+      });
+      for (let i = 1; i <= 14; i += 1) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [
+            { x: x + Math.round((dx * i) / 14), y: y + Math.round((dy * i) / 14) },
+          ],
+        });
+        await page.waitForTimeout(16);
+      }
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await page.waitForTimeout(400);
+    }
+
+    const scrollTop = () =>
+      page.evaluate(() =>
+        Math.round(document.querySelector(".scroll")!.scrollTop),
+      );
+
+    await touchDrag(0, -220);
+    // Порог низкий намеренно: сколько именно прокрутится, зависит от инерции
+    // конкретного окружения. Проверяется не расстояние, а то, что жест вообще
+    // достался странице, — раньше он целиком уходил карточке.
+    expect(await scrollTop()).toBeGreaterThan(30);
+    await expect(topCard(page)).toHaveAttribute("data-idx", "0");
+
+    await page.evaluate(() => document.querySelector(".scroll")!.scrollTo(0, 0));
+    await touchDrag(-200, 0);
+    // Горизонтальный жест остаётся свайпом колоды и страницу не двигает.
+    await expect(topCard(page)).toHaveAttribute("data-idx", "1");
+    expect(await scrollTop()).toBe(0);
   });
 
   test("сбой Supabase объясняется текстом, а не пустым экраном", async ({ page }) => {

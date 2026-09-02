@@ -110,7 +110,9 @@ export function RequestDraftProvider({
   const [photos, setPhotos] = useState<readonly UploadedPhoto[]>([]);
   const [topic, setTopicState] = useState<DraftTopic | null>(null);
   const [materialId, setMaterialId] = useState<string | null>(null);
-  const [snap, setSnap] = useState<SheetSnap>("half");
+  // Сложена по умолчанию: под ней целиком помещается карточка колоды, а
+  // заявка открывается одним нажатием кнопки в подвале.
+  const [snap, setSnap] = useState<SheetSnap>("peek");
 
   // Стартовая тема колоды — в ref, а не в состоянии: её читают один раз на
   // монтировании колоды, и перерисовывать из-за неё всё приложение незачем.
