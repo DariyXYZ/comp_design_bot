@@ -16,8 +16,19 @@
      набегают 13px и 22px, которые по отдельности незаметны, а вместе читаются
      как неряшливость. */
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:40px;
-  /* Радиусы: вложенный элемент всегда на ступень меньше родителя. */
-  --r1:8px; --r2:12px; --r3:16px; --r4:20px;
+  /* Радиусы. Правило вложения жёсткое и проверяемое: радиус внутреннего блока
+     равен радиусу внешнего МИНУС расстояние между их кромками. Тогда у обеих
+     дуг общий центр, и зазор в углу такой же, как вдоль прямых сторон; иначе
+     угол либо поджимается, либо расходится, и блок выглядит косым.
+
+     Правило касается вложенных поверхностей — тех, чьи кромки идут параллельно
+     кромкам родителя (превью в строке, обложка, поле пути в карточке). К
+     мелочи, у которой сбоку остаётся свободное место — подписи-теги, круглые
+     кнопки, крестик на слоте, — оно не применяется: параллельных кромок там
+     нет, и форма у них своя.
+
+     Шаг 4px, и --r0 нужен именно для вложения в --r3 через отступ --s3. */
+  --r0:4px; --r1:8px; --r2:12px; --r3:16px; --r4:20px;
   /* Типографика разделов. Шаг ~1.15 — в продуктовом интерфейсе элементов
      много, и резкий контраст размеров превращается в шум. */
   --t-title:1.22rem; --t-h2:.95rem; --t-body:.84rem; --t-small:.78rem;
@@ -343,9 +354,11 @@ body{
    которому вещь узнают, текст только подтверждает догадку. */
 /* Ширина фиксирована, высота тянется по строке: превью, которое ниже текста,
    оставляет под собой дыру, а вместе они читаются как один блок. */
+/* --r0, а не --r2: строка скруглена на --r3 и отбивает превью на --s3.
+   16 − 12 = 4, и дуга превью концентрична дуге строки. */
 .row-thumb{
   flex:0 0 96px;align-self:stretch;min-height:96px;
-  border-radius:var(--r2);
+  border-radius:var(--r0);
   background:var(--pill);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
@@ -356,7 +369,8 @@ body{
    квадратные, а ряд карточек не должен от этого прыгать. */
 .feed-cover{
   width:100%;aspect-ratio:16/10;object-fit:cover;display:block;
-  border-radius:var(--r2);background:var(--pill);
+  /* Та же арифметика, что у превью: 16 карточки − 12 её паддинга. */
+  border-radius:var(--r0);background:var(--pill);
 }
 
 /* Условное обозначение скрипта на месте отсутствующей картинки.
@@ -572,10 +586,25 @@ body{
   flex:0 0 auto;width:34px;height:34px;
   display:flex;align-items:center;justify-content:center;
   border:1px solid var(--line);background:var(--card);
-  color:var(--ink);border-radius:var(--r1);cursor:pointer;
+  color:var(--ink);
+  /* 12 поля − 8 его отступа = 4. В карточке потока поле само скруглено на 4 —
+     там это ещё и предел: круглее родителя ребёнку быть нельзя. */
+  border-radius:var(--r0);cursor:pointer;
   transition:background .16s var(--ease), color .16s var(--ease),
              border-color .16s var(--ease);
 }
+/* В карточке потока поле пути идёт от кромки до кромки и лежит у её нижнего
+   края: 16 − 12 = 4. На экране решения тот же блок стоит в скролле, где
+   скруглённого родителя нет, и живёт со своим --r2.
+
+   Здесь же единственное место, где правило концентричности не сходится:
+   вложений три (карточка → поле пути → кнопка копирования), отступов в сумме
+   20, а радиус карточки 16 — на кнопку не остаётся ничего, 4 − 8 уходит в
+   минус. Кнопка берёт радиус родителя: концентричной ей не быть, но круглее
+   родителя она хотя бы не выглядит. Сошлось бы при радиусе карточки 24
+   (24 → 12 → 4), но это заметно круглее всех строк в приложении — решение не
+   про один блок. */
+.feed-card .path-field{border-radius:var(--r0)}
 .path-copy:hover{background:var(--pill);border-color:var(--sub)}
 .path-copy:active{transform:scale(.96)}
 /* Заливка вместо всплывающей подписи: подтверждение видно там же, где был тап,
@@ -929,17 +958,6 @@ body{
   flex:none;font-size:var(--t-caption);color:var(--sub);
   background:var(--pill);border-radius:999px;padding:3px var(--s2);
 }
-/* Без плашки: это не подсказка про жест, а признание «пока ничего не
-   выбрано». Плашка сделала бы из него кнопку, которой он не является. */
-.origin-aside-quiet{background:none;padding:3px 0}
-.origin-clear{
-  flex:none;width:28px;height:28px;border-radius:50%;
-  border:1px solid var(--line);background:var(--card);color:var(--sub);
-  font-size:1rem;line-height:1;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:background .16s var(--ease), color .16s var(--ease);
-}
-.origin-clear:hover{background:var(--pill);color:var(--ink)}
 
 
 /* Клавиатурная навигация: обводка одна для всех интерактивных элементов
@@ -947,14 +965,13 @@ body{
 .row:focus-visible,.card:focus-visible,.pill:focus-visible,.btn:focus-visible,
 .back:focus-visible,.path-copy:focus-visible,.row-action:focus-visible,
 .slot:focus-visible,.field input:focus-visible,.field textarea:focus-visible,
-.feed-foot a:focus-visible,.sheet-grab:focus-visible,.origin-row:focus-visible,
-.origin-clear:focus-visible{
+.feed-foot a:focus-visible,.sheet-grab:focus-visible,.origin-row:focus-visible{
   outline:2px solid var(--ink);outline-offset:2px;
 }
 
 @media (prefers-reduced-motion: reduce){
   .row,.card,.btn,.back,.path-copy,.row-action,.slot,.pill,
-  .origin-row,.origin-clear,.sheet,
+  .origin-row,.sheet,
   .field input,.field textarea{transition:none}
   .btn-primary:active,.back:active,.path-copy:active,.pill:active{transform:none}
 }
