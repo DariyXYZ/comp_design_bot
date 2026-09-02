@@ -133,6 +133,37 @@ test.describe("жест шторки", () => {
     await expect(page.locator(".rows .row").first()).toBeInViewport();
   });
 
+  test("карточка не меняет размер, когда шторку поднимают", async ({ page }) => {
+    // Замечание глазами: «открываю шторку на половину — карточка чуть
+    // уменьшается, выглядит как баг». Так и было: подпись над кнопкой
+    // появляется вместе с открытием шторки, попадала в замер сложенной высоты,
+    // а от неё считается место под колоду.
+    await open(page);
+    await settled(page);
+    const cardWidth = () =>
+      page.evaluate(() =>
+        Math.round(document.querySelector(".deck")!.getBoundingClientRect().width),
+      );
+
+    const collapsed = await cardWidth();
+    expect(collapsed).toBeGreaterThan(0);
+
+    await page.locator(".sheet-grab").click();
+    await expect.poll(() => height(page)).toBe(await halfHeight(page));
+    expect(await cardWidth()).toBe(collapsed);
+
+    // И на всю высоту тоже: карточку она закрывает, но не пересчитывает.
+    await page
+      .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
+      .click();
+    await page.waitForTimeout(400);
+    expect(await cardWidth()).toBe(collapsed);
+
+    await page.locator(".sheet-grab").click();
+    await page.waitForTimeout(400);
+    expect(await cardWidth()).toBe(collapsed);
+  });
+
   test("тап по ручке переключает между сложенным и средним положением", async ({
     page,
   }) => {

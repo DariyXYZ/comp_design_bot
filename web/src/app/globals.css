@@ -872,6 +872,10 @@ body{
   height:var(--s4);pointer-events:none;
   background:linear-gradient(to bottom, transparent, var(--card));
 }
+/* Приписка над кнопкой: подсказки и сообщения об ошибке. Отдельным блоком —
+   он не входит в замер сложенной высоты (см. `measure()` в bottom-sheet.tsx),
+   поэтому её появление не двигает карточку под шторкой. */
+.sheet-foot-aside{display:flex;flex-direction:column;gap:var(--s2)}
 /* Подпись под кнопкой в шторке переносится: тут она объясняет, чего не хватает
    для отправки, и обрезать это многоточием нельзя. */
 .sheet-foot .action-note{white-space:normal;line-height:1.35}

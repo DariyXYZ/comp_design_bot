@@ -91,6 +91,7 @@ export function BottomSheet({
   label,
   head,
   foot,
+  footAside,
   children,
 }: Readonly<{
   snap: SheetSnap;
@@ -100,6 +101,15 @@ export function BottomSheet({
   head: React.ReactNode;
   /** Не скроллится: главное действие всегда на экране, как «Заказать». */
   foot: React.ReactNode;
+  /**
+   * Приписка над главным действием: подсказки и сообщения об ошибке.
+   *
+   * Отдельным слотом, а не частью `foot`, ровно по одной причине: в сложенном
+   * положении её нет, а высота сложенного положения — это то, от чего экран под
+   * шторкой считает своё место. Считайся приписка вместе с кнопкой, открытие
+   * шторки уменьшало бы карточку колоды, и выглядело бы это как дёрганье.
+   */
+  footAside?: React.ReactNode;
   children: React.ReactNode;
 }>) {
   const sheetRef = useRef<HTMLElement>(null);
@@ -107,6 +117,7 @@ export function BottomSheet({
   const headRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLDivElement>(null);
+  const footMainRef = useRef<HTMLDivElement>(null);
 
   // Колбэк в ref: жесты поднимаются один раз, и замыкание на первый проп
   // сделало бы отпускание шторки немым.
@@ -158,12 +169,25 @@ export function BottomSheet({
     const head = headRef.current;
     const body = bodyRef.current;
     const foot = footRef.current;
-    if (!sheet || !grab || !head || !body || !foot) return null;
+    const footMain = footMainRef.current;
+    if (!sheet || !grab || !head || !body || !foot || !footMain) return null;
 
     // Нижний отступ под жест-полоску входит в высоту элемента (border-box),
     // поэтому его нужно прибавить, иначе `peek` срежет кнопку.
     const padBottom = parseFloat(getComputedStyle(sheet).paddingBottom) || 0;
-    const peek = grab.offsetHeight + head.offsetHeight + foot.offsetHeight + padBottom;
+    // Считаем по кнопке, а не по всему подвалу: приписка над ней приходит и
+    // уходит вместе с положением шторки, и если бы она попадала в замер,
+    // сложенная высота гуляла бы — а от неё считается размер карточки.
+    const footStyle = getComputedStyle(foot);
+    const footPad =
+      (parseFloat(footStyle.paddingTop) || 0) +
+      (parseFloat(footStyle.paddingBottom) || 0);
+    const peek =
+      grab.offsetHeight +
+      head.offsetHeight +
+      footPad +
+      footMain.offsetHeight +
+      padBottom;
     const frame = frameHeight();
     const limit = Math.max(peek, frame - TOP_GAP_PX);
     const full = Math.min(limit, peek + body.scrollHeight);
@@ -389,7 +413,10 @@ export function BottomSheet({
         {children}
       </div>
       <div className="sheet-foot" ref={footRef}>
-        {foot}
+        {footAside ? <div className="sheet-foot-aside">{footAside}</div> : null}
+        <div className="sheet-foot-main" ref={footMainRef}>
+          {foot}
+        </div>
       </div>
     </section>
   );
