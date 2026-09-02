@@ -46,6 +46,12 @@
      containment на грани карточки мешает 3D-флипу. Множители подобраны так,
      что при карточке 400px значения совпадают с исходным дизайном. */
   --cu:calc(var(--card-w) / 100);
+
+  /* Высота шторки заявки в среднем положении — том, в котором она стоит по
+     умолчанию. От неё же считается место под колоду. Значение уточняется
+     замером из JS (см. `measure()` в bottom-sheet.tsx); здесь стоит та же
+     доля экрана, что и там, чтобы до гидратации ничего не прыгало. */
+  --sheet-rest:42svh;
 }
 @media (prefers-color-scheme: dark){
   :root{--ink:#f0f0ee; --sub:#94949a; --page:#101012; --card:#1b1b1e;
@@ -68,31 +74,20 @@ body{
      нижний паддинг больше не нужно. */
   /* Сверху 12, а не 24: в Mini App над страницей уже стоит шапка клиента с
      названием бота, и лишний воздух под ней читался как пустой экран.
-     Снизу только системный отступ: панель разделов прижата к краю, и лишние
-     двадцать пикселей отнимались у списка, который должен выглядывать
-     из-под плашки заявки. */
-  padding:max(12px,env(safe-area-inset-top)) 0 calc(var(--s2) + env(safe-area-inset-bottom));
+     Снизу ничего: у нижнего края теперь стоят разные вещи — шторка заявки на
+     главном экране, полоса действия на вложенных, — и системный отступ под
+     жест-полоску каждая из них добирает сама. Общий отступ у body отодвигал
+     бы от края шторку, которая обязана к нему липнуть. */
+  padding:max(12px,env(safe-area-inset-top)) 0 0;
   user-select:none;-webkit-user-select:none;touch-action:none;
 }
 
-header{padding:0 22px;text-align:center}
-header h1{
-  font-size:1.55rem;font-weight:800;
-  line-height:1.2;letter-spacing:-.02em;
-}
-header .brand{
-  font-family:var(--font-golos),-apple-system,sans-serif;font-size:.72rem;font-weight:400;
-  color:var(--sub);margin-top:6px;
-}
-
-/* padding-top:24px = 2X (тот же отступ, что над заголовком и перед CTA) — именно
-   паддингом, а не отступом у .deck-col: замер свободной высоты в sizeCard()
-   вычитает паддинги этого блока, а внешний margin ребёнка в clientHeight не
-   виден. */
+/* Свободную высоту под карточку задаёт родитель (`.stage`), а не собственный
+   паддинг: замер в sizeCard() вычитает паддинги этого блока, и держать отступы
+   в двух местах значило бы считать их дважды. */
 .deck-wrap{
   flex:1;position:relative;min-height:0;
   display:flex;align-items:flex-start;justify-content:center;
-  padding-top:24px;
 }
 .deck-col{display:flex;flex-direction:column;align-items:center}
 /* Пропорции игральной карты (5:7). Задана только ширина — высота выводится из
@@ -220,14 +215,6 @@ header .brand{
 .cta:active{transform:scale(.98)}
 .swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
 .cta-label{text-align:left}
-/* justify-content:space-between на .cta прижимает стрелку к правому краю
-   при любой длине текста — раньше был фиксированный отступ (position:absolute),
-   рассчитанный под короткую фразу, и длинный текст в неё упирался. */
-.cta-arrow{
-  display:flex;align-items:center;justify-content:center;
-  flex:0 0 auto;
-  width:32px;height:32px;color:#9a9a9e;
-}
 
 /* Стрелки листания. На телефоне они не заменяют свайп, а подсказывают, что
    колода листается вообще: свайп невидим, и человек, не тронувший карточку,
@@ -318,42 +305,9 @@ header .brand{
 .scroll{
   flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   touch-action:pan-y;-webkit-overflow-scrolling:touch;
-  padding:0 var(--s4) var(--s3);
+  padding:0 var(--s4) calc(var(--s3) + env(safe-area-inset-bottom));
 }
-/* Сбрасываем центрирование и боковые отступы, которые задаёт `header` для
-   колоды: в разделах шапка выровнена по левому краю вместе со списком. */
-.scroll > header{padding:0;text-align:left}
 
-/* Шапка таб-экрана: название раздела и одна строка о том, что внутри.
-   Селектор с тегом — не для красоты: правило `.scroll > header` выше
-   специфичнее одного класса и обнуляло бы отступ снизу. */
-.scroll > header.topics-head{padding-bottom:var(--s4)}
-/* 700, а не унаследованные от колоды 800: на 1.22rem жирность 800 выглядит
-   плотно и спорит с содержимым за внимание. */
-.topics-head h1{
-  font-size:var(--t-title);font-weight:700;
-  line-height:1.25;letter-spacing:-.015em;
-}
-.topics-head .brand{margin-top:var(--s1);line-height:1.4}
-
-/* Колода внутри скролла обязана иметь заданную высоту: sizeCard() считает
-   ширину карточки от clientHeight этого блока, и высота по контенту замкнула
-   бы расчёт на самого себя — карточка схлопнулась бы в ноль.
-
-   Высота — не просто доля экрана: `100svh - 330px` резервирует место под
-   заголовок списка и верхушку первой строки. Без этого резерва экран
-   читается как «здесь только карточки», и до готовых решений никто не
-   доскроллит — край строки единственный сигнал, что ниже что-то есть.
-   Резерв фиксированный, поэтому на высоком экране он не растёт, а доля
-   55svh не даёт колоде занять его целиком. Нижняя граница 240px держит
-   карточку читаемой: пропорция 5:7 фиксирована, и при меньшей высоте
-   подсказка на карточке перестаёт помещаться. Ступенька по медиазапросу
-   была хуже — на 700px карточка прыгала с 261 до 192 пикселей. */
-.scroll .deck-wrap{
-  height:clamp(240px, min(55svh, calc(100svh - 320px)), 470px);
-  flex:none;padding-top:0;
-}
-.scroll .swipe-hint{margin:var(--s3) 0 0;padding:0}
 
 /* Секция: заголовок, необязательное пояснение, содержимое. Воздуха между
    секциями больше, чем внутри — так блоки читаются как отдельные, без линеек
@@ -453,7 +407,7 @@ header .brand{
    контент обрывается ровной линией и выглядит как конец страницы. */
 .action-bar{
   position:relative;flex:none;
-  padding:var(--s3) var(--s4) 0;
+  padding:var(--s3) var(--s4) calc(var(--s2) + env(safe-area-inset-bottom));
   display:flex;flex-direction:column;gap:var(--s2);
 }
 .action-bar::before{
@@ -500,8 +454,9 @@ header .brand{
 
 /* Подпись и кнопка — один предмет на общей плашке. Кнопка внутри неё уже на
    padding: видно, что она принадлежит подписи, а не полосе экрана. */
-/* Плашка скруглена так же, как панель разделов внизу: два серых блока стоят
-   друг над другом, и разный радиус читался бы как разные материалы. */
+/* Плашка скруглена так же, как шторка заявки: два блока делают одну работу —
+   «вот из чего заявка, вот кнопка», — и разный радиус читался бы как разные
+   материалы. */
 .action-card{
   display:flex;flex-direction:column;gap:var(--s2);
   padding:var(--s2);border-radius:var(--r4);
@@ -510,7 +465,7 @@ header .brand{
 /* Правило вложенных скруглений: радиус внутреннего блока = радиус внешнего
    минус расстояние между ними. 20 − 8 = 12, и кромки идут эквидистантно —
    иначе зазор между кнопкой и краем плашки «гуляет» по углам. Тем же
-   правилом живёт панель разделов: 20 − 4 = 16 у .tab. */
+   правилом живёт полоса действия внутри шторки. */
 .action-card .btn{border-radius:var(--r2)}
 .action-note{
   font-size:var(--t-caption);color:var(--sub);text-align:center;
@@ -534,36 +489,6 @@ header .brand{
    не разрешено — это понятнее, чем пустая ошибка после нажатия. */
 .btn:disabled{opacity:.4;cursor:default}
 .btn:disabled:active{transform:none}
-
-/* Активный раздел — приподнятая плашка, остальное на фоне страницы. Общей
-   подложки у панели нет: два серых блока подряд (плашка заявки и панель)
-   съедали низ экрана, и первая строка списка переставала выглядывать. Панель
-   прижата к нижнему краю — снизу только системный отступ под жест-полоску. */
-.tabbar{
-  flex:none;display:flex;gap:var(--s1);
-  margin:var(--s2) var(--s4) 0;padding:0;
-}
-.tab{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:var(--s1) 0;border-radius:var(--r2);
-  color:var(--sub);text-decoration:none;
-  font-size:var(--t-caption);font-weight:600;
-  transition:color .16s var(--ease), background .16s var(--ease);
-}
-/* Неактивные разделы приглушены иконкой, а не подписью: подпись набрана
-   мелким кеглем, и осветлять её — значит ронять контраст текста ниже
-   читаемого. Иконка же чистая графика, ей приглушение ничего не стоит. */
-.tab svg{opacity:.42;transition:opacity .16s var(--ease)}
-.tab:hover{color:var(--ink)}
-.tab:hover svg{opacity:.8}
-/* Активный раздел различается только яркостью: белая плашка и полная
-   непрозрачность иконки против приглушённых соседей. Кромки нет намеренно —
-   она читалась как рамка кнопки и спорила с плашкой заявки над панелью. */
-.tab.on{
-  color:var(--ink);background:var(--raised);
-  box-shadow:0 6px 16px -10px rgba(0,0,0,.45);
-}
-.tab.on svg{opacity:1}
 
 /* Шапка вложенного экрана. В проде «назад» уедет в BackButton Telegram. */
 .screen-top{
@@ -653,19 +578,6 @@ header .brand{
 /* Заливка вместо всплывающей подписи: подтверждение видно там же, где был тап,
    и высота блока не меняется. */
 .path-copy.done{background:var(--accent);border-color:var(--accent);color:var(--card)}
-
-/* Происхождение заявки. Не поле формы и не чип-фильтр: убрать его нельзя,
-   поэтому и выглядит как факт, а не как элемент управления. */
-.origin{
-  display:flex;flex-direction:column;gap:var(--s1);
-  border:1px solid var(--ink);border-radius:var(--r2);
-  padding:var(--s4);
-}
-.origin-key{
-  font-size:.66rem;font-weight:600;color:var(--sub);
-  text-transform:uppercase;letter-spacing:.06em;
-}
-.origin-value{font-size:var(--t-body);font-weight:600;line-height:1.35}
 
 .field{display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s5)}
 .field > span{font-size:var(--t-small);font-weight:600}
@@ -824,17 +736,210 @@ header .brand{
 /* Ждущие ответа — единственная цифра, требующая действия. */
 .stat-attention strong{color:var(--attention)}
 
+/* ==========================================================================
+   Главный экран: «карта» с колодой и шторка заявки над ней.
+
+   Устройство взято у экрана заказа в такси. Причина не в сходстве, а в том,
+   что там решена та же задача: выбрать предмет заказа и оформить его, не
+   теряя из виду то, из чего выбираешь. У нас «карта» — это колода тем, а
+   «заказ» — заявка в отдел.
+
+   Из этого следуют три правила, которым подчинён весь блок:
+   1. «Карта» — это колода и список готового под ней. Она скроллится и целиком
+      живёт над шторкой в её среднем положении (`--sheet-rest`) — том, в
+      котором шторка стоит по умолчанию. Значение приходит замером, а не долей
+      экрана: фрейм Mini App бывает какой угодно высоты.
+   2. Шторка перекрывает «карту», а не сдвигает её. Развёрнутая шторка — это
+      по-прежнему шторка, поэтому сверху всегда остаётся полоска колоды.
+   3. В шторке только поля заявки. Что именно заказывают, выбирают на «карте»:
+      тему — свайпом колоды, решение — тапом по строке списка.
+   ========================================================================== */
+
+/* «Карта»: всё, что не шторка. Верхний отступ — под плашки разделов, они
+   лежат поверх и места в потоке не занимают. */
+.stage{
+  position:relative;flex:1;min-height:0;
+  display:flex;flex-direction:column;
+  padding-top:46px;
+}
+/* Конец списка должен доставаться скроллом, а не прятаться под шторкой.
+   Резерв по её среднему положению: развёрнутая шторка закрывает список
+   намеренно — в этот момент человек пишет заявку, а не выбирает. */
+.stage .scroll{padding-bottom:calc(var(--sheet-rest) + var(--s3))}
+
+/* Колода внутри скролла обязана иметь заданную высоту: sizeCard() считает
+   ширину карточки от clientHeight этого блока, и высота по контенту замкнула
+   бы расчёт на самого себя — карточка схлопнулась бы в ноль.
+
+   Высота — остаток экрана над шторкой минус резерв под заголовок списка и
+   верхушку первой строки. Без этого резерва экран читается как «здесь только
+   карточки», и до готовых решений никто не доскроллит — край строки
+   единственный сигнал, что ниже что-то есть. Нижняя граница держит карточку
+   читаемой: пропорция 5:7 фиксирована, и при меньшей высоте подсказка на
+   карточке перестаёт помещаться. */
+.stage .deck-wrap{
+  flex:none;
+  height:clamp(230px, calc(100svh - var(--sheet-rest) - 132px), 470px);
+}
+/* Обвязка колоды плотнее, чем была: каждый пиксель воздуха вокруг карточки —
+   это пиксель, отнятый у самой карточки, потому что её размер выводится из
+   оставшейся высоты. По той же причине список подтянут к колоде ближе
+   обычного — так из-под шторки успевает выглянуть край первой строки. */
+.stage .dots-row{padding-top:12px}
+.stage .section{margin-top:var(--s4)}
+.stage .swipe-hint{margin:var(--s2) 0 0;padding:0}
+
+/* Разделы в верхних углах. Раньше это была нижняя панель из трёх сегментов;
+   низ теперь занят заявкой, а редкие разделы ушли туда, где место всё равно
+   пустует, — в углы над колодой. */
+.topbar{
+  position:absolute;z-index:20;top:0;left:var(--s4);right:var(--s4);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s2);
+  /* Плашки не должны отбирать у колоды всю полосу под собой: колоду тянут
+     пальцем, и невидимый прямоугольник во всю ширину съедал бы жест. */
+  pointer-events:none;
+}
+.topbar > *{pointer-events:auto}
+.pill{
+  display:inline-flex;align-items:center;gap:var(--s2);
+  height:36px;padding:0 var(--s3);border-radius:999px;
+  background:var(--card);border:1px solid var(--line);
+  box-shadow:0 10px 22px -16px rgba(0,0,0,.55);
+  color:var(--ink);text-decoration:none;white-space:nowrap;
+  font-size:var(--t-small);font-weight:600;
+  transition:background .16s var(--ease), border-color .16s var(--ease),
+             transform .12s var(--ease);
+}
+/* Иконка приглушена, подпись — нет: подпись набрана мелким кеглем, и осветлять
+   её значило бы ронять контраст текста ниже читаемого. */
+.pill svg{opacity:.5}
+.pill:hover{background:var(--pill);border-color:var(--sub)}
+.pill:active{transform:scale(.97)}
+
+/* Шторка. Высота задаётся инлайном из JS — три положения и жест между ними
+   (см. bottom-sheet.tsx); здесь стоит стартовое значение до гидратации.
+   touch-action:none обязателен: без него вертикальный жест по шапке уходит
+   в скролл страницы, и шторка не тянется. */
+.sheet{
+  position:fixed;z-index:40;left:0;right:0;bottom:0;
+  display:flex;flex-direction:column;
+  height:var(--sheet-rest);
+  background:var(--card);
+  border-top:1px solid var(--line);
+  border-radius:var(--r4) var(--r4) 0 0;
+  box-shadow:0 -22px 48px -30px rgba(0,0,0,.5);
+  padding-bottom:calc(var(--s2) + env(safe-area-inset-bottom));
+  touch-action:none;
+  transition:height .3s var(--ease);
+  /* Страховка от любой ошибки замера: min-content флекс-колонки — это ручка,
+     шапка и подвал (тело сжимается в ноль), то есть ровно нижнее положение
+     шторки. Без неё слишком маленькая высота — например, до того как
+     подхватился шрифт и подпись под кнопкой переехала на вторую строку, —
+     выталкивала кнопку отправки за нижний край экрана. */
+  min-height:min-content;
+}
+/* Во время жеста высота идёт за пальцем — переход её бы запаздывал. */
+.sheet.dragging{transition:none}
+
+/* Ручка. Единственный видимый признак того, что шторку можно тянуть, поэтому
+   она есть всегда, а не появляется по наведению. */
+.sheet-grab{
+  flex:none;height:22px;cursor:grab;
+  display:flex;align-items:center;justify-content:center;
+}
+.sheet-grab::before{
+  content:"";width:38px;height:4px;border-radius:999px;background:var(--line);
+}
+.sheet-grab:active{cursor:grabbing}
+
+.sheet-head{flex:none;padding:0 var(--s4)}
+/* Тело — единственная скроллящаяся часть. Шапка и подвал остаются на месте
+   при любой высоте: по ним тянут шторку и в них лежит главное действие. */
+.sheet-body{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;
+  padding:0 var(--s4);
+}
+.sheet-foot{
+  position:relative;flex:none;
+  padding:var(--s3) var(--s4) 0;
+  display:flex;flex-direction:column;gap:var(--s2);
+}
+/* Растушёвка над подвалом: без неё прокрученное содержимое обрывается ровной
+   линией и читается как конец формы. */
+.sheet-foot::before{
+  content:"";position:absolute;left:0;right:0;top:calc(var(--s4) * -1);
+  height:var(--s4);pointer-events:none;
+  background:linear-gradient(to bottom, transparent, var(--card));
+}
+/* Подпись под кнопкой в шторке переносится: тут она объясняет, чего не хватает
+   для отправки, и обрезать это многоточием нельзя. */
+.sheet-foot .action-note{white-space:normal;line-height:1.35}
+.sheet-foot .banner{margin-bottom:0}
+.sheet-form{display:flex;flex-direction:column;padding-bottom:var(--s4)}
+.sheet-form .row-action{margin-top:var(--s3)}
+.sheet-note{
+  font-size:var(--t-small);color:var(--sub);line-height:1.45;margin-top:var(--s3);
+}
+
+/* Основа заявки: две строки, как «откуда» и «куда» в заказе. Верхняя идёт
+   следом за колодой, нижняя закрепляется руками. Обе — кнопки: тап по любой
+   раскрывает шторку, потому что менять основу можно только там, где виден
+   ряд решений. */
+.sheet-origin{display:flex;flex-direction:column;padding-bottom:var(--s2)}
+.origin-row{
+  display:flex;align-items:center;gap:var(--s3);width:100%;
+  padding:var(--s3) 0;background:none;border:none;
+  font-family:inherit;color:inherit;text-align:left;cursor:pointer;
+}
+.origin-row + .origin-row{border-top:1px solid var(--line)}
+/* Кружок темы — тот же знак, что на карточке в колоде: по цвету видно, к
+   какой именно карточке относится заявка, ещё до чтения названия. Пустое
+   кольцо у второй строки означает «решение не выбрано». */
+.origin-mark{
+  flex:none;width:12px;height:12px;border-radius:50%;
+  border:2.5px solid var(--sub);background:transparent;
+}
+.origin-mark-on{border:none}
+.origin-body{min-width:0;flex:1;display:flex;flex-direction:column}
+.origin-label{
+  font-size:.66rem;font-weight:600;color:var(--sub);
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.origin-title{
+  font-size:var(--t-body);font-weight:600;line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.origin-aside{
+  flex:none;font-size:var(--t-caption);color:var(--sub);
+  background:var(--pill);border-radius:999px;padding:3px var(--s2);
+}
+/* Без плашки: это не подсказка про жест, а признание «пока ничего не
+   выбрано». Плашка сделала бы из него кнопку, которой он не является. */
+.origin-aside-quiet{background:none;padding:3px 0}
+.origin-clear{
+  flex:none;width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--line);background:var(--card);color:var(--sub);
+  font-size:1rem;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .16s var(--ease), color .16s var(--ease);
+}
+.origin-clear:hover{background:var(--pill);color:var(--ink)}
+
+
 /* Клавиатурная навигация: обводка одна для всех интерактивных элементов
    раздела, включая ссылки-карточки. */
-.row:focus-visible,.card:focus-visible,.tab:focus-visible,.btn:focus-visible,
+.row:focus-visible,.card:focus-visible,.pill:focus-visible,.btn:focus-visible,
 .back:focus-visible,.path-copy:focus-visible,.row-action:focus-visible,
 .slot:focus-visible,.field input:focus-visible,.field textarea:focus-visible,
-.feed-foot a:focus-visible{
+.feed-foot a:focus-visible,.sheet-grab:focus-visible,.origin-row:focus-visible,
+.origin-clear:focus-visible{
   outline:2px solid var(--ink);outline-offset:2px;
 }
 
 @media (prefers-reduced-motion: reduce){
-  .row,.card,.btn,.back,.path-copy,.row-action,.slot,.tab,
+  .row,.card,.btn,.back,.path-copy,.row-action,.slot,.pill,
+  .origin-row,.origin-clear,.sheet,
   .field input,.field textarea{transition:none}
-  .btn-primary:active,.back:active,.path-copy:active{transform:none}
+  .btn-primary:active,.back:active,.path-copy:active,.pill:active{transform:none}
 }

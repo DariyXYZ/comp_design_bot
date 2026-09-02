@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { PathField } from "@/components/ui/path-field";
+import { Screen } from "@/components/layout/screen";
 import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { FEED, type FeedItem } from "@/features/feed";
 import { plural } from "@/lib/plural";
-import { requestHref } from "@/config/navigation";
+import { requestHref, routes } from "@/config/navigation";
 
 /**
  * Поток отдела: что делается сейчас и что уже сделано.
@@ -14,18 +15,21 @@ import { requestHref } from "@/config/navigation";
  *
  * «В работе» стоит выше «сделано» специально: по этому блоку видно, занят ли
  * отдел и не делают ли уже похожую задачу по тому же проекту.
+ *
+ * Экран вложенный: в него заходят плашкой «Задачи» из левого верхнего угла
+ * главного экрана, обратно — кнопкой «назад». Нижней панели разделов больше
+ * нет, её место занято шторкой заявки.
  */
 export default function FeedPage() {
   const inWork = FEED.filter((item) => item.status === "in_work");
   const done = FEED.filter((item) => item.status === "done");
 
   return (
-    <div className="scroll">
-      <header className="topics-head">
-        <h1>Поток отдела</h1>
-        <div className="brand">Задачи и файлы по ним</div>
-      </header>
-
+    <Screen
+      title="Задачи отдела"
+      subtitle="Что в работе, что сделано и где лежат файлы"
+      backHref={routes.topics}
+    >
       <div className="load-line">
         <strong>Берём новые задачи</strong>
         <span>
@@ -71,7 +75,7 @@ export default function FeedPage() {
         </Link>
         .
       </p>
-    </div>
+    </Screen>
   );
 }
 

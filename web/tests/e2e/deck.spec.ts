@@ -77,6 +77,10 @@ async function open(page: Page, { casesFail = false } = {}) {
 
 const topCard = (page: Page) => page.locator(".deck .swipe-card").last();
 
+/** Верхняя строка основы заявки в шторке — та, что идёт следом за колодой. */
+const sheetTopic = (page: Page) =>
+  page.locator(".origin-row").first().locator(".origin-title");
+
 async function centerOf(page: Page) {
   const box = await topCard(page).boundingBox();
   if (!box) throw new Error("Карточка не отрисована");
@@ -162,27 +166,41 @@ test.describe("колода кейсов", () => {
     await expect(topCard(page)).toHaveAttribute("data-idx", "0");
   });
 
-  test("листание колоды меняет тему заявки и список под ней", async ({ page }) => {
+  test("листание колоды меняет тему в шторке заявки", async ({ page }) => {
     await open(page);
 
-    // Кнопка заявки больше не отправляет данные боту: колода выбирает тему, а
-    // заявка открывается отдельным экраном уже с этой темой в ссылке. Тема
-    // названа в плашке контекста над кнопкой — по ней и проверяем.
-    await expect(page.locator(".action-context-title")).toHaveText("Кейс 0");
+    // Колода и шторка живут на одном экране: свайп меняет предмет заявки, не
+    // трогая набранное. Тема названа в верхней строке основы — по ней и
+    // проверяем.
+    await expect(sheetTopic(page)).toHaveText("Кейс 0");
 
     await page.keyboard.press("ArrowRight");
     await expect(topCard(page)).toHaveAttribute("data-idx", "1");
+    await expect(sheetTopic(page)).toHaveText("Кейс 1");
 
-    await expect(page.locator(".action-context-title")).toHaveText("Кейс 1");
-    await expect(page.locator(".action-bar a")).toHaveAttribute(
-      "href",
-      /\/request\/\?topic=case-1/,
-    );
-
-    // Ничего боту не ушло — отправка переехала в форму заявки.
+    // Ничего боту не ушло — отправляет только кнопка в шторке.
     expect(
       await page.evaluate(() => (window as unknown as { __sent: string[] }).__sent),
     ).toEqual([]);
+  });
+
+  test("стрелки листают колоду, но не когда ими правят текст заявки", async ({
+    page,
+  }) => {
+    await open(page);
+
+    // Форма и колода теперь на одном экране, и стрелки нужны обеим. Пока
+    // фокус вне полей, они листают колоду.
+    await page.keyboard.press("ArrowRight");
+    await expect(topCard(page)).toHaveAttribute("data-idx", "1");
+
+    // А в описании каретка важнее: иначе правка текста молча меняет предмет
+    // заявки.
+    await page
+      .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
+      .click();
+    await page.keyboard.press("ArrowRight");
+    await expect(topCard(page)).toHaveAttribute("data-idx", "1");
   });
 
   test("сбой Supabase объясняется текстом, а не пустым экраном", async ({ page }) => {
@@ -210,18 +228,22 @@ test.describe("пропорции карточки", () => {
   ];
 
   for (const frame of FRAMES) {
-    test(`${frame.width}×${frame.height}: пропорция 5:7, колода и кнопка заявки в кадре`, async ({
+    test(`${frame.width}×${frame.height}: пропорция 5:7, колода и шторка в кадре`, async ({
       page,
     }) => {
       await page.setViewportSize(frame);
       await open(page);
+      // Шрифт подхватывается после первого кадра и меняет высоту подписей —
+      // до этого замеры шторки говорят о раскладке, которой уже не будет.
+      await page.waitForFunction(() => document.fonts.status === "loaded");
 
       const m = await page.evaluate(() => {
         const rect = (s: string) => document.querySelector(s)!.getBoundingClientRect();
         const card = rect(".deck");
         const wrap = rect(".deck-wrap");
         const dots = rect(".dots-row");
-        const action = rect(".action-bar");
+        const sheet = rect(".sheet");
+        const send = rect(".sheet-foot .btn");
         return {
           ratio: card.width / card.height,
           cardTop: card.top,
@@ -229,8 +251,10 @@ test.describe("пропорции карточки", () => {
           wrapTop: wrap.top,
           wrapBottom: wrap.bottom,
           dotsBottom: dots.bottom,
-          actionBottom: action.bottom,
-          actionW: Math.round(action.width),
+          sheetBottom: sheet.bottom,
+          sheetW: Math.round(sheet.width),
+          sendBottom: send.bottom,
+          sendTop: send.top,
           viewportW: window.innerWidth,
           viewportH: window.innerHeight,
           overflowX: document.documentElement.scrollWidth - window.innerWidth,
@@ -245,10 +269,13 @@ test.describe("пропорции карточки", () => {
       expect(m.dotsBottom).toBeLessThanOrEqual(m.wrapBottom + 1);
       // Карточка в кадре, а не обрезана сверху.
       expect(m.cardTop).toBeGreaterThanOrEqual(0);
-      // Кнопка заявки стоит на одном месте внизу и не уезжает за кадр:
-      // это единственный вход в заявку, скроллом его искать нельзя.
-      expect(m.actionBottom).toBeLessThanOrEqual(m.viewportH + 1);
-      expect(m.actionW).toBe(m.viewportW);
+      // Шторка прижата к нижнему краю во всю ширину, а её кнопка видна при
+      // любой высоте фрейма: это единственный вход в отправку, и искать его
+      // скроллом нельзя.
+      expect(m.sheetBottom).toBeLessThanOrEqual(m.viewportH + 1);
+      expect(m.sheetW).toBe(m.viewportW);
+      expect(m.sendBottom).toBeLessThanOrEqual(m.viewportH + 1);
+      expect(m.sendTop).toBeGreaterThanOrEqual(0);
       // Горизонтального переполнения быть не должно ни при какой ширине.
       expect(m.overflowX).toBeLessThanOrEqual(0);
     });

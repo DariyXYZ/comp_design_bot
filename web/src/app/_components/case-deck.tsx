@@ -41,12 +41,26 @@ const SWIPE_OUT_MS = 460;
  * списки и формы, там обычный декларативный React.
  *
  * Дека больше ничего не отправляет боту: её работа — выбрать тему. Что
- * делать с выбранной темой, решает экран (`onTopicChange` → список
- * материалов под колодой и кнопка заявки внизу).
+ * делать с выбранной темой, решает экран: тема уходит в черновик заявки
+ * (`onTopicChange`), а шторка над колодой показывает решения по ней.
  */
 export function CaseDeck({
   onTopicChange,
-}: Readonly<{ onTopicChange: (topic: Case) => void }>) {
+  resolveInitialKey,
+}: Readonly<{
+  onTopicChange: (topic: Case) => void;
+  /**
+   * С какой темы открыть колоду.
+   *
+   * Колода монтируется заново после каждого возврата с другого экрана, и без
+   * этого она начинала бы с первой карточки — молча подменяя основу уже
+   * начатой заявки. Тот же путь используют прямые ссылки `/request/?topic=…`.
+   *
+   * Функция, а не значение: спрашивают её один раз, когда карточки уже
+   * пришли. Дальше колодой управляют жесты, и внешнее значение её не двигает.
+   */
+  resolveInitialKey?: () => string | null;
+}>) {
   const deckWrapRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
@@ -61,6 +75,11 @@ export function CaseDeck({
   useEffect(() => {
     notifyRef.current = onTopicChange;
   }, [onTopicChange]);
+
+  const resolveInitialKeyRef = useRef(resolveInitialKey);
+  useEffect(() => {
+    resolveInitialKeyRef.current = resolveInitialKey;
+  }, [resolveInitialKey]);
 
   useEffect(() => {
     const deckWrap = deckWrapRef.current;
@@ -296,6 +315,19 @@ export function CaseDeck({
     const onNextClick = () => goNext();
     const onPrevClick = () => goPrev();
     function onKeyDown(e: KeyboardEvent) {
+      // Стрелки листают колоду, но только когда ими не набирают текст: поля
+      // заявки лежат в шторке над колодой, на том же экране, и раньше каретка
+      // в описании переключала карточку.
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
     }
@@ -306,6 +338,12 @@ export function CaseDeck({
     window.addEventListener("pointercancel", onUp);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", sizeCard);
+    // Высоту под колоду задаёт шторка (`--sheet-peek`), и меняется она не по
+    // событию окна, а когда шторка домерила себя. Наблюдатель ловит это, и
+    // заодно любое другое изменение раскладки. Обратной связи нет: ширина
+    // карточки на высоту `.deck-wrap` не влияет, цикла не будет.
+    const resizeObserver = new ResizeObserver(sizeCard);
+    resizeObserver.observe(deckWrap);
     // Фрейм Mini App меняет высоту при разворачивании — своё событие клиента
     // приходит и там, где window.resize не срабатывает.
     tg?.onEvent?.("viewportChanged", sizeCard);
@@ -336,10 +374,13 @@ export function CaseDeck({
       if (disposed) return;
 
       cases = rows;
+      const wanted = resolveInitialKeyRef.current?.() ?? null;
+      const start = cases.findIndex((item) => item.key === wanted);
+      if (start >= 0) current = start;
       deck.replaceChildren(); // убираем заглушку загрузки
       cases.forEach((_, i) => {
         const d = document.createElement("i");
-        if (i === 0) d.className = "on";
+        if (i === current) d.className = "on";
         dots.appendChild(d);
       });
       sizeCard(); // точки появились — свободной высоты под карточку стало меньше
@@ -357,6 +398,7 @@ export function CaseDeck({
       window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", sizeCard);
+      resizeObserver.disconnect();
       tg?.offEvent?.("viewportChanged", sizeCard);
       arrowRight.removeEventListener("click", onNextClick);
       arrowLeft.removeEventListener("click", onPrevClick);

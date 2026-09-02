@@ -2,15 +2,23 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { TAB_ROUTES, isSameRoute } from "@/config/navigation";
+import { isSameRoute, routes } from "@/config/navigation";
+import { RequestDraftProvider } from "@/features/requests/draft-store";
 import { exchangeSession } from "@/lib/client/api";
-import { askLeave } from "@/lib/client/leave-guard";
 import { cacheViewer, initTelegramViewport, readViewer } from "@/lib/client/telegram";
-import { TabBar } from "./tab-bar";
 
 /**
- * Оболочка приложения: настройка фрейма Telegram, кнопка «назад» клиента и
- * нижняя навигация.
+ * Оболочка приложения: настройка фрейма Telegram, черновик заявки и кнопка
+ * «назад» клиента.
+ *
+ * Черновик держится здесь, а не на экране формы, потому что формы-экрана
+ * больше нет: заявка живёт в шторке над главным экраном, а её содержимое
+ * обязано пережить и листание колоды, и поход в поток или профиль. Провайдер
+ * выше маршрутов — единственное место, где это возможно без хранилища.
+ *
+ * Нижней панели разделов тоже больше нет: низ экрана занят шторкой, а «Задачи»
+ * и «Профиль» уехали плашками в верхние углы главного экрана (см. `TopBar`).
+ * Значит, все экраны кроме главного — вложенные, и у каждого есть «назад».
  *
  * Клиентский компонент — `layout.tsx` остаётся серверным и не тянет за собой
  * ничего лишнего.
@@ -18,17 +26,17 @@ import { TabBar } from "./tab-bar";
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
-  const onTabScreen = TAB_ROUTES.some((route) => isSameRoute(pathname, route));
+  const onHome = isSameRoute(pathname, routes.topics);
 
   useEffect(() => {
     initTelegramViewport();
     // Вход подтверждается здесь, на старте приложения, а не на экране профиля.
     // Причина: код входа лежит в адресе кнопки (`?c=`), а бот открывает
-    // приложение на первом экране. Переход по табам — клиентская навигация, и
-    // адрес меняется целиком: и код, и имя из адреса до профиля не доживали.
-    // Отсюда и был симптом «открыто вне Telegram» при живой кнопке.
-    // `readViewer` сам запоминает найденное имя — здесь важен сам вызов,
-    // сделанный на экране, куда пришёл адрес с параметрами.
+    // приложение на первом экране. Переход между экранами — клиентская
+    // навигация, и адрес меняется целиком: и код, и имя из адреса до профиля
+    // не доживали. Отсюда и был симптом «открыто вне Telegram» при живой
+    // кнопке. `readViewer` сам запоминает найденное имя — здесь важен сам
+    // вызов, сделанный на экране, куда пришёл адрес с параметрами.
     readViewer();
     void exchangeSession().then((session) => {
       if (!session) return;
@@ -43,32 +51,25 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   // На вложенных экранах «назад» рисует сам Telegram в своей шапке — это
   // привычное место, и оно не отнимает высоту у контента. Своя кнопка в
   // вёрстке остаётся для браузера, где BackButton не существует.
+  //
+  // Вопроса «выйти?» здесь больше нет: уходить некуда — черновик заявки живёт
+  // в провайдере выше и переживает любой переход. Спрашивать осталось только
+  // при закрытии приложения, и это делает сама шторка.
   useEffect(() => {
     const back = window.Telegram?.WebApp?.BackButton;
     if (!back) return;
-    if (onTabScreen) {
+    if (onHome) {
       back.hide();
       return;
     }
-    // Кнопку рисует клиент, и она стоит рядом с закрытием приложения —
-    // промахнуться легко. С заполненной формы уходим только после вопроса.
-    const goBack = () => {
-      void askLeave().then((leave) => {
-        if (leave) router.back();
-      });
-    };
+    const goBack = () => router.back();
     back.onClick(goBack);
     back.show();
     return () => {
       back.offClick(goBack);
       back.hide();
     };
-  }, [onTabScreen, router]);
+  }, [onHome, router]);
 
-  return (
-    <>
-      {children}
-      <TabBar />
-    </>
-  );
+  return <RequestDraftProvider>{children}</RequestDraftProvider>;
 }

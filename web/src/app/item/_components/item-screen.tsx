@@ -1,14 +1,15 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ActionBar } from "@/components/layout/action-bar";
 import { PathField } from "@/components/ui/path-field";
 import { Screen } from "@/components/layout/screen";
 import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { MATERIAL_TYPE_LABEL, materialById, type Material } from "@/features/materials";
 import { topicColor } from "@/features/topics/color";
-import { requestHref, routes } from "@/config/navigation";
+import { routes } from "@/config/navigation";
 import { RESTART_HINT } from "@/config/copy";
+import { useRequestDraft } from "@/features/requests/draft-store";
 
 /**
  * Оформленный материал: кейс, инструмент или модуль.
@@ -17,10 +18,17 @@ import { RESTART_HINT } from "@/config/copy";
  * инструкция и путь к файлам. Заявка тут не главное действие, а выход на
  * случай «сам не справлюсь» или «нужна адаптация», и она уже привязана к
  * этому материалу.
+ *
+ * Кнопка внизу не открывает отдельную форму — её больше нет. Она закрепляет
+ * это решение основой заявки и возвращает на главный экран, где шторка уже
+ * развёрнута. Смысл возврата в том, что заявку и дальше можно передумать:
+ * колода под шторкой остаётся под рукой.
  */
 export function ItemScreen() {
   const id = useSearchParams().get("id") ?? "";
   const material = materialById(id);
+  const router = useRouter();
+  const { pinMaterial, setSnap } = useRequestDraft();
 
   if (!material) {
     return (
@@ -75,7 +83,11 @@ export function ItemScreen() {
       </Screen>
 
       <ActionBar
-        href={requestHref({ item: material.id })}
+        onClick={() => {
+          pinMaterial(material.id);
+          setSnap("full");
+          router.push(routes.topics);
+        }}
         label={CALL_TO_ACTION[material.type].label}
         context={{ kind: typeLabel, title: material.title, color: topicColor(material.topic) }}
         note={CALL_TO_ACTION[material.type].note}

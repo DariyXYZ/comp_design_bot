@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Chevron } from "@/components/ui/chevron";
+import { Screen } from "@/components/layout/screen";
 import { myRequestHref, routes } from "@/config/navigation";
 import { RESTART_HINT } from "@/config/copy";
 import { requestExcerpt } from "@/features/requests/excerpt";
@@ -27,6 +28,10 @@ import type { PyrusRequest } from "@/lib/server/pyrus";
  * Заявки идут через своё API, которое проверяет подпись и читает реестр формы
  * Pyrus по Telegram-id: без проверки любой запросил бы чужие заявки, а ключ
  * Pyrus в браузере жить не может.
+ *
+ * Экран вложенный: в него заходят плашкой «Профиль» из правого верхнего угла
+ * главного экрана, обратно — кнопкой «назад». Нижней панели разделов больше
+ * нет, её место занято шторкой заявки.
  */
 type State =
   | { kind: "loading" }
@@ -94,7 +99,7 @@ export function ProfileScreen() {
   const problem = sessionUser || state.kind === "ready" ? null : loginProblem(trace);
 
   return (
-    <div className="scroll">
+    <Screen title="Профиль" backHref={routes.topics}>
       <section className="profile">
         <div className="avatar" aria-hidden="true">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
@@ -259,6 +264,6 @@ export function ProfileScreen() {
           </details>
         ) : null}
       </section>
-    </div>
+    </Screen>
   );
 }

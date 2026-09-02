@@ -7,10 +7,18 @@ import { expect, test, type Page } from "@playwright/test";
  * понимали модель приложения — тема это «попросите нас», материал это «вот
  * готовое, можно повторить или забрать себе». Проверка держит формулировки,
  * потому что ломаются они молча: интерфейс работает, а смысл теряется.
+ *
+ * Со шторкой к этому добавилось второе: у заявки два слоя основы. Верхний идёт
+ * следом за колодой, нижний закрепляется руками с экрана решения. Проверяем,
+ * что закрепление доезжает до шторки и переживает переход между экранами.
  */
 
 const PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+/** Строка основы: первая — карточка колоды, вторая — закреплённое решение. */
+const originTitle = (page: Page, index: number) =>
+  page.locator(".origin-row").nth(index).locator(".origin-title");
 
 async function stubApp(page: Page) {
   await page.route("**/telegram-web-app.js", (route) => route.abort());
@@ -35,18 +43,19 @@ async function stubApp(page: Page) {
 }
 
 test.describe("входы в заявку", () => {
-  test("кнопка называет действие, а плашка — карточку, из которой заявка", async ({
+  test("кнопка называет действие, а шторка — карточку, из которой заявка", async ({
     page,
   }) => {
     await stubApp(page);
 
     await page.goto("/");
-    const topicCta = page.locator(".action-bar .btn");
-    await expect(topicCta).toHaveText("Создать задачу по теме карточки");
-    // Контекст читается первым и основным размером: подпись caption'ом
-    // серым люди не видели, и заявка уходила «непонятно про что».
-    await expect(page.locator(".action-context-kind")).toHaveText("Карточка");
-    await expect(page.locator(".action-context-title")).toHaveText("Тема physics");
+    // Шторка стоит на среднем положении: описание уже видно, поэтому кнопка
+    // предлагает отправку — и объясняет, чего для неё не хватает.
+    const send = page.locator(".sheet-foot .btn");
+    await expect(send).toHaveText("Отправить заявку");
+    await expect(send).toBeDisabled();
+    await expect(originTitle(page, 0)).toHaveText("Тема physics");
+    await expect(originTitle(page, 1)).toHaveText("по теме карточки");
 
     // Кейс: главное действие — «хочу так же», отдел повторит сделанное.
     await page.goto("/item/?id=case-vereyskaya");
@@ -60,18 +69,44 @@ test.describe("входы в заявку", () => {
     await expect(page.locator(".action-note")).toContainText("заберите файлы");
   });
 
-  test("тип материала подписан на языке заявителя, а в заявку уходит слово отдела", async ({
+  test("решение с экрана материала закрепляется в шторке и снимается оттуда же", async ({
     page,
   }) => {
     await stubApp(page);
 
-    await page.goto("/");
-    // В списке под темой — «Готовый инструмент», а не «Инструмент».
-    await expect(page.locator(".rows .tag").first()).toHaveText("Готовый инструмент");
+    await page.goto("/item/?id=tool-insolation");
+    await page.locator(".action-bar .btn").click();
 
-    // А в основе заявки, которую читает отдел, остаётся внутреннее слово:
-    // по нему исполнители ищут в реестре Pyrus.
+    // Отдельного экрана формы больше нет: кнопка возвращает на главный, где
+    // шторка уже развёрнута и знает, о чём заявка.
+    await expect(page).toHaveURL(/\/$/);
+    await expect(originTitle(page, 1)).toHaveText("IND Solar — инсоляция и КЕО");
+    // Колода едет следом: решение лежит под своей темой, и карточка под
+    // шторкой должна быть той же.
+    await expect(originTitle(page, 0)).toHaveText("Тема physics");
+
+    await page.locator(".origin-clear").click();
+    await expect(originTitle(page, 1)).toHaveText("по теме карточки");
+  });
+
+  test("тип материала подписан на языке заявителя", async ({ page }) => {
+    await stubApp(page);
+
+    await page.goto("/");
+    // В списке под колодой — «Готовый инструмент», а не «Инструмент».
+    // Внутреннее слово отдела уходит только в основу заявки (см. request.spec).
+    await expect(page.locator(".rows .tag").first()).toHaveText("Готовый инструмент");
+  });
+
+  test("прямая ссылка на заявку раскладывает основу и уводит на главный", async ({
+    page,
+  }) => {
+    await stubApp(page);
+
+    // Адрес остаётся законным входом снаружи — ссылка в тексте, сообщение
+    // бота, закладка, — но экрана за ним больше нет.
     await page.goto("/request/?item=tool-insolation");
-    await expect(page.locator(".origin-value")).toHaveText("Инструмент · IND Solar — инсоляция и КЕО");
+    await expect(page).toHaveURL(/\/$/);
+    await expect(originTitle(page, 1)).toHaveText("IND Solar — инсоляция и КЕО");
   });
 });
