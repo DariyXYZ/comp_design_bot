@@ -86,22 +86,35 @@ export default function FeedPage() {
  */
 function FeedRow({ item }: Readonly<{ item: FeedItem }>) {
   const inWork = item.status === "in_work";
+  // У задачи в работе даты нет, а слово «в работе» уже стоит в теге — вместо
+  // повтора показываем, кто ведёт. Пусто бывает и там и там: исполнитель
+  // назначен не везде, а у закрытого разом не записана дата. Пустой строки в
+  // разметке при этом быть не должно — она оставляет дырку в ряду тегов.
+  const aside = inWork ? (item.owner ? `Ведёт ${item.owner}` : "") : item.when;
   return (
     <article className="feed-card">
+      {/* Обложка — во всю ширину строки, а не в узком превью слева: это вид
+          проекта, и в колонке 96 пикселей от него оставалась бы вертикальная
+          полоска из середины кадра. Превью слева остаётся там, где обложки
+          нет, — знак скрипта в него помещается. */}
+      {item.cover ? (
+        // Обычный img, а не next/image: оптимизатор в проекте выключен
+        // (см. next.config.ts), а картинка уже сжата под этот размер.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="feed-cover" src={item.cover} alt="" loading="lazy" decoding="async" />
+      ) : null}
       <div className="feed-top">
-        <div className="row-thumb">
-          <ScriptGlyph className="glyph" />
-        </div>
+        {item.cover ? null : (
+          <div className="row-thumb">
+            <ScriptGlyph className="glyph" />
+          </div>
+        )}
         <div className="row-text">
           <div className="row-meta">
             <span className={inWork ? "tag tag-work" : "tag"}>
               {inWork ? "В работе" : "Готово"}
             </span>
-            {/* У задачи в работе даты в данных нет, а слово «в работе» уже
-                стоит в теге — вместо повтора показываем, кто ведёт. */}
-            <span className="row-dim">
-              {inWork ? (item.owner ? `Ведёт ${item.owner}` : "") : item.when}
-            </span>
+            {aside ? <span className="row-dim">{aside}</span> : null}
           </div>
           <h3>{item.title}</h3>
           <p>{item.project}</p>

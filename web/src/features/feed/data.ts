@@ -3,7 +3,10 @@
  *
  * В отличие от материалов эти строки никто не готовит руками — они приходят из
  * задач. Ценность строки — название, проект и путь к папке с файлами.
- * Содержимое выгружено из ClickUp, пути требуют сверки (см. `../materials`).
+ *
+ * Состав сверен с отделом 3 сентября 2026: в работе остались три проекта,
+ * остальное закрыто. У закрытых тогда же задач даты нет — они не были
+ * записаны, и выдумывать её здесь нельзя: строка просто покажет «Готово».
  */
 
 export type FeedItem = {
@@ -15,15 +18,59 @@ export type FeedItem = {
   owner?: string;
   files: string;
   when: string;
+  /**
+   * Обложка из папки проекта, уже сжатая и положенная в `public/feed`.
+   *
+   * Есть только у того, что в работе: именно эти строки человек читает, чтобы
+   * понять, не делают ли уже похожую задачу. У закрытых задач на её месте
+   * остаётся знак скрипта — картинку для каждой из семнадцати никто не
+   * готовил, и ставить её ради единообразия значило бы придумывать.
+   */
+  cover?: string;
 };
 
 export const FEED: readonly FeedItem[] = [
+  // ──────────────────────────────────────────────────────────────────────
+  // В работе. Пути — папки обмена с архитекторами: там лежит то, что отдел
+  // отдаёт, а не его внутренняя кухня.
+  // ──────────────────────────────────────────────────────────────────────
+  {
+    id: "f-alfa-wind",
+    title: "Расчёт ветрового комфорта",
+    project: "1-52-2025 АЛЬФА Маши Порываевой",
+    status: "in_work",
+    files: "X:\\CompDesign_Projects\\Exchange\\1-52-2025 АЛЬФА Маши Порываевой",
+    when: "",
+    cover: "/feed/alfa-poryvaevoy.jpg",
+  },
+  {
+    id: "f-bishkek-panels-dwg",
+    title: "Панели фасада: модель и выгрузка в DWG",
+    project: "1-69-2024 Western Bus Station Bishkek",
+    status: "in_work",
+    files: "X:\\CompDesign_Projects\\Exchange\\1-69-2024 Western Bus Station Bishkek",
+    when: "",
+    cover: "/feed/bishkek-panels.jpg",
+  },
+  {
+    id: "f-shenogina-louvers",
+    title: "Ламели фасада — параметрическая модель",
+    project: "1-34-2026 ФСК Шеногина Сидней",
+    status: "in_work",
+    files: "X:\\CompDesign_Projects\\Exchange\\1-34-2026 ФСК Шеногина Сидней",
+    when: "",
+    cover: "/feed/shenogina-louvers.jpg",
+  },
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Закрыто 3 сентября 2026 — то, что до этого числилось в работе. Идёт
+  // первым в «сделано»: это самое свежее из закрытого.
+  // ──────────────────────────────────────────────────────────────────────
   {
     id: "f-louvers-openings",
     title: "Логика разрывов ламелей под проёмы",
     project: "1-19-2026 МР Верейская БЦ",
-    status: "in_work",
-    owner: "Дарий",
+    status: "done",
     files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
     when: "",
   },
@@ -31,8 +78,7 @@ export const FEED: readonly FeedItem[] = [
     id: "f-louvers-complex",
     title: "Генерация ламелей сложной формы вдоль фасада",
     project: "1-19-2026 МР Верейская БЦ",
-    status: "in_work",
-    owner: "Дарий",
+    status: "done",
     files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
     when: "",
   },
@@ -40,8 +86,7 @@ export const FEED: readonly FeedItem[] = [
     id: "f-wind-testing",
     title: "Тестирование инструмента ветра в рабочих проектах",
     project: "Ветровой комфорт · IND Tools",
-    status: "in_work",
-    owner: "Дарий",
+    status: "done",
     files: "X:\\CompDesign_Projects\\Library\\wind\\Templates New",
     when: "",
   },
@@ -49,8 +94,7 @@ export const FEED: readonly FeedItem[] = [
     id: "f-insolation-calc",
     title: "Погрешность расчёта инсоляции",
     project: "Инсоляция · IND Tools",
-    status: "in_work",
-    owner: "Елена",
+    status: "done",
     files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
     when: "",
   },
@@ -58,8 +102,7 @@ export const FEED: readonly FeedItem[] = [
     id: "f-plancy-projects",
     title: "Оформление проектов в архитектуре Plancy",
     project: "Plancy Projects · IND Tools",
-    status: "in_work",
-    owner: "Дарий",
+    status: "done",
     files: "X:\\CompDesign_Projects\\Library\\plancy",
     when: "",
   },
@@ -67,8 +110,7 @@ export const FEED: readonly FeedItem[] = [
     id: "f-google-3d",
     title: "Выгрузка 3D-окружения по API из Google — проверка возможности",
     project: "Google Maps · Tools",
-    status: "in_work",
-    owner: "Пётр",
+    status: "done",
     files: "X:\\CompDesign_Projects\\Library\\tools\\google_maps",
     when: "",
   },
@@ -76,11 +118,12 @@ export const FEED: readonly FeedItem[] = [
     id: "f-landscape-tool",
     title: "Инструмент для ландшафтников — старт работ",
     project: "Ландшафтный отдел",
-    status: "in_work",
-    owner: "Пётр",
+    status: "done",
     files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\landscape",
     when: "",
   },
+
+  // ── Закрытое раньше, с датами ────────────────────────────────────────
   {
     id: "f-bishkek-cornice",
     title: "Раскладка карниза: линии реза, сгибов, отверстий, швов",
@@ -162,5 +205,3 @@ export const FEED: readonly FeedItem[] = [
     when: "11 февраля",
   },
 ];
-
-/** Вехи заявки. Порядок = порядок прохождения. */
