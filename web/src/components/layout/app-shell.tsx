@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { isSameRoute, routes } from "@/config/navigation";
+import { RequestSheet } from "@/features/requests/components/request-sheet";
 import { RequestDraftProvider } from "@/features/requests/draft-store";
 import { exchangeSession } from "@/lib/client/api";
 import { cacheViewer, initTelegramViewport, readViewer } from "@/lib/client/telegram";
@@ -20,6 +21,11 @@ import { cacheViewer, initTelegramViewport, readViewer } from "@/lib/client/tele
  * и «Профиль» уехали плашками в верхние углы главного экрана (см. `TopBar`).
  * Значит, все экраны кроме главного — вложенные, и у каждого есть «назад».
  *
+ * Шторка стоит внизу на обоих экранах выбора — на колоде и на открытом
+ * решении, — и рисуется здесь, а не внутри них: так она не перемонтируется на
+ * переходе между ними и не теряет ни высоту, ни прокрутку формы. В разделах
+ * «Задачи» и «Профиль» её нет: там ничего не выбирают.
+ *
  * Клиентский компонент — `layout.tsx` остаётся серверным и не тянет за собой
  * ничего лишнего.
  */
@@ -27,6 +33,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const pathname = usePathname();
   const router = useRouter();
   const onHome = isSameRoute(pathname, routes.topics);
+  const withSheet = onHome || isSameRoute(pathname, routes.item);
 
   useEffect(() => {
     initTelegramViewport();
@@ -71,5 +78,13 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     };
   }, [onHome, router]);
 
-  return <RequestDraftProvider>{children}</RequestDraftProvider>;
+  return (
+    <RequestDraftProvider>
+      {/* Обёртка нужна флексбоксу: экран занимает всё, что осталось от body, а
+          шторка стоит поверх и в поток не входит. Класс говорит содержимому,
+          сколько места снизу занято. */}
+      <div className={withSheet ? "app app-with-sheet" : "app"}>{children}</div>
+      {withSheet ? <RequestSheet /> : null}
+    </RequestDraftProvider>
+  );
 }

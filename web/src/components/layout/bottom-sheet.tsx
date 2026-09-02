@@ -11,13 +11,12 @@ import type { SheetSnap } from "@/features/requests/draft-store";
  * останавливаясь на подходящей теме. Отдельный маршрут формы это запрещал:
  * чтобы посмотреть соседний кейс, надо было уйти с формы.
  *
- * Три положения, а не два:
+ * Три положения:
  *
- * - `peek` — видна только шапка (основа заявки) и кнопка. Колода открыта
- *   целиком, ею удобно листать.
- * - `half` — плюс поле описания и решения по теме. Положение по умолчанию:
- *   человек должен видеть, что заявку можно начать писать прямо здесь.
- * - `full` — вся форма. Верхняя полоска колоды остаётся видна, чтобы шторка
+ * - `peek` — видна только основа заявки и кнопка. Колода открыта целиком.
+ * - `half` — плюс поле описания. Положение по умолчанию: человек должен
+ *   видеть, что заявку можно начать писать прямо здесь.
+ * - `full` — вся форма. Верхняя полоска экрана остаётся видна, чтобы шторка
  *   читалась шторкой, а не экраном.
  *
  * Высота считается замером, а не долями экрана: `peek` — это ровно шапка плюс
@@ -34,14 +33,18 @@ import type { SheetSnap } from "@/features/requests/draft-store";
 const TOP_GAP_PX = 56;
 
 /**
- * Доля экрана в среднем положении. Уточняется границами `peek` и `full`.
+ * Среднее положение: доля экрана, но не меньше, чем нужно на первое поле.
  *
- * Ровно столько, сколько нужно на основу заявки и начало описания: человек
- * должен видеть, что заявку можно писать прямо здесь, не разворачивая шторку.
- * Больше отдавать нельзя — остаток экрана занимает колода, и от него же
- * считается размер карточки.
+ * Доля намеренно маленькая. Всё, что шторка забирает сверх необходимого, —
+ * это отнятая ширина карточки: колода считает своё место от этой же величины.
  */
-const HALF_RATIO = 0.42;
+const HALF_RATIO = 0.3;
+
+/** Сколько тела шторки обязано быть видно в среднем положении: первое поле. */
+const HALF_MIN_BODY_PX = 96;
+
+/** Выше половины экрана среднее положение не поднимается ни при каком фрейме. */
+const HALF_MAX_RATIO = 0.5;
 
 /** Скорость, после которой отпускание считается броском, а не установкой. */
 const FLING_PX_PER_MS = 0.5;
@@ -49,7 +52,12 @@ const FLING_PX_PER_MS = 0.5;
 /** Люфт, в пределах которого движение по ручке ещё считается тапом. */
 const TAP_SLOP_PX = 6;
 
+/** Насколько надо потянуть тело вниз, чтобы жест перешёл к шторке. */
+const BODY_TAKEOVER_PX = 8;
+
 const ORDER: readonly SheetSnap[] = ["peek", "half", "full"];
+
+type Sizes = { peek: number; half: number; full: number };
 
 export function BottomSheet({
   snap,
@@ -82,15 +90,26 @@ export function BottomSheet({
   }, [onSnapChange]);
 
   const snapRef = useRef(snap);
+  /**
+   * Идёт ли жест прямо сейчас.
+   *
+   * Без этого флага шторку невозможно было тянуть, и это стоит помнить:
+   * высоту пересчитывает ResizeObserver, повешенный на части самой шторки, а
+   * тело меняет высоту на каждый кадр жеста. Наблюдатель тут же возвращал
+   * шторку в её положение — палец тянул, шторка отпрыгивала обратно, и
+   * двигалась она только тапами.
+   */
+  const draggingRef = useRef(false);
 
   /**
    * Высоты трёх положений в пикселях.
    *
    * `peek` — шапка с ручкой и подвал: тело при такой высоте получает ноль
    * (`flex:1; min-height:0`) и просто исчезает. `full` — по содержимому, но не
-   * выше экрана без верхней полоски.
+   * выше экрана без верхней полоски. `half` — столько, чтобы над кнопкой
+   * помещалось первое поле формы.
    */
-  const measure = useCallback(() => {
+  const measure = useCallback((): Sizes | null => {
     const sheet = sheetRef.current;
     const grab = grabRef.current;
     const head = headRef.current;
@@ -104,8 +123,12 @@ export function BottomSheet({
     const peek = grab.offsetHeight + head.offsetHeight + foot.offsetHeight + padBottom;
     const limit = Math.max(peek, window.innerHeight - TOP_GAP_PX);
     const full = Math.min(limit, peek + body.scrollHeight);
-    const half = Math.min(full, Math.max(peek, Math.round(window.innerHeight * HALF_RATIO)));
-    return { peek, half, full };
+    const half = Math.min(
+      full,
+      Math.round(window.innerHeight * HALF_MAX_RATIO),
+      Math.max(peek + HALF_MIN_BODY_PX, Math.round(window.innerHeight * HALF_RATIO)),
+    );
+    return { peek, half: Math.max(peek, half), full };
   }, []);
 
   const applySnap = useCallback(
@@ -118,7 +141,7 @@ export function BottomSheet({
       // величины запускала бы наблюдателя по кругу.
       const height = `${sizes[next]}px`;
       if (sheet.style.height !== height) sheet.style.height = height;
-      // Колода считает своё место от СРЕДНЕГО положения шторки, а не от
+      // Экран под шторкой считает своё место от её СРЕДНЕГО положения, а не от
       // нижнего. Карточка — предмет, а не карта: наполовину закрытая, она
       // теряет ровно то, ради чего её показывают (название, подсказку, срок).
       // Поэтому она умещается целиком в положении, в котором шторка стоит по
@@ -134,11 +157,14 @@ export function BottomSheet({
   }, [snap, applySnap]);
 
   // Пересчёт при смене размеров: поворот экрана, разворачивание фрейма Mini
-  // App, появление и исчезновение содержимого шторки (чипы решений, картинки,
-  // баннер ошибки). ResizeObserver — потому что содержимое меняет высоту само,
-  // без события окна.
+  // App, появление и исчезновение содержимого шторки (вторая строка основы,
+  // картинки, баннер ошибки). ResizeObserver — потому что содержимое меняет
+  // высоту само, без события окна.
   useEffect(() => {
-    const relayout = () => applySnap(snapRef.current);
+    const relayout = () => {
+      if (draggingRef.current) return;
+      applySnap(snapRef.current);
+    };
     const observer = new ResizeObserver(relayout);
     for (const el of [headRef.current, footRef.current, bodyRef.current]) {
       if (el) observer.observe(el);
@@ -160,66 +186,92 @@ export function BottomSheet({
     const sheet = sheetRef.current;
     const grab = grabRef.current;
     const head = headRef.current;
-    if (!sheet || !grab || !head) return;
+    const body = bodyRef.current;
+    if (!sheet || !grab || !head || !body) return;
 
-    let active = false;
+    let armed = false;
+    /** Жест начат с тела: перехватываем, только если прокручивать уже нечего. */
+    let fromBody = false;
+    let fromGrab = false;
     let startY = 0;
     let startH = 0;
     let lastY = 0;
     let lastT = 0;
     let velocity = 0;
     let moved = false;
-    let fromGrab = false;
-    let sizes: { peek: number; half: number; full: number } | null = null;
+    let sizes: Sizes | null = null;
+
+    function begin(clientY: number) {
+      sizes = measure();
+      if (!sizes) return false;
+      draggingRef.current = true;
+      startH = sheet!.getBoundingClientRect().height;
+      startY = clientY;
+      sheet!.classList.add("dragging");
+      return true;
+    }
 
     function onDown(e: PointerEvent) {
       if (!(e.target instanceof Node)) return;
-      // Тянуть можно за ручку и за шапку. Кнопки внутри шапки (переключение
-      // основы) должны нажиматься, поэтому жест на них не начинаем — до
-      // порога `TAP_SLOP_PX` он всё равно ничего не двигает, а после порога
-      // клик уже не сработает.
-      if (!grab!.contains(e.target) && !head!.contains(e.target)) return;
-      sizes = measure();
-      if (!sizes) return;
-      active = true;
-      moved = false;
+      const inTop = grab!.contains(e.target) || head!.contains(e.target);
+      const inBody = body!.contains(e.target);
+      if (!inTop && !inBody) return;
+      armed = true;
+      fromBody = !inTop && inBody;
       fromGrab = grab!.contains(e.target);
+      moved = false;
+      velocity = 0;
       startY = e.clientY;
       lastY = e.clientY;
       lastT = e.timeStamp;
-      velocity = 0;
-      startH = sheet!.getBoundingClientRect().height;
-      sheet!.classList.add("dragging");
+      // Жест с верхней части начинается сразу — тянуть там больше нечего.
+      // Из тела он ещё не жест: сначала это может быть прокрутка формы.
+      if (!fromBody && !begin(e.clientY)) armed = false;
     }
 
     function onMove(e: PointerEvent) {
-      if (!active || !sizes) return;
-      const dy = e.clientY - startY;
-      if (Math.abs(dy) > TAP_SLOP_PX) moved = true;
+      if (!armed) return;
+
+      if (fromBody && !draggingRef.current) {
+        // Смахнуть шторку вниз можно и с формы, но только когда прокручивать
+        // уже нечего: иначе жест отбирал бы у формы её собственный скролл.
+        if (e.clientY - startY <= BODY_TAKEOVER_PX || body!.scrollTop > 0) return;
+        if (!begin(e.clientY)) {
+          armed = false;
+          return;
+        }
+      }
+      if (!draggingRef.current || !sizes) return;
+
+      if (Math.abs(e.clientY - startY) > TAP_SLOP_PX) moved = true;
       const dt = e.timeStamp - lastT;
       if (dt > 0) velocity = (e.clientY - lastY) / dt;
       lastY = e.clientY;
       lastT = e.timeStamp;
-      // Вниз — палец идёт вниз, высота уменьшается. Границы жёсткие: тянуть
-      // шторку выше содержимого или ниже кнопки некуда.
-      const height = Math.min(sizes.full, Math.max(sizes.peek, startH - dy));
+      // Палец идёт вниз — высота уменьшается. Границы жёсткие: тянуть шторку
+      // выше содержимого или ниже кнопки некуда.
+      const height = Math.min(
+        sizes.full,
+        Math.max(sizes.peek, startH - (e.clientY - startY)),
+      );
       sheet!.style.height = `${height}px`;
     }
 
     function onUp() {
-      if (!active || !sizes) return;
-      active = false;
+      if (!armed) return;
+      armed = false;
+      if (!draggingRef.current || !sizes) return;
+      draggingRef.current = false;
       sheet!.classList.remove("dragging");
       const height = sheet!.getBoundingClientRect().height;
       const current = snapRef.current;
 
       if (!moved) {
-        // Тап по ручке — следующее положение по кругу: единственный способ
-        // узнать про шторку, не трогая её пальцем в первый раз. Тап по шапке
-        // так не работает: там живут кнопки выбора основы, и подмена их
-        // нажатия движением шторки была бы сюрпризом.
+        // Тап по ручке — переключатель, а не карусель: развёрнутая шторка
+        // уходит вниз, свёрнутая поднимается к полю описания. Три положения
+        // по кругу от одного тапа читались случайными.
         if (fromGrab) {
-          const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
+          const next: SheetSnap = current === "peek" ? "half" : "peek";
           notifyRef.current(next);
           applySnap(next);
         } else {
@@ -238,6 +290,7 @@ export function BottomSheet({
         );
         target = ORDER[index];
       } else {
+        // Медленное движение — магнит к ближайшему положению.
         target = ORDER.reduce((best, candidate) =>
           Math.abs(sizes![candidate] - height) < Math.abs(sizes![best] - height)
             ? candidate
@@ -253,6 +306,7 @@ export function BottomSheet({
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     return () => {
+      draggingRef.current = false;
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);

@@ -33,9 +33,10 @@ import type { UploadedPhoto } from "./photos";
  *
  * Основа устроена двухслойно и это главное решение всего файла. Тема идёт
  * следом за колодой: что сейчас наверху, по тому и заявка — человек листает и
- * останавливается на подходящем. Решение закрепляется явно (чипом в шторке
- * или кнопкой с экрана материала) и колоду больше не слушает: закреплённое
- * человек выбрал руками, и подменять его свайпом было бы враньём.
+ * останавливается на подходящем. Решение привязано к экрану материала: пока он
+ * открыт, заявка про это решение, ушёл назад — снова про тему. Отдельного
+ * «закрепить» нет: открыть решение и выбрать его — одно и то же действие, и
+ * разводить их значило бы просить человека подтвердить то, что он уже сделал.
  */
 
 /** Тема колоды в том объёме, в каком она нужна заявке. */
@@ -83,7 +84,11 @@ type DraftStore = {
   readInitialTopicKey: () => string | null;
   requestTopic: (key: string, title?: string) => void;
 
-  /** Закреплённое решение. `null` — заявка по теме карточки. */
+  /**
+   * Открытое решение. `null` — заявка по теме карточки.
+   *
+   * Ставит и снимает экран материала на монтировании и размонтировании.
+   */
   materialId: string | null;
   pinMaterial: (id: string | null) => void;
 
@@ -115,22 +120,10 @@ export function RequestDraftProvider({
     setFields((current) => ({ ...current, [key]: value }));
   }, []);
 
-  /**
-   * Колода сообщает, какая карточка сейчас наверху.
-   *
-   * Здесь же снимается закреплённое решение, если оно с другой темы. Свайп на
-   * соседнюю карточку — это смена предмета заявки, и оставить под ней решение
-   * от предыдущей темы значило бы отправить в отдел противоречие. Ключ тот же
-   * (колода перемонтировалась и объявила ту же тему) — ничего не трогаем.
-   */
+  /** Колода сообщает, какая карточка сейчас наверху. */
   const setTopic = useCallback((next: DraftTopic) => {
     initialTopicKey.current = next.key;
     setTopicState(next);
-    setMaterialId((current) => {
-      if (!current) return current;
-      const material = materialById(current);
-      return material && material.topic !== next.key ? null : current;
-    });
   }, []);
 
   const readInitialTopicKey = useCallback(() => initialTopicKey.current, []);
@@ -165,22 +158,17 @@ export function RequestDraftProvider({
   }, []);
 
   /**
-   * Закрепляет решение как основу заявки.
+   * Делает открытое решение основой заявки.
    *
-   * Колода едет следом: решение живёт под своей темой, и если закрепили его с
-   * экрана материала другой темы, карточка под шторкой должна стать той же.
-   * Название темы придёт от колоды, когда та смонтируется, — оно приходит из
-   * Supabase, а здесь его взять негде.
+   * Колода едет следом: решение живёт под своей темой, и если его открыли по
+   * прямой ссылке, вернуться человек должен на ту карточку, под которой оно
+   * лежит, а не на первую.
    */
   const pinMaterial = useCallback((id: string | null) => {
     setMaterialId(id);
     if (!id) return;
     const material = materialById(id);
-    if (!material) return;
-    initialTopicKey.current = material.topic;
-    setTopicState((current) =>
-      current?.key === material.topic ? current : { key: material.topic, title: "" },
-    );
+    if (material) initialTopicKey.current = material.topic;
   }, []);
 
   const reset = useCallback(() => {

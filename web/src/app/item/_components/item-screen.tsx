@@ -1,12 +1,11 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { ActionBar } from "@/components/layout/action-bar";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { PathField } from "@/components/ui/path-field";
 import { Screen } from "@/components/layout/screen";
 import { ScriptGlyph } from "@/components/ui/script-glyph";
 import { MATERIAL_TYPE_LABEL, materialById, type Material } from "@/features/materials";
-import { topicColor } from "@/features/topics/color";
 import { routes } from "@/config/navigation";
 import { RESTART_HINT } from "@/config/copy";
 import { useRequestDraft } from "@/features/requests/draft-store";
@@ -16,19 +15,27 @@ import { useRequestDraft } from "@/features/requests/draft-store";
  *
  * Экран сделан так, чтобы человек мог применить решение сам — демо, короткая
  * инструкция и путь к файлам. Заявка тут не главное действие, а выход на
- * случай «сам не справлюсь» или «нужна адаптация», и она уже привязана к
- * этому материалу.
+ * случай «сам не справлюсь» или «нужна адаптация».
  *
- * Кнопка внизу не открывает отдельную форму — её больше нет. Она закрепляет
- * это решение основой заявки и возвращает на главный экран, где шторка уже
- * развёрнута. Смысл возврата в том, что заявку и дальше можно передумать:
- * колода под шторкой остаётся под рукой.
+ * Своей кнопки заявки у экрана нет. Внизу стоит та же шторка, что и на колоде,
+ * и открытое решение само становится основой заявки — оно названо второй
+ * строкой в её шапке. Отдельная кнопка «создать заявку по этому решению»
+ * означала бы второй способ сделать то, что уже сделано открытием экрана.
+ *
+ * Основа держится, пока экран открыт: уход назад к колоде её снимает, потому
+ * что заявка снова становится заявкой по теме.
  */
 export function ItemScreen() {
   const id = useSearchParams().get("id") ?? "";
   const material = materialById(id);
-  const router = useRouter();
-  const { pinMaterial, setSnap } = useRequestDraft();
+  const { pinMaterial } = useRequestDraft();
+  const materialId = material?.id ?? null;
+
+  useEffect(() => {
+    if (!materialId) return;
+    pinMaterial(materialId);
+    return () => pinMaterial(null);
+  }, [materialId, pinMaterial]);
 
   if (!material) {
     return (
@@ -43,82 +50,62 @@ export function ItemScreen() {
   const typeLabel = MATERIAL_TYPE_LABEL[material.type];
 
   return (
-    <>
-      <Screen
-        title={material.title}
-        subtitle={`${typeLabel} · обновлён ${material.updated}`}
-        backHref={routes.topics}
-      >
-        <div className="media-slot">
-          <ScriptGlyph className="glyph glyph-lg" />
-          <span>{material.media}</span>
+    <Screen
+      title={material.title}
+      subtitle={`${typeLabel} · обновлён ${material.updated}`}
+      backHref={routes.topics}
+    >
+      <div className="media-slot">
+        <ScriptGlyph className="glyph glyph-lg" />
+        <span>{material.media}</span>
+      </div>
+
+      <p className="lead">{material.summary}</p>
+
+      {material.project ? (
+        <div className="fact">
+          <span className="fact-key">Где применялось</span>
+          <span className="fact-value">{material.project}</span>
         </div>
+      ) : null}
 
-        <p className="lead">{material.summary}</p>
+      <section className="section">
+        <div className="section-head">
+          <h2>Как применить</h2>
+        </div>
+        <ol className="steps">
+          {material.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </section>
 
-        {material.project ? (
-          <div className="fact">
-            <span className="fact-key">Где применялось</span>
-            <span className="fact-value">{material.project}</span>
-          </div>
-        ) : null}
-
-        <section className="section">
-          <div className="section-head">
-            <h2>Как применить</h2>
-          </div>
-          <ol className="steps">
-            {material.steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="section">
-          <div className="section-head">
-            <h2>Файлы</h2>
-          </div>
-          <PathField path={material.files} />
-        </section>
-      </Screen>
-
-      <ActionBar
-        onClick={() => {
-          pinMaterial(material.id);
-          setSnap("full");
-          router.push(routes.topics);
-        }}
-        label={CALL_TO_ACTION[material.type].label}
-        context={{ kind: typeLabel, title: material.title, color: topicColor(material.topic) }}
-        note={CALL_TO_ACTION[material.type].note}
-      />
-    </>
+      <section className="section">
+        <div className="section-head">
+          <h2>Файлы</h2>
+        </div>
+        <PathField path={material.files} />
+        {/* Подпись стоит у файлов, а не под кнопкой заявки: она про них и
+            говорит. У инструмента и модуля это главная альтернатива заявке —
+            ради неё материалы и оформляют. */}
+        <p className="section-note" style={{ margin: "var(--s3) 0 0" }}>
+          {SELF_SERVICE[material.type]}
+        </p>
+      </section>
+    </Screen>
   );
 }
 
 /**
- * Что написано на кнопке заявки.
+ * Что человек может сделать с материалом сам, не обращаясь в отдел.
  *
- * Раньше везде стояло «Создать заявку» — и на теме, и на материале. Два
- * разных действия выглядели одним, а разница («что уйдёт в заявку») жила в
- * подписи под кнопкой, в самом тихом месте экрана. Люди не понимали модель
- * приложения именно из-за этого, а не из-за отсутствия онбординга.
- *
- * Теперь кнопка называет действие, а подпись говорит про альтернативу:
- * у инструмента и модуля она напоминает, что можно забрать файлы и сделать
- * самому — ради этого материалы и оформляют.
+ * Раньше эти фразы стояли подписью под кнопкой заявки — в самом тихом месте
+ * экрана и далеко от файлов, о которых говорят. Кнопки больше нет (заявка
+ * лежит в шторке внизу и уже знает про это решение), а подпись переехала туда,
+ * где она осмысленна.
  */
-const CALL_TO_ACTION: Record<Material["type"], { label: string; note: string }> = {
-  case: {
-    label: "Хочу так же",
-    note: "Ссылка на этот кейс уйдёт в заявку",
-  },
-  tool: {
-    label: "Настроить под мой проект",
-    note: "Или заберите файлы выше и примените сами",
-  },
-  module: {
-    label: "Помочь с этим скриптом",
-    note: "Или заберите файлы выше и вставьте в своё определение",
-  },
+const SELF_SERVICE: Record<Material["type"], string> = {
+  case: "Заявка внизу уже привязана к этому кейсу — опишите, что нужно повторить.",
+  tool: "Заберите файлы и примените сами — или опишите задачу в заявке внизу, отдел настроит под ваш проект.",
+  module: "Заберите файлы и вставьте в своё определение — или опишите задачу в заявке внизу.",
 };

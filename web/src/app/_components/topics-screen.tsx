@@ -2,7 +2,6 @@
 
 import { useCallback } from "react";
 import { TopBar } from "@/components/layout/top-bar";
-import { RequestSheet } from "@/features/requests/components/request-sheet";
 import { useRequestDraft } from "@/features/requests/draft-store";
 import { MaterialRow, materialsByTopic } from "@/features/materials";
 import type { Case } from "../_lib/deck-math";
@@ -36,8 +35,7 @@ export function TopicsScreen() {
   const materials = topic ? materialsByTopic(topic.key) : [];
 
   return (
-    <>
-      <main className="stage">
+    <main className="stage">
         <TopBar />
         <div className="scroll">
           <CaseDeck
@@ -79,11 +77,8 @@ export function TopicsScreen() {
                 </p>
               </div>
             ) : null}
-          </section>
-        </div>
-      </main>
-
-      <RequestSheet />
-    </>
+        </section>
+      </div>
+    </main>
   );
 }

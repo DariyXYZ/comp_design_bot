@@ -1,11 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
-import { Chevron } from "@/components/ui/chevron";
 import { RESTART_HINT } from "@/config/copy";
-import { itemHref } from "@/config/navigation";
 import { MATERIAL_TYPE_FORMAL, materialById } from "@/features/materials";
 import { topicColor } from "@/features/topics/color";
 import { useRequestDraft } from "../draft-store";
@@ -18,12 +15,15 @@ import { submitRequest } from "../submit";
  * Строение повторяет лист заказа в такси, и не ради сходства: там решена та же
  * задача — оформить заказ, не теряя из виду то, из чего выбираешь.
  *
- * - Шапка отвечает на вопрос «о чём заявка»: карточка колоды и, если выбрано,
- *   конкретное решение. Это адресные строки «откуда — куда».
+ * - Шапка отвечает на вопрос «о чём заявка». Строка карточки есть всегда и
+ *   идёт следом за колодой. Строка решения появляется только когда решение
+ *   открыто: на экране материала. Пока человек листает колоду, писать «решение
+ *   не выбрано» незачем — это половина высоты свёрнутой шторки, потраченная на
+ *   отсутствие факта.
  * - Тело — поля заявки, и больше ничего. Выбор предмета заявки живёт снаружи,
- *   на «карте»: карточку выбирают свайпом колоды, решение — тапом по строке
- *   в списке под ней. Дублировать этот выбор внутри шторки значило бы завести
- *   два способа делать одно и то же.
+ *   на «карте»: карточку выбирают свайпом колоды, решение — открыв его из
+ *   списка под колодой. Дублировать этот выбор внутри шторки значило бы
+ *   завести два способа делать одно и то же.
  * - Подвал — кнопка заказа. Она на месте всегда, при любой высоте шторки.
  *
  * Максимум шести картинок — не каприз: `sendData` ограничен четырьмя
@@ -41,7 +41,6 @@ export function RequestSheet() {
     removePhoto,
     topic,
     materialId,
-    pinMaterial,
     snap,
     setSnap,
     filled,
@@ -152,6 +151,11 @@ export function RequestSheet() {
       label="Заявка в отдел"
       head={
         <div className="sheet-origin">
+          {/* Тему называем только когда знаем её название. По прямой ссылке на
+              решение колода ещё не загружалась, и звать листать её на экране,
+              где её нет, — враньё; решение в такой ситуации и так полностью
+              определяет заявку. */}
+          {topic?.title || !material ? (
           <button
             type="button"
             className="origin-row"
@@ -168,33 +172,22 @@ export function RequestSheet() {
                 {topic?.title || "листайте колоду"}
               </span>
             </span>
-            <span className="origin-aside">свайп</span>
+            {material ? null : <span className="origin-aside">свайп</span>}
           </button>
+          ) : null}
 
-          {/* Не кнопка: решение выбирают в списке под колодой, а здесь видно,
-              что именно выбрано. Единственное действие — снять выбор, и оно
-              появляется только когда снимать есть что. */}
-          <div className="origin-row">
-            <span className="origin-mark" aria-hidden="true" />
-            <span className="origin-body">
-              <span className="origin-label">Решение</span>
-              <span className="origin-title">
-                {material ? material.title : "по теме карточки"}
+          {/* Появляется вместе с открытым решением и исчезает вместе с ним.
+              Не кнопка: решение выбирают снаружи — открывают его из списка под
+              колодой, — а здесь оно только названо. */}
+          {material ? (
+            <div className="origin-row">
+              <span className="origin-mark" aria-hidden="true" />
+              <span className="origin-body">
+                <span className="origin-label">Решение</span>
+                <span className="origin-title">{material.title}</span>
               </span>
-            </span>
-            {material ? (
-              <button
-                type="button"
-                className="origin-clear"
-                onClick={() => pinMaterial(null)}
-                aria-label="Убрать решение из заявки"
-              >
-                ×
-              </button>
-            ) : (
-              <span className="origin-aside origin-aside-quiet">из списка</span>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
       }
       foot={
@@ -239,13 +232,6 @@ export function RequestSheet() {
           пол-экрана, и поле, набранное в среднем положении, оказалось бы под
           ней. */}
       <div className="sheet-form" onFocusCapture={() => setSnap("full")}>
-        {material ? (
-          <Link href={itemHref(material.id)} className="row-action">
-            <span>Открыть решение целиком</span>
-            <Chevron />
-          </Link>
-        ) : null}
-
         {/* Описание идёт первым: в среднем положении шторки видно начало тела,
             и там должно лежать то, без чего заявку не отправить. */}
         <label className="field">
