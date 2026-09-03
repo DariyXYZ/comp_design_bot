@@ -4,9 +4,12 @@
  * В отличие от материалов эти строки никто не готовит руками — они приходят из
  * задач. Ценность строки — название, проект и путь к папке с файлами.
  *
- * Состав сверен с отделом 3 сентября 2026: в работе остались три проекта,
+ * Состав сверен с отделом 3 сентября 2026: в работе остались два проекта,
  * остальное закрыто. У закрытых тогда же задач даты нет — они не были
  * записаны, и выдумывать её здесь нельзя: строка просто покажет «Готово».
+ *
+ * Пути сверены с диском. Те, чьи папки не нашлись, оставлены как были и ждут
+ * сверки: ЦентрЛаб, Plancy, Google Maps, ландшафтный инструмент.
  */
 
 export type FeedItem = {
@@ -21,10 +24,9 @@ export type FeedItem = {
   /**
    * Обложка из папки проекта, уже сжатая и положенная в `public/feed`.
    *
-   * Есть только у того, что в работе: именно эти строки человек читает, чтобы
-   * понять, не делают ли уже похожую задачу. У закрытых задач на её месте
-   * остаётся знак скрипта — картинку для каждой из семнадцати никто не
-   * готовил, и ставить её ради единообразия значило бы придумывать.
+   * Есть там, где превью в папке проекта нашлось. У остальных на её месте
+   * остаётся знак скрипта: картинку для каждой строки никто не готовил, и
+   * ставить её ради единообразия значило бы придумывать.
    */
   cover?: string;
 };
@@ -32,7 +34,8 @@ export type FeedItem = {
 export const FEED: readonly FeedItem[] = [
   // ──────────────────────────────────────────────────────────────────────
   // В работе. Пути — папки обмена с архитекторами: там лежит то, что отдел
-  // отдаёт, а не его внутренняя кухня.
+  // отдаёт, а не его внутренняя кухня. Бишкек отсюда уехал 3 сентября: панели
+  // сданы, и проект переехал в готовые кейсы (см. `case-bishkek-panels`).
   // ──────────────────────────────────────────────────────────────────────
   {
     id: "f-alfa-wind",
@@ -42,15 +45,6 @@ export const FEED: readonly FeedItem[] = [
     files: "X:\\CompDesign_Projects\\Exchange\\1-52-2025 АЛЬФА Маши Порываевой",
     when: "",
     cover: "/feed/alfa-poryvaevoy.jpg",
-  },
-  {
-    id: "f-bishkek-panels-dwg",
-    title: "Панели фасада: модель и выгрузка в DWG",
-    project: "1-69-2024 Western Bus Station Bishkek",
-    status: "in_work",
-    files: "X:\\CompDesign_Projects\\Exchange\\1-69-2024 Western Bus Station Bishkek",
-    when: "",
-    cover: "/feed/bishkek-panels.jpg",
   },
   {
     id: "f-shenogina-louvers",
@@ -67,11 +61,20 @@ export const FEED: readonly FeedItem[] = [
   // первым в «сделано»: это самое свежее из закрытого.
   // ──────────────────────────────────────────────────────────────────────
   {
+    id: "f-bishkek-panels-dwg",
+    title: "Панели фасада: модель и выгрузка в DWG",
+    project: "1-69-2024 Western Bus Station Bishkek",
+    status: "done",
+    files: "X:\\CompDesign_Projects\\Exchange\\1-69-2024 Western Bus Station Bishkek",
+    when: "3 сентября",
+    cover: "/feed/bishkek-panels.jpg",
+  },
+  {
     id: "f-louvers-openings",
     title: "Логика разрывов ламелей под проёмы",
     project: "1-19-2026 МР Верейская БЦ",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2026\\1-19-2026 МР Верейская БЦ",
     when: "",
   },
   {
@@ -79,7 +82,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Генерация ламелей сложной формы вдоль фасада",
     project: "1-19-2026 МР Верейская БЦ",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2026\\1-19-2026 МР Верейская БЦ",
     when: "",
   },
   {
@@ -95,7 +98,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Погрешность расчёта инсоляции",
     project: "Инсоляция · IND Tools",
     status: "done",
-    files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
+    files: "X:\\CompDesign_Projects\\Library\\insolation_beta",
     when: "",
   },
   {
@@ -129,7 +132,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Раскладка карниза: линии реза, сгибов, отверстий, швов",
     project: "1-69-2024 Western Bus Station Bishkek",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-69-2024\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2024\\1-69-2024 Western Bus Station Bishkek",
     when: "19 августа",
   },
   {
@@ -137,7 +140,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Подготовка развёрток к мокапу",
     project: "1-69-2024 Western Bus Station Bishkek",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-69-2024\\mockup",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2024\\1-69-2024 Western Bus Station Bishkek",
     when: "19 августа",
   },
   {
@@ -145,7 +148,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Передача панелей в Revit через Rhino.Inside",
     project: "1-76-2025 ФСК Измайлово БЦ",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-76-2025\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2025\\1-76-2025 ФСК Измайлово БЦ",
     when: "10 августа",
   },
   {
@@ -153,7 +156,7 @@ export const FEED: readonly FeedItem[] = [
     title: "8 вариантов паттернов фасада",
     project: "1-19-2026 МР Верейская БЦ",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-19-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2026\\1-19-2026 МР Верейская БЦ",
     when: "24 июня",
   },
   {
@@ -161,7 +164,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Скрипт стержневого моделинга из блоков",
     project: "1-24-2026 MR Мосфильмовская ЖК",
     status: "done",
-    files: "X:\\CompDesign_Projects\\1-24-2026\\gh",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\01_Architecture\\2026\\1-24-2026 MR Мосфильмовская ЖК",
     when: "24 июня",
   },
   {
@@ -169,7 +172,7 @@ export const FEED: readonly FeedItem[] = [
     title: "GhCrowdFlow — публикация в Yak и интеграция в INDTools",
     project: "Пешеходные потоки · Tools",
     status: "done",
-    files: "X:\\CompDesign_Projects\\Library\\tools\\crowdflow",
+    files: "X:\\CompDesign_Projects\\Library\\crowd_flow",
     when: "24 июня",
   },
   {
@@ -193,7 +196,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Алгоритм бетонных слоёных чаш",
     project: "Ландшафтный отдел",
     status: "done",
-    files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\concrete_bowls",
+    files: "X:\\CompDesign_Projects\\Work\\PROJECTS\\AlgorithmicModeling\\02_LandscapeArchitecture\\1-8-2025 Sarabi Residential Al Satwa\\concrete_bowls",
     when: "6 марта",
   },
   {
@@ -201,7 +204,7 @@ export const FEED: readonly FeedItem[] = [
     title: "Оформление solar_envelope для архитекторов",
     project: "Инсоляция · IND Tools",
     status: "done",
-    files: "X:\\CompDesign_Projects\\Library\\tools\\insolation",
+    files: "X:\\CompDesign_Projects\\Library\\insolation_beta",
     when: "11 февраля",
   },
 ];
