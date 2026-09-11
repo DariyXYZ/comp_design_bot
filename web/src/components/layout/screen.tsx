@@ -14,11 +14,13 @@ export function Screen({
   title,
   subtitle,
   backHref,
+  action,
   children,
 }: Readonly<{
   title: string;
   subtitle?: string;
   backHref: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }>) {
   return (
@@ -29,6 +31,7 @@ export function Screen({
           <h1>{title}</h1>
           {subtitle ? <p>{subtitle}</p> : null}
         </div>
+        {action ? <div className="screen-action">{action}</div> : null}
       </div>
       <div className="scroll">{children}</div>
     </>

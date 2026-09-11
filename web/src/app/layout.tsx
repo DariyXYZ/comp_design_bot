@@ -40,7 +40,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ru" className={golos.variable}>
+    <html lang="ru" className={golos.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `try{var theme=localStorage.getItem("comp-design-bot:theme");if(theme==="light"||theme==="dark")document.documentElement.dataset.theme=theme}catch{}` }} />
+      </head>
       <body>
         {/* beforeInteractive — SDK Telegram обязан существовать до гидратации:
             дека читает window.Telegram.WebApp сразу на маунте, а без него

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Chevron } from "@/components/ui/chevron";
 import { Screen } from "@/components/layout/screen";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { myRequestHref, routes } from "@/config/navigation";
 import { RESTART_HINT } from "@/config/copy";
 import { requestExcerpt } from "@/features/requests/excerpt";
@@ -99,7 +100,7 @@ export function ProfileScreen() {
   const problem = sessionUser || state.kind === "ready" ? null : loginProblem(trace);
 
   return (
-    <Screen title="Профиль" backHref={routes.topics}>
+    <Screen title="Профиль" subtitle="Заявки и обратная связь" backHref={routes.topics} action={<ThemeToggle />}>
       <section className="profile">
         <div className="avatar" aria-hidden="true">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
