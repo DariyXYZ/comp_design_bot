@@ -86,23 +86,6 @@ export const MATERIALS: readonly Material[] = [
   // physics — «Нужно просчитать физику проекта»: инструменты и кейсы расчётов.
   // ──────────────────────────────────────────────────────────────────────
   {
-    id: "case-alfa-tent",
-    topic: "physics",
-    type: "case",
-    title: "АЛЬФА Маши Порываевой — тентовая конструкция двора",
-    summary: "Создание тентовой конструкции для защиты двора от ветра и осадков. Проект в работе.",
-    project: "1-52-2025 АЛЬФА Маши Порываевой",
-    media: "Модель тентовой конструкции во дворе",
-    steps: [
-      "Открыть папку «Тент» в папке проекта",
-      "Посмотреть модель «Модель с крышей.3dm» и определение «тентовая симуляция.gh»",
-      "Для похожей задачи описать двор и требования к защите от ветра и осадков в заявке ниже",
-    ],
-    files: "X:\\CompDesign_Projects\\Exchange\\1-52-2025 АЛЬФА Маши Порываевой",
-    updated: "11 сентября",
-    cover: "/materials/alfa-poryvaevoy-tent.png",
-  },
-  {
     id: "tool-insolation",
     topic: "physics",
     type: "tool",
@@ -166,6 +149,23 @@ export const MATERIALS: readonly Material[] = [
     files: "X:\\CompDesign_Projects\\Library\\gh_definitions\\remesh_wip",
     updated: "30 марта",
     cover: "/materials/remesh-wip.jpg",
+  },
+  {
+    id: "case-alfa-tent",
+    topic: "physics",
+    type: "case",
+    title: "АЛЬФА Маши Порываевой — тентовая конструкция двора",
+    summary: "Создание тентовой конструкции для защиты двора от ветра и осадков. Проект в работе.",
+    project: "1-52-2025 АЛЬФА Маши Порываевой",
+    media: "Модель тентовой конструкции во дворе",
+    steps: [
+      "Открыть папку «Тент» в папке проекта",
+      "Посмотреть модель «Модель с крышей.3dm» и определение «тентовая симуляция.gh»",
+      "Для похожей задачи описать двор и требования к защите от ветра и осадков в заявке ниже",
+    ],
+    files: "X:\\CompDesign_Projects\\Exchange\\1-52-2025 АЛЬФА Маши Порываевой",
+    updated: "11 сентября",
+    cover: "/materials/alfa-poryvaevoy-tent.png",
   },
   {
     id: "case-shelepiha-wind",

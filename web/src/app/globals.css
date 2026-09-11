@@ -357,6 +357,7 @@ body{
 /* --r0, а не --r2: строка скруглена на --r3 и отбивает превью на --s3.
    16 − 12 = 4, и дуга превью концентрична дуге строки. */
 .row-thumb{
+  position:relative;
   flex:0 0 96px;align-self:stretch;min-height:96px;
   border-radius:var(--r0);
   background:var(--pill);border:1px solid var(--line);
@@ -375,7 +376,7 @@ body{
 
 /* Превью решения в строке списка. Заполняет колонку целиком: вписанная
    картинка оставляла бы поля разной величины в каждой строке. */
-.thumb-cover{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 
 /* Условное обозначение скрипта на месте отсутствующей картинки.
    Белый в обеих темах, а не цвет текста: знак лежит поверх подложки превью и
@@ -534,13 +535,9 @@ body{
 .screen-titles p{font-size:var(--t-caption);color:var(--sub);margin-top:3px}
 .screen-top + .scroll{padding-top:var(--s4)}
 
-/* Превью решения на его экране. Вписано целиком, а не обрезано: в списке важна
-   ровная колонка, а здесь — увидеть решение, и срезанная треть кадра этому
-   мешает. Подложка остаётся видна по бокам — она же и рамка блока. */
-/* Подложка белая в обеих темах: превью в папках отдела сняты на белом, и серая
-   подложка вокруг них читалась бы как рамка вокруг рамки. */
-.media-slot-cover{padding:0;overflow:hidden;background:#ffffff}
-.media-cover{width:100%;height:100%;object-fit:contain;display:block}
+/* Обложка занимает всю ширину; высота фрейма следует пропорциям изображения. */
+.media-slot.media-slot-cover{display:block;aspect-ratio:auto;padding:0;overflow:hidden;background:transparent}
+.media-cover{width:100%;height:auto;display:block}
 
 /* Место демо-гифки, когда превью в папке нет: знак скрипта и подпись. */
 .media-slot{
