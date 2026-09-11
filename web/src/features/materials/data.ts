@@ -100,6 +100,7 @@ export const MATERIALS: readonly Material[] = [
     ],
     files: "X:\\CompDesign_Projects\\Library\\insolation_beta",
     updated: "11 февраля",
+    cover: "/materials/tool-insolation.jpg",
   },
   {
     id: "tool-wind",
@@ -116,6 +117,7 @@ export const MATERIALS: readonly Material[] = [
     ],
     files: "X:\\CompDesign_Projects\\Library\\wind\\Templates New",
     updated: "9 апреля",
+    cover: "/materials/tool-wind.gif",
   },
   {
     id: "tool-crowdflow",
@@ -132,6 +134,7 @@ export const MATERIALS: readonly Material[] = [
     ],
     files: "X:\\CompDesign_Projects\\Library\\crowd_flow",
     updated: "24 июня",
+    cover: "/materials/tool-crowdflow.gif",
   },
   {
     id: "module-remesh-wip",
