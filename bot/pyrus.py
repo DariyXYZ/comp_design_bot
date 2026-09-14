@@ -363,28 +363,26 @@ class Pyrus:
             return False
         log.info("Pyrus: задача %s закрыта", task_id)
         return True
-    async def update_fields(
-        self, task_id: int, values: dict[str, object], form_id: int, note: str = ""
+    async def close_with_fields(
+        self, task_id: int, values: dict[str, object], form_id: int, note: str
     ) -> bool:
-        """Меняет поля задачи комментарием с `field_updates`, не закрывая её.
+        """Закрывает задачу и тем же комментарием меняет поля (`field_updates`).
 
-        Нужно доске отдела: закрыть задачу там бот не может — у формы есть
-        этап утверждения, и закрытие Pyrus отдаёт только утверждающему
-        (`access_denied_close_task`). Зато колонки канбана идут по полю
-        «Статус», и его бот менять вправе: заявка уезжает в «Выполнено»,
-        а закрывает её руководитель сам.
+        Нужно доске отдела: колонки канбана идут по полю «Статус», и просто
+        закрытая задача осталась бы в «Новая задача». Закрытие требует прав
+        администратора формы у аккаунта бота — иначе Pyrus отвечает
+        `access_denied_close_task`, и тогда не применяется и статус: запрос
+        отклоняется целиком.
         """
         updates = await self._field_values(values, form_id)
-        if not updates:
-            return False
-        payload: dict[str, object] = {"field_updates": updates}
-        if note:
-            payload["text"] = note
+        payload: dict[str, object] = {"text": note, "action": "finished"}
+        if updates:
+            payload["field_updates"] = updates
         result = await self._call(f"/tasks/{task_id}/comments", payload)
         if result is None:
-            log.warning("Pyrus: не удалось обновить поля задачи %s", task_id)
+            log.warning("Pyrus: не удалось закрыть задачу %s", task_id)
             return False
-        log.info("Pyrus: задача %s — поля обновлены: %s", task_id, list(values))
+        log.info("Pyrus: задача %s закрыта, поля: %s", task_id, list(values))
         return True
 
     async def create_text_task(self, text: str) -> int | None:
@@ -497,16 +495,13 @@ async def close_task(task_id: int, note: str) -> bool:
         return False
 
 async def close_board_task(task_id: int, note: str) -> bool:
-    """«Закрытие» копии на доске отдела = перевод «Статуса» в «Выполнено».
-
-    Настоящее закрытие боту недоступно: у доски этап утверждения, закрывает
-    только утверждающий (руководитель отдела). Перевод статуса двигает
-    карточку в последнюю колонку канбана — этого отделу и нужно; закрыть
-    руководитель может сам. Никогда не бросает."""
+    """Закрывает копию на доске отдела и переводит «Статус» в «Выполнено» —
+    иначе закрытая карточка осталась бы в первой колонке канбана. Аккаунт
+    бота должен быть администратором формы доски. Никогда не бросает."""
     if not pyrus.enabled or not task_id or not config.pyrus_board_id:
         return False
     try:
-        return await pyrus.update_fields(
+        return await pyrus.close_with_fields(
             task_id, {BOARD_STATUS: BOARD_STATUS_DONE}, config.pyrus_board_id, note
         )
     except Exception:  # noqa: BLE001 — см. docstring
