@@ -156,13 +156,18 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
         # незакрытая задача висит в списках и портит отчёты. Промежуточные
         # статусы туда не уходят — второй источник правды никому не нужен.
         # Ошибки Pyrus гасятся внутри: в чате заявка уже переведена.
-        if new_status in ("done", "rejected") and req.get("pyrus_task_id"):
+        if new_status in ("done", "rejected"):
             if new_status == "done":
                 actor = req.get("finished_by_name")
                 note = f"Готово (завершил: {actor})" if actor else "Готово"
             else:
                 note = "Отклонена в чате отдела"
-            await pyrus.close_task(req["pyrus_task_id"], note)
+            # И реестр, и доска: копия на доске живёт своей жизнью, и
+            # незакрытая она висела бы в «активных» у всего отдела.
+            if req.get("pyrus_task_id"):
+                await pyrus.close_task(req["pyrus_task_id"], note)
+            if req.get("pyrus_board_task_id"):
+                await pyrus.close_board_task(req["pyrus_board_task_id"], note)
 
         # Перерисовываем тем же рендерером, что и при создании — никакой строковой
         # хирургии. Способ редактирования зависит от того, каким сообщением

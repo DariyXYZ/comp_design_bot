@@ -17,6 +17,12 @@
   и тогда заявки начали бы уезжать в чужие поля молча. Названия при этом
   видны человеку в конструкторе, поэтому расхождение сразу заметно. Схема
   формы читается один раз и кэшируется на время жизни процесса.
+* **Заявка уходит в две формы сразу.** Реестр заявок (`PYRUS_FORM_ID`) —
+  мастер: только там есть «Telegram ID», по которому личный кабинет отбирает
+  заявки человека. Доска отдела (`PYRUS_BOARD_ID`) — зеркало: её видит весь
+  отдел, но полей под тему, срок и Telegram ID у неё нет, поэтому всё
+  складывается в «Описание задачи» текстом. Зеркало необязательно и никогда не
+  ломает основную заявку: не создалось — ушло в лог, и только.
 """
 from __future__ import annotations
 
@@ -47,6 +53,36 @@ FIELD_AUTHOR = "Автор в Telegram"
 FIELD_TG_ID = "Telegram ID"
 FIELD_REQUEST_NO = "Номер заявки в боте"
 
+# Названия полей доски «Вычислительное Проектирование задачи». Доска плоская:
+# ни темы, ни срока, ни Telegram ID у неё нет — всё, что не влезло в отдельные
+# поля, уходит текстом в «Описание задачи» (см. board_description).
+BOARD_DESCRIPTION = "Описание задачи"
+BOARD_PATH = "Путь к проекту"
+BOARD_TELEGRAM = "Telegram"
+BOARD_STATUS = "Статус"
+
+# Статус, с которым задача появляется на доске. Дальше её ведёт отдел руками:
+# промежуточные статусы бот не трогает, у него свои — в чате.
+BOARD_STATUS_NEW = "Новая задача"
+BOARD_STATUS_DONE = "Выполнено"
+
+def _flatten(fields: list[dict]) -> list[dict]:
+    """Поля формы одним списком, включая вложенные в разделы.
+
+    На доске отдела поля лежат внутри разделов («Инфо», «Задача») — Pyrus
+    отдаёт их как `info.fields` поля типа `title`, и плоский обход их не
+    видит: «Описание задачи» тогда просто «нет в форме». Заполняются такие
+    поля обычным `id`, как и верхнеуровневые.
+    """
+    flat: list[dict] = []
+    for field in fields:
+        flat.append(field)
+        nested = (field.get("info") or {}).get("fields") or []
+        if nested:
+            flat.extend(_flatten(nested))
+    return flat
+
+
 class Pyrus:
     """Минимальный клиент: авторизация, схема формы, создание задачи."""
 
@@ -56,11 +92,14 @@ class Pyrus:
         # Один лок на авторизацию: две одновременные заявки не должны
         # логиниться дважды и гасить токен друг друга.
         self._auth_lock = asyncio.Lock()
-        # Схема формы: {название поля: id} и {название темы: choice_id}.
-        self._fields: dict[str, int] | None = None
-        # «название поля» → «подпись варианта» → choice_id. Плоского словаря
-        # мало: одна и та же подпись может встретиться в двух полях выбора.
-        self._choices: dict[str, dict[str, int]] = {}
+        # Схемы форм: {form_id: {название поля: id}}. По форме, а не одна на
+        # клиент — заявка уходит и в реестр, и на доску отдела, а поля у них
+        # разные, и общий кэш перетирал бы одну схему другой.
+        self._fields: dict[int, dict[str, int]] = {}
+        # {form_id: {«название поля» → {«подпись варианта» → choice_id}}}.
+        # Плоского словаря мало: одна и та же подпись может встретиться в двух
+        # полях выбора.
+        self._choices: dict[int, dict[str, dict[str, int]]] = {}
 
     @property
     def enabled(self) -> bool:
@@ -108,14 +147,18 @@ class Pyrus:
                     return None
         return None
 
-    async def _schema(self) -> dict[str, int]:
+    async def _schema(self, form_id: int | None = None) -> dict[str, int]:
         """Соответствие «название поля → id», прочитанное из самой формы."""
-        if self._fields is not None:
-            return self._fields
-        body = await self._call(f"/forms/{config.pyrus_form_id}")
+        form_id = form_id or config.pyrus_form_id
+        if not form_id:
+            return {}
+        cached = self._fields.get(form_id)
+        if cached is not None:
+            return cached
+        body = await self._call(f"/forms/{form_id}")
         fields: dict[str, int] = {}
         choices: dict[str, dict[str, int]] = {}
-        for field in (body or {}).get("fields", []):
+        for field in _flatten((body or {}).get("fields", [])):
             name = (field.get("name") or "").strip()
             if not name:
                 continue
@@ -138,18 +181,26 @@ class Pyrus:
                     by_value[value] = option["choice_id"]
             if by_value:
                 choices[name] = by_value
-        self._fields = fields
-        self._choices = choices
+        self._fields[form_id] = fields
+        self._choices[form_id] = choices
         if fields:
-            log.info("Pyrus: схема формы %s прочитана, полей %s",
-                     config.pyrus_form_id, len(fields))
+            log.info("Pyrus: схема формы %s прочитана, полей %s", form_id, len(fields))
         return fields
 
-    async def create_form_task(self, values: dict[str, object]) -> int | None:
-        """Создаёт задачу по форме. `values` — {название поля: значение}."""
-        schema = await self._schema()
+    async def _field_values(
+        self, values: dict[str, object], form_id: int | None = None
+    ) -> list[dict]:
+        """`{название поля: значение}` → список `{id, value}` для API.
+
+        Общий для создания задачи и для `field_updates` в комментарии:
+        правила одни — пустое не отправляется, поля выбора принимают не
+        текст, а номер варианта, чужое название уходит в лог.
+        """
+        form_id = form_id or config.pyrus_form_id
+        schema = await self._schema(form_id)
         if not schema:
-            return None
+            return []
+        choices = self._choices.get(form_id, {})
         fields = []
         for name, value in values.items():
             if value in (None, "", []):
@@ -158,7 +209,7 @@ class Pyrus:
             if field_id is None:
                 log.warning("Pyrus: в форме нет поля %r — значение не отправлено", name)
                 continue
-            options = self._choices.get(name)
+            options = choices.get(name)
             if options is not None:
                 # Поле выбора принимает не текст, а номер варианта.
                 choice_id = options.get(str(value))
@@ -168,10 +219,20 @@ class Pyrus:
                 fields.append({"id": field_id, "value": {"choice_id": choice_id}})
             else:
                 fields.append({"id": field_id, "value": value})
-        body = await self._call("/tasks", {"form_id": config.pyrus_form_id, "fields": fields})
+        return fields
+
+    async def create_form_task(
+        self, values: dict[str, object], form_id: int | None = None
+    ) -> int | None:
+        """Создаёт задачу по форме. `values` — {название поля: значение}."""
+        form_id = form_id or config.pyrus_form_id
+        fields = await self._field_values(values, form_id)
+        if not fields:
+            return None
+        body = await self._call("/tasks", {"form_id": form_id, "fields": fields})
         task_id = ((body or {}).get("task") or {}).get("id")
         if task_id:
-            log.info("Pyrus: создана задача %s по форме", task_id)
+            log.info("Pyrus: создана задача %s по форме %s", task_id, form_id)
         return task_id
 
     async def upload_and_attach(
@@ -302,6 +363,30 @@ class Pyrus:
             return False
         log.info("Pyrus: задача %s закрыта", task_id)
         return True
+    async def update_fields(
+        self, task_id: int, values: dict[str, object], form_id: int, note: str = ""
+    ) -> bool:
+        """Меняет поля задачи комментарием с `field_updates`, не закрывая её.
+
+        Нужно доске отдела: закрыть задачу там бот не может — у формы есть
+        этап утверждения, и закрытие Pyrus отдаёт только утверждающему
+        (`access_denied_close_task`). Зато колонки канбана идут по полю
+        «Статус», и его бот менять вправе: заявка уезжает в «Выполнено»,
+        а закрывает её руководитель сам.
+        """
+        updates = await self._field_values(values, form_id)
+        if not updates:
+            return False
+        payload: dict[str, object] = {"field_updates": updates}
+        if note:
+            payload["text"] = note
+        result = await self._call(f"/tasks/{task_id}/comments", payload)
+        if result is None:
+            log.warning("Pyrus: не удалось обновить поля задачи %s", task_id)
+            return False
+        log.info("Pyrus: задача %s — поля обновлены: %s", task_id, list(values))
+        return True
+
     async def create_text_task(self, text: str) -> int | None:
         """Обычная задача с текстом — путь на случай, когда формы нет."""
         body = await self._call("/tasks", {"text": text})
@@ -338,6 +423,37 @@ def request_text(
         lines += ["", f"Исходники: {source_path}"]
     if photos:
         lines += ["", f"Картинок в заявке: {photos} (в чате бота)"]
+    return "\n".join(lines)
+
+
+def board_description(
+    req_id: int,
+    case_title: str,
+    description: str,
+    author: str,
+    origin: str | None = None,
+    origin_path: str | None = None,
+    deadline: str | None = None,
+    photos: int = 0,
+) -> str:
+    """Текст в поле «Описание задачи» на доске отдела.
+
+    Доска плоская: отдельных полей под тему, автора, основу и срок у неё нет,
+    а терять их нельзя — отдел смотрит на доску и должен видеть заявку целиком,
+    примерно в том же виде, что в реестре. Поэтому всё лишнее складывается
+    сюда строками. Номер заявки первой строкой — по нему задача на доске
+    находится поиском и сходится с карточкой в чате отдела.
+    """
+    lines = [f"Заявка №{req_id} · {case_title}", f"От: {author}"]
+    if deadline:
+        lines.append(f"Срок: {deadline}")
+    if origin:
+        lines.append(f"Основа: {origin}")
+    if origin_path:
+        lines.append(f"Решение-источник: {origin_path}")
+    lines += ["", description]
+    if photos:
+        lines += ["", f"Картинок в заявке: {photos}"]
     return "\n".join(lines)
 
 
@@ -380,6 +496,71 @@ async def close_task(task_id: int, note: str) -> bool:
         log.exception("Pyrus: не удалось закрыть задачу %s", task_id)
         return False
 
+async def close_board_task(task_id: int, note: str) -> bool:
+    """«Закрытие» копии на доске отдела = перевод «Статуса» в «Выполнено».
+
+    Настоящее закрытие боту недоступно: у доски этап утверждения, закрывает
+    только утверждающий (руководитель отдела). Перевод статуса двигает
+    карточку в последнюю колонку канбана — этого отделу и нужно; закрыть
+    руководитель может сам. Никогда не бросает."""
+    if not pyrus.enabled or not task_id or not config.pyrus_board_id:
+        return False
+    try:
+        return await pyrus.update_fields(
+            task_id, {BOARD_STATUS: BOARD_STATUS_DONE}, config.pyrus_board_id, note
+        )
+    except Exception:  # noqa: BLE001 — см. docstring
+        log.exception("Pyrus: не удалось закрыть задачу %s на доске", task_id)
+        return False
+
+
+async def send_to_board(
+    req_id: int,
+    case_title: str,
+    description: str,
+    author: str,
+    source_path: str | None,
+    photos: int,
+    project: str | None = None,
+    origin: str | None = None,
+    origin_path: str | None = None,
+    deadline: str | None = None,
+) -> int | None:
+    """Зеркалит заявку на доску отдела. Возвращает id задачи или None.
+
+    Зачем отдельно от реестра: доску видит весь отдел, а реестр заявок — нет,
+    и ради этого заявка дублируется. Мастером остаётся реестр — только там
+    есть «Telegram ID», по которому личный кабинет отбирает заявки человека.
+
+    Блок «Инфо» (ФИО, почта, руководитель) не заполняется: он тянется из
+    справочника сотрудников, к которому у бота нет доступа, а сопоставить
+    Telegram-аккаунт с карточкой сотрудника бот и так не может.
+
+    Никогда не бросает: доска — зеркало, и её сбой не должен трогать заявку.
+    """
+    if not pyrus.enabled or not config.pyrus_board_id:
+        return None
+    try:
+        return await pyrus.create_form_task(
+            {
+                BOARD_DESCRIPTION: board_description(
+                    req_id, case_title, description, author,
+                    origin, origin_path, deadline, photos,
+                ),
+                # Путь к проекту на доске один, а в заявке их два: исходники
+                # и путь к решению-источнику. Сюда идут исходники — это то,
+                # с чем отдел работает; источник ушёл в описание.
+                BOARD_PATH: source_path or project,
+                BOARD_TELEGRAM: author,
+                BOARD_STATUS: BOARD_STATUS_NEW,
+            },
+            form_id=config.pyrus_board_id,
+        )
+    except Exception:  # noqa: BLE001 — зеркало не рушит заявку, см. docstring
+        log.exception("Pyrus: не удалось создать задачу на доске для заявки %s", req_id)
+        return None
+
+
 async def send_request(
     req_id: int,
     case_title: str,
@@ -393,13 +574,15 @@ async def send_request(
     origin_path: str | None = None,
     deadline: str | None = None,
 ) -> int | None:
-    """Отправляет заявку в Pyrus. Возвращает id задачи или None.
+    """Отправляет заявку в реестр Pyrus. Возвращает id задачи или None.
 
     Никогда не бросает: заявка к этому моменту уже принята, и падение из-за
     внешнего сервиса было бы худшим из вариантов.
 
     Заявки из чата (без Mini App) приходят без проекта, основы и срока — эти
     поля просто остаются пустыми, форма их не требует.
+
+    На доску отдела заявка уходит отдельно — см. `send_to_board`.
     """
     if not pyrus.enabled:
         return None

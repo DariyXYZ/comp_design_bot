@@ -38,6 +38,9 @@ class Config:
     pyrus_login: str
     pyrus_security_key: str
     pyrus_form_id: int | None
+    # Доска отдела: то же самое зеркалом, чтобы заявку видел весь отдел.
+    # Пусто — зеркала нет, заявка идёт только в реестр.
+    pyrus_board_id: int | None
 
     @classmethod
     def load(cls) -> "Config":
@@ -69,6 +72,7 @@ class Config:
         pyrus_login = os.environ.get("PYRUS_LOGIN", "").strip()
         pyrus_security_key = os.environ.get("PYRUS_SECURITY_KEY", "").strip()
         pyrus_form_id = _int_or_none("PYRUS_FORM_ID")
+        pyrus_board_id = _int_or_none("PYRUS_BOARD_ID")
 
         return cls(
             token=token,
@@ -81,6 +85,7 @@ class Config:
             pyrus_login=pyrus_login,
             pyrus_security_key=pyrus_security_key,
             pyrus_form_id=pyrus_form_id,
+            pyrus_board_id=pyrus_board_id,
         )
 
 
