@@ -481,7 +481,10 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     if board_task_id:
         await db.set_pyrus_board_task(req_id, board_task_id)
         await _attach_photos_to_pyrus(bot, board_task_id, data.get("photos", []))
-        await pyrus.attach_uploaded(board_task_id, data.get("pyrus_photo_guids", []))
+        # Картинки из Mini App: guid одноразовый и уже ушёл в реестр, поэтому
+        # на доску они переносятся из задачи реестра, а не тем же guid.
+        if task_id and data.get("pyrus_photo_guids"):
+            await pyrus.copy_attachments(task_id, board_task_id)
 
     if config.dept_chat_id is None:
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))

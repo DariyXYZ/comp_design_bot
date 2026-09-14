@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from urllib.parse import unquote
 
 import aiohttp
 
@@ -339,6 +340,35 @@ class Pyrus:
         log.info("Pyrus: к задаче %s привязано файлов из Mini App: %s", task_id, len(guids))
         return len(guids)
 
+    async def copy_attachments(self, from_task: int, to_task: int, text: str) -> int:
+        """Переносит вложения одной задачи в другую. Возвращает число файлов.
+
+        Guid загруженного файла Pyrus принимает один раз: картинки из Mini
+        App уже ушли в реестр, и приложить те же guid к копии на доске нельзя
+        (`The attachment file ... already attached`). Поэтому файлы читаются
+        из задачи-источника и заливаются заново.
+        """
+        body = await self._call(f"/tasks/{from_task}")
+        attachments = ((body or {}).get("task") or {}).get("attachments") or []
+        if not attachments:
+            return 0
+        files: list[tuple[str, bytes]] = []
+        async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+            token = self._token or await self._authorize(session)
+            if not token:
+                return 0
+            headers = {"Authorization": f"Bearer {token}"}
+            for att in attachments:
+                url = att.get("url") or f"{self._api}/files/download/{att.get('id')}"
+                async with session.get(url, headers=headers) as resp:
+                    if resp.status != 200:
+                        log.warning("Pyrus: файл %s не скачался (%s)", att.get("name"), resp.status)
+                        continue
+                    # Имя в ответе Pyrus URL-кодировано (пробелы как %20).
+                    name = unquote(att.get("name") or "file")
+                    files.append((name, await resp.read()))
+        return await self.upload_and_attach(to_task, files, text)
+
     async def close_task(self, task_id: int, note: str) -> bool:
         """Закрывает задачу — заявка отработана.
 
@@ -429,29 +459,22 @@ def board_description(
     case_title: str,
     description: str,
     author: str,
-    origin: str | None = None,
     origin_path: str | None = None,
-    deadline: str | None = None,
-    photos: int = 0,
 ) -> str:
     """Текст в поле «Описание задачи» на доске отдела.
 
-    Доска плоская: отдельных полей под тему, автора, основу и срок у неё нет,
-    а терять их нельзя — отдел смотрит на доску и должен видеть заявку целиком,
-    примерно в том же виде, что в реестре. Поэтому всё лишнее складывается
-    сюда строками. Номер заявки первой строкой — по нему задача на доске
-    находится поиском и сходится с карточкой в чате отдела.
+    Доска плоская: отдельных полей под тему и автора у неё нет, а терять их
+    нельзя — отдел смотрит на доску и должен видеть заявку целиком. Номер
+    заявки первой строкой — по нему задача на доске находится поиском и
+    сходится с карточкой в чате отдела. Проект, основа, срок и число
+    картинок сюда не дописываются: заявка из Mini App уже несёт их в шапке
+    самого описания (см. `_describe` в handlers/create.py), и на доске они
+    удваивались.
     """
     lines = [f"Заявка №{req_id} · {case_title}", f"От: {author}"]
-    if deadline:
-        lines.append(f"Срок: {deadline}")
-    if origin:
-        lines.append(f"Основа: {origin}")
     if origin_path:
         lines.append(f"Решение-источник: {origin_path}")
     lines += ["", description]
-    if photos:
-        lines += ["", f"Картинок в заявке: {photos}"]
     return "\n".join(lines)
 
 
@@ -480,6 +503,19 @@ async def attach_uploaded(task_id: int, guids: list[str]) -> int:
         )
     except Exception:  # noqa: BLE001 — заявка уже создана, падать нельзя
         log.exception("Pyrus: не удалось привязать картинки к задаче %s", task_id)
+        return 0
+
+
+async def copy_attachments(from_task: int, to_task: int) -> int:
+    """Переносит картинки из задачи реестра в копию на доске. Никогда не бросает."""
+    if not pyrus.enabled or not from_task or not to_task:
+        return 0
+    try:
+        return await pyrus.copy_attachments(
+            from_task, to_task, "Картинки из заявки (приложены в Mini App)"
+        )
+    except Exception:  # noqa: BLE001 — зеркало не рушит заявку
+        log.exception("Pyrus: не удалось перенести вложения %s → %s", from_task, to_task)
         return 0
 
 
@@ -539,8 +575,7 @@ async def send_to_board(
         return await pyrus.create_form_task(
             {
                 BOARD_DESCRIPTION: board_description(
-                    req_id, case_title, description, author,
-                    origin, origin_path, deadline, photos,
+                    req_id, case_title, description, author, origin_path
                 ),
                 # Путь к проекту на доске один, а в заявке их два: исходники
                 # и путь к решению-источнику. Сюда идут исходники — это то,
