@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from urllib.parse import unquote
 
 import aiohttp
@@ -77,6 +78,15 @@ CHAT_TO_BOARD: dict[str, tuple[str, str | None]] = {
 }
 
 
+@dataclass(frozen=True)
+class CatalogItem:
+    """Значение поля, которое в форме может быть и текстом, и справочником:
+    текст — для текстового поля, id позиции — для справочника."""
+
+    text: str | None
+    item_id: int | None
+
+
 def _flatten(fields: list[dict]) -> list[dict]:
     """Поля формы одним списком, включая вложенные в разделы.
 
@@ -122,6 +132,9 @@ class Pyrus:
         # Плоского словаря мало: одна и та же подпись может встретиться в двух
         # полях выбора.
         self._choices: dict[int, dict[str, dict[str, int]]] = {}
+        # {form_id: {название поля: тип}} — полю-справочнику нужен не текст,
+        # а id позиции (см. _field_values), остальным тип не важен.
+        self._types: dict[int, dict[str, str]] = {}
 
     @property
     def enabled(self) -> bool:
@@ -179,12 +192,14 @@ class Pyrus:
             return cached
         body = await self._call(f"/forms/{form_id}")
         fields: dict[str, int] = {}
+        types: dict[str, str] = {}
         choices: dict[str, dict[str, int]] = {}
         for field in _flatten((body or {}).get("fields", [])):
             name = (field.get("name") or "").strip()
             if not name:
                 continue
             fields[name] = field["id"]
+            types[name] = field.get("type") or ""
             # Варианты нужны у любого поля выбора, а не только у «Темы»:
             # статус — такое же поле, и особый случай на каждое поле пришлось
             # бы дописывать заново.
@@ -205,6 +220,7 @@ class Pyrus:
                 choices[name] = by_value
         self._fields[form_id] = fields
         self._choices[form_id] = choices
+        self._types[form_id] = types
         if fields:
             log.info("Pyrus: схема формы %s прочитана, полей %s", form_id, len(fields))
         return fields
@@ -223,6 +239,7 @@ class Pyrus:
         if not schema:
             return []
         choices = self._choices.get(form_id, {})
+        types = self._types.get(form_id, {})
         fields = []
         for name, value in values.items():
             if value in (None, "", []):
@@ -232,6 +249,20 @@ class Pyrus:
                 log.warning("Pyrus: в форме нет поля %r — значение не отправлено", name)
                 continue
             options = choices.get(name)
+            if types.get(name) == "catalog":
+                # Справочник принимает id позиции. Текст сюда не положить —
+                # он остаётся в описании, а поле пустует, пока проекта нет в
+                # справочнике; это честнее, чем «похожая» позиция.
+                item_id = value.item_id if isinstance(value, CatalogItem) else None
+                if item_id:
+                    fields.append({"id": field_id, "value": {"item_id": item_id}})
+                else:
+                    log.info("Pyrus: поле «%s» — справочник, текст %r не отправлен", name, value)
+                continue
+            if isinstance(value, CatalogItem):
+                value = value.text
+                if not value:
+                    continue
             if options is not None:
                 # Поле выбора принимает не текст, а номер варианта.
                 choice_id = options.get(str(value))
@@ -531,6 +562,7 @@ async def send_request(
     photos: int,
     tg_user_id: int | None = None,
     project: str | None = None,
+    project_id: int | None = None,
     origin: str | None = None,
     origin_path: str | None = None,
     deadline: str | None = None,
@@ -546,7 +578,10 @@ async def send_request(
     try:
         return await pyrus.create_form_task({
             FIELD_TOPIC: case_title,
-            FIELD_PROJECT: project,
+            # «Проект» бывает текстом (тогда уходит название) и справочником
+            # (тогда нужен id позиции из подсказки Mini App; без него поле
+            # остаётся пустым, название всё равно есть в шапке описания).
+            FIELD_PROJECT: CatalogItem(project, project_id),
             FIELD_DESCRIPTION: description,
             FIELD_ORIGIN: origin,
             FIELD_SOURCE: source_path,

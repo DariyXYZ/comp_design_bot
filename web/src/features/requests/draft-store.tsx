@@ -47,6 +47,8 @@ export type SheetSnap = "peek" | "half" | "full";
 
 export type DraftFields = {
   project: string;
+  /** Позиция справочника проектов Pyrus, если название выбрано из подсказки. */
+  projectId: string;
   description: string;
   source: string;
   deadline: string;
@@ -54,6 +56,7 @@ export type DraftFields = {
 
 const EMPTY_FIELDS: DraftFields = {
   project: "",
+  projectId: "",
   description: "",
   source: "",
   deadline: "",

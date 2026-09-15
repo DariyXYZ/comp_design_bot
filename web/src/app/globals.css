@@ -644,6 +644,20 @@ body{
 }
 .field input:hover,.field textarea:hover{border-color:var(--sub)}
 .field input::placeholder,.field textarea::placeholder{color:var(--sub)}
+/* Подсказка проектов: список сразу под полем, в потоке, а не поверх —
+   в шторке поверх нечего перекрывать, а в потоке он не уезжает за край. */
+.project-field{position:relative}
+.suggest{
+  list-style:none;margin:0;padding:var(--s1);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r2);
+  display:flex;flex-direction:column;
+}
+.suggest button{
+  width:100%;text-align:left;font:inherit;font-size:var(--t-small);color:var(--ink);
+  background:none;border:0;border-radius:var(--r0);padding:var(--s2) var(--s3);
+  cursor:pointer;
+}
+.suggest button:hover,.suggest button.active{background:var(--pill)}
 /* Слоты картинок: сетка, а не одна строка — снимков может быть до шести, и
    на телефоне они должны переноситься, а не сжиматься в полоски. */
 .slots{

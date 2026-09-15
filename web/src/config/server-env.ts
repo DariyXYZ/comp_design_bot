@@ -23,6 +23,9 @@ export function serverEnv() {
     pyrusLogin: required("PYRUS_LOGIN"),
     pyrusSecurityKey: required("PYRUS_SECURITY_KEY"),
     pyrusFormId: Number(required("PYRUS_FORM_ID")),
+    // Общий справочник проектов бюро «Проект» — источник подсказки в поле
+    // «Проект». Id постоянный, переменная — на случай переезда справочника.
+    pyrusProjectCatalogId: Number(process.env.PYRUS_PROJECT_CATALOG_ID ?? "278856"),
     // Те же значения, что у бота. Без префикса NEXT_PUBLIC_ они не попадают в
     // браузер — и это правильно: карточки читает серверный роут, а не клиент.
     supabaseUrl: required("SUPABASE_URL").replace(/\/$/, ""),

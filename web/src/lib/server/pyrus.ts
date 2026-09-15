@@ -243,6 +243,24 @@ export class Pyrus {
   }
 
   /**
+   * Позиции справочника: id + первая колонка как название.
+   *
+   * У справочника «Проект» одна колонка; если колонок больше, название — в
+   * первой, остальные здесь не нужны.
+   */
+  async catalogItems(catalogId: number): Promise<{ id: number; name: string }[]> {
+    const body = await this.call<{
+      items?: { item_id: number; values?: string[] }[];
+    }>(`/catalogs/${catalogId}`);
+    const items: { id: number; name: string }[] = [];
+    for (const item of body.items ?? []) {
+      const name = item.values?.[0]?.trim();
+      if (name) items.push({ id: item.item_id, name });
+    }
+    return items;
+  }
+
+  /**
    * Пишет комментарий к задаче и, если попросили, меняет её состояние.
    *
    * Комментарий — единственный способ что-либо сделать с существующей

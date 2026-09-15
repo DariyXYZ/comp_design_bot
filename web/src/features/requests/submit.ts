@@ -25,6 +25,8 @@ export type RequestDraft = {
   origin?: string;
   originPath?: string;
   project?: string;
+  /** id позиции справочника «Проект» — бот пишет его в поле-справочник. */
+  projectId?: string;
   description?: string;
   source?: string;
   deadline?: string;
@@ -52,6 +54,7 @@ export function buildRequestPayload(draft: RequestDraft): Record<string, string>
   const fields: ReadonlyArray<[string, string | undefined, number]> = [
     ["description", draft.description, LIMITS.description],
     ["project", draft.project, LIMITS.short],
+    ["project_id", draft.projectId, LIMITS.short],
     ["deadline", draft.deadline, LIMITS.short],
     ["origin", draft.origin, LIMITS.short],
     ["origin_path", draft.originPath, LIMITS.source],

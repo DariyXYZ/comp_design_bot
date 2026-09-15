@@ -146,6 +146,12 @@ async def choose_case(message: Message, state: FSMContext) -> None:
 MAX_MINIAPP_FIELD = 200  # проект, срок, название основы — короткие строки
 
 
+def _int_field(data: dict, key: str) -> int | None:
+    """Целое из payload Mini App; мусор и пусто — None."""
+    raw = str(data.get(key, "")).strip()
+    return int(raw) if raw.isdigit() else None
+
+
 def _field(data: dict, key: str, limit: int) -> str | None:
     """Строковое поле из Mini App: только строки, обрезанные по лимиту."""
     value = data.get(key)
@@ -263,6 +269,7 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
             # отдельности: карточке в чате нужен связный текст, а форме
             # Pyrus — поля, по которым работают фильтры и реестр.
             wa_project=_field(data, "project", MAX_MINIAPP_FIELD),
+            wa_project_id=_int_field(data, "project_id"),
             wa_origin=_field(data, "origin", MAX_MINIAPP_FIELD),
             wa_origin_path=_field(data, "origin_path", MAX_SOURCE),
             wa_deadline=_field(data, "deadline", MAX_MINIAPP_FIELD),
@@ -447,6 +454,7 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
             photos=len(data.get("photos", [])),
             tg_user_id=user.id,
             project=data.get("wa_project"),
+            project_id=data.get("wa_project_id"),
             origin=data.get("wa_origin"),
             origin_path=data.get("wa_origin_path"),
             deadline=data.get("wa_deadline"),

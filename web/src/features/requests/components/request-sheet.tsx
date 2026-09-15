@@ -8,6 +8,7 @@ import { topicColor } from "@/features/topics/color";
 import { haptic } from "@/lib/client/telegram";
 import { useRequestDraft } from "../draft-store";
 import { uploadPhoto } from "../photos";
+import { ProjectField } from "./project-field";
 import { submitRequest } from "../submit";
 
 /**
@@ -113,6 +114,7 @@ export function RequestSheet() {
       origin: origin.label,
       originPath: origin.path,
       project: fields.project,
+      projectId: fields.projectId,
       description: fields.description,
       source: fields.source,
       deadline: fields.deadline,
@@ -274,16 +276,13 @@ export function RequestSheet() {
           />
         </label>
 
-        <label className="field">
-          <span>Номер и название проекта</span>
-          <input
-            type="text"
-            value={fields.project}
-            onChange={(e) => setField("project", e.target.value)}
-            placeholder="1-19-2026 МР Верейская БЦ"
-            enterKeyHint="next"
-          />
-        </label>
+        <ProjectField
+          value={fields.project}
+          onChange={(name, id) => {
+            setField("project", name);
+            setField("projectId", id);
+          }}
+        />
 
         <label className="field">
           <span>Ссылка или путь к исходным файлам</span>
