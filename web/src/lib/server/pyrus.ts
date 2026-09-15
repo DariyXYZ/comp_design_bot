@@ -263,6 +263,30 @@ export class Pyrus {
     return this.toRequest(body.task, tgFieldId, telegramId);
   }
 
+  /** Весь реестр формы, включая закрытые задачи — сырые задачи Pyrus. */
+  async register<T = PyrusTask>(): Promise<T[]> {
+    const body = await this.call<{ tasks?: T[] }>(`/forms/${this.formId}/register`, {
+      include_archived: true,
+    });
+    return body.tasks ?? [];
+  }
+
+  /** Одна задача целиком (поля, вложения, комментарии). `null` — нет такой. */
+  async task<T = PyrusTask>(taskId: number): Promise<T | null> {
+    try {
+      const body = await this.call<{ task?: T }>(`/tasks/${taskId}`);
+      return body.task ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Файл вложения под ключом сервера — в браузер ключ не отдаётся. */
+  async download(url: string): Promise<Response> {
+    const token = this.token ?? (await this.authorize());
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  }
+
   /**
    * Позиции справочника: id + первая колонка как название.
    *

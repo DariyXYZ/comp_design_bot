@@ -325,3 +325,55 @@ export async function actOnRequest(
   });
   return Boolean(body?.ok);
 }
+
+/** Строка ленты отдела, как её отдаёт /api/feed/. */
+export type FeedTask = {
+  taskId: number;
+  topic: string | null;
+  project: string | null;
+  excerpt: string;
+  status: string | null;
+  closed: boolean;
+  created: string | null;
+  closedAt: string | null;
+  source: string | null;
+  hasCover: boolean;
+  watching: boolean;
+};
+
+let feedCache: Promise<FeedTask[] | null> | null = null;
+
+/**
+ * Лента отдела. Без входа тоже работает — тогда без пометок «вы следите».
+ * Один запрос на сессию: ленту читают и экран задач, и проверка дубликата в
+ * форме заявки.
+ */
+export function fetchFeed(force = false): Promise<FeedTask[] | null> {
+  if (!feedCache || force) {
+    feedCache = (async () => {
+      const token = readStoredToken();
+      try {
+        const response = await fetch(`${API_BASE}/api/feed/`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          cache: "no-store",
+        });
+        if (!response.ok) return null;
+        const body = (await response.json()) as { tasks?: FeedTask[] };
+        return body.tasks ?? [];
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return feedCache;
+}
+
+/** Подписаться на задачу или снять подписку. `null` — нет входа или отказ. */
+export async function toggleWatch(taskId: number): Promise<boolean | null> {
+  const body = await withSession<{ watching?: boolean }>(`/api/feed/${taskId}/watch/`, {
+    method: "POST",
+  });
+  if (!body || typeof body.watching !== "boolean") return null;
+  feedCache = null;
+  return body.watching;
+}

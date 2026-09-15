@@ -226,6 +226,9 @@ CANCELED = "Заявка отменена. Черновик удалён."
 STATUS_CHANGED_NOTIFY = (
     "Статус вашей заявки №{req_id} («{case_title}») изменился:\n{status}"
 )
+WATCHER_STATUS_NOTIFY = (
+    "Задача №{req_id} («{case_title}»), за которой вы следите:\n{status}"
+)
 
 ACCEPTED_CONTACT_LINE = "\n\nЕсли появятся вопросы — можно написать: {contact}"
 DONE_CONTACT_LINE = "\n\nДля связи и передачи решения: {contact}"

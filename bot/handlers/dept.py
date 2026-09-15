@@ -31,6 +31,7 @@ from ..texts import (
     REJECTION_REASON_SAVED,
     STATUS_CHANGED_NOTIFY,
     STATUSES,
+    WATCHER_STATUS_NOTIFY,
 )
 
 router = Router()
@@ -181,6 +182,19 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
             # Карточка старше 48ч и её больше нельзя редактировать: в Pyrus
             # статус уже сменён, автора всё равно уведомим ниже.
             log.warning("Заявка №%s: не удалось обновить карточку: %s", req_id, e)
+
+        # Подписчики из ленты Mini App: то же уведомление, без строк про
+        # контакт исполнителя — они адресованы автору.
+        watch_note = WATCHER_STATUS_NOTIFY.format(
+            req_id=req_id, case_title=html.escape(case_title), status=STATUSES[new_status]
+        )
+        for watcher in req.get("watchers", []):
+            if watcher == req["user_id"]:
+                continue
+            try:
+                await bot.send_message(watcher, watch_note)
+            except Exception:
+                log.info("Заявка №%s: подписчику %s не доставлено", req_id, watcher)
 
         if not req["user_id"]:
             return

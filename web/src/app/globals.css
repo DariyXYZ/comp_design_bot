@@ -428,6 +428,18 @@ body{
   background:var(--card);border:1px solid var(--line);border-radius:var(--r3);
 }
 .feed-top{display:flex;gap:var(--s3)}
+/* Проект — строка идентификации, суть — под ней тише. */
+.feed-card .row-project{color:var(--ink);font-weight:500}
+/* «Следить» — тихое действие в ряд с путём: строка ленты, а не кнопка экрана. */
+.feed-watch{
+  align-self:flex-start;font:inherit;font-size:var(--t-small);font-weight:600;
+  color:var(--ink);background:var(--pill);border:1px solid var(--line);
+  border-radius:999px;padding:var(--s1) var(--s3);cursor:pointer;
+  transition:background .16s var(--ease), border-color .16s var(--ease);
+}
+.feed-watch:hover{border-color:var(--sub)}
+.feed-watch.on{background:var(--card);border-color:var(--ink)}
+.feed-watch:disabled{opacity:.5;cursor:default}
 
 .empty{
   border:1.5px dashed var(--line);border-radius:var(--r3);
@@ -658,6 +670,8 @@ body{
   cursor:pointer;
 }
 .suggest button:hover,.suggest button.active{background:var(--pill)}
+.field-note{font-size:var(--t-small);color:var(--sub);line-height:1.4;font-weight:400}
+.field-note a{color:var(--ink);font-weight:600}
 /* Слоты картинок: сетка, а не одна строка — снимков может быть до шести, и
    на телефоне они должны переноситься, а не сжиматься в полоски. */
 .slots{

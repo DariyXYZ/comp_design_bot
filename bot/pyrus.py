@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
 from urllib.parse import unquote
 
@@ -105,6 +106,25 @@ def _flatten(fields: list[dict]) -> list[dict]:
         if nested:
             flat.extend(_flatten(nested))
     return flat
+
+
+_WATCH_RE = re.compile(r"^(Подписка|Отписка):\s*tg:(\d+)")
+
+
+def _watchers(comments: list[dict]) -> list[int]:
+    """Кто подписался на задачу из Mini App: комментарии «Подписка: tg:<id>»,
+    снятые последующей «Отписка: tg:<id>». Хранилище подписок — сама задача,
+    у бота своей базы нет."""
+    ids: set[int] = set()
+    for comment in comments:
+        match = _WATCH_RE.match((comment.get("text") or "").strip())
+        if not match:
+            continue
+        if match.group(1) == "Подписка":
+            ids.add(int(match.group(2)))
+        else:
+            ids.discard(int(match.group(2)))
+    return sorted(ids)
 
 
 def _task_fields(task: dict) -> list[dict]:
@@ -449,6 +469,7 @@ class Pyrus:
             "board_status": values.get(FIELD_STATUS) or "",
             "chat_message_id": int(chat_message) if chat_message not in (None, "") else None,
             "photos": len(task.get("attachments") or []),
+            "watchers": _watchers(task.get("comments") or []),
             "created": task.get("create_date"),
             "closed": bool(task.get("is_closed") or task.get("close_date")),
         }
