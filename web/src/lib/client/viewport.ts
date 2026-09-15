@@ -20,6 +20,20 @@
 
 let baseHeight = 0;
 let installed = false;
+let settled = false;
+
+/**
+ * Дошла ли клавиатура до своей высоты. Между фокусом в поле и стабильным
+ * событием клиента живая высота фрейма — либо старая, либо промежуточная;
+ * считать от неё раскладку — показать её прыжок.
+ */
+export function keyboardSettled(): boolean {
+  return settled;
+}
+
+export function markKeyboardSettled(value: boolean): void {
+  settled = value;
+}
 
 export function editableFocused(): boolean {
   const el = document.activeElement;
@@ -69,6 +83,15 @@ function publish() {
   document.documentElement.style.setProperty("--app-h", `${stableFrameHeight()}px`);
 }
 
+/**
+ * Страница не прокручивается — но вебвью iOS всё равно сдвигает её, чтобы
+ * показать поле под клавиатурой, а потом клиент возвращает. Держим ноль:
+ * раскладка сама ставит поле в поле зрения, сдвиг страницы только дёргает.
+ */
+function pin() {
+  if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
+}
+
 /** Один раз на приложение: следит за фреймом и держит `--app-h` актуальным. */
 export function installViewport(): () => void {
   if (installed) return () => {};
@@ -79,6 +102,8 @@ export function installViewport(): () => void {
     publish();
   };
   window.addEventListener("resize", onChange);
+  window.addEventListener("scroll", pin, { passive: true });
+  window.visualViewport?.addEventListener("scroll", pin);
   // Клавиатура закрылась: фокус ушёл, и следующее событие уже без неё. Но
   // событие может прийти раньше blur — перепубликуем и на blur тоже.
   const onBlur = () => window.setTimeout(publish, 50);
@@ -88,6 +113,8 @@ export function installViewport(): () => void {
   return () => {
     installed = false;
     window.removeEventListener("resize", onChange);
+    window.removeEventListener("scroll", pin);
+    window.visualViewport?.removeEventListener("scroll", pin);
     document.removeEventListener("focusout", onBlur);
     tg?.offEvent?.("viewportChanged", onChange);
   };

@@ -691,11 +691,12 @@ body{
   background:rgba(0,0,0,0);cursor:zoom-out;touch-action:none;
 }
 .lightbox-open{background:rgba(0,0,0,.82)}
+/* cover, а не contain: рамка идёт от квадрата миниатюры к пропорциям снимка,
+   и по пути снимок должен заполнять рамку, а не плавать в ней. В конечной
+   рамке пропорции совпадают, и cover показывает кадр целиком. */
 .lightbox-img{
-  position:absolute;display:block;object-fit:contain;
-  border-radius:var(--r2);transform-origin:center;
+  position:absolute;display:block;object-fit:cover;
   box-shadow:0 24px 60px -20px rgba(0,0,0,.6);
-  will-change:transform;
 }
 .slot-remove{
   position:absolute;top:4px;right:4px;

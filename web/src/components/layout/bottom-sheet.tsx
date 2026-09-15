@@ -3,7 +3,9 @@
 import {
   editableFocused,
   eventIsStable,
+  keyboardSettled,
   liveFrameHeight,
+  markKeyboardSettled,
   stableFrameHeight,
 } from "@/lib/client/viewport";
 import { useCallback, useEffect, useRef } from "react";
@@ -89,7 +91,7 @@ type Sizes = { peek: number; half: number; full: number };
  * появлением клавиатуры нельзя (см. lib/client/viewport).
  */
 function frameHeight(): number {
-  return editableFocused() ? liveFrameHeight() : stableFrameHeight();
+  return editableFocused() && keyboardSettled() ? liveFrameHeight() : stableFrameHeight();
 }
 
 export function BottomSheet({
@@ -245,17 +247,47 @@ export function BottomSheet({
     // прыгает за каждым кадром. Появление поля ввода в фокусе разворачивает
     // шторку целиком: над клавиатурой места мало, и половина превращается в
     // полоску с одной строкой.
+    // Поле получило фокус, клавиатура ещё не поднялась. Перекладываться
+    // сейчас нельзя: высота фрейма пока старая, шторка выросла бы на весь
+    // экран и через полсекунды съехала бы под клавиатуру — то самое
+    // «пролистнулось вверх и обратно». Ждём стабильного события клиента
+    // (или таймаут — в браузере без Telegram событий нет) и перекладываемся
+    // один раз, сразу в высоту над клавиатурой.
+    let settleTimer: number | null = null;
+    const settle = () => {
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      settleTimer = null;
+      markKeyboardSettled(true);
+      if (snapRef.current !== "full") commitSnap("full");
+      relayout();
+      // Поле — в поле зрения: тело шторки прокручивается само, страница нет.
+      const el = document.activeElement;
+      if (el instanceof HTMLElement && sheetRef.current?.contains(el)) {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    };
     const onViewport = (arg?: unknown) => {
-      if (eventIsStable(arg)) relayout();
+      if (!eventIsStable(arg)) return;
+      if (settleTimer !== null) settle();
+      else relayout();
     };
     const onFocusIn = (e: FocusEvent) => {
       const sheet = sheetRef.current;
       if (!sheet || !(e.target instanceof Node) || !sheet.contains(e.target)) return;
       if (!editableFocused()) return;
-      if (snapRef.current !== "full") commitSnap("full");
-      // Клиент ещё не ужал фрейм — дождёмся его события; но на всякий случай
-      // перекладываемся и сами, чуть позже.
-      window.setTimeout(relayout, 300);
+      if (settleTimer !== null) return;
+      markKeyboardSettled(false);
+      settleTimer = window.setTimeout(settle, 450);
+    };
+    const onFocusOut = () => {
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      settleTimer = null;
+      markKeyboardSettled(false);
+      // Клавиатура уходит: фрейм вернётся событием, но blur приходит раньше —
+      // перекладываемся и сами, когда фокус точно пуст.
+      window.setTimeout(() => {
+        if (!editableFocused()) relayout();
+      }, 60);
     };
     const observer = new ResizeObserver(relayout);
     for (const el of [headRef.current, footRef.current, bodyRef.current]) {
@@ -263,14 +295,15 @@ export function BottomSheet({
     }
     window.addEventListener("resize", onViewport);
     document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onViewport);
+    document.addEventListener("focusout", onFocusOut);
     const tg = window.Telegram?.WebApp;
     tg?.onEvent?.("viewportChanged", onViewport);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", onViewport);
       document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onViewport);
+      document.removeEventListener("focusout", onFocusOut);
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
       tg?.offEvent?.("viewportChanged", onViewport);
       document.documentElement.style.removeProperty("--sheet-peek");
     };
