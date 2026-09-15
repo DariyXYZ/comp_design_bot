@@ -30,7 +30,6 @@ class Config:
     dept_chat_id: int | None
     dept_thread_id: int | None
     webapp_url: str
-    db_path: Path
     supabase_url: str
     supabase_anon_key: str
     # Pyrus: пустые значения означают «интеграции нет» — бот работает как
@@ -75,7 +74,6 @@ class Config:
             dept_chat_id=_int_or_none("DEPT_CHAT_ID"),
             dept_thread_id=_int_or_none("DEPT_THREAD_ID"),
             webapp_url=webapp_url,
-            db_path=BASE_DIR / os.environ.get("DB_FILE", "requests.sqlite3"),
             supabase_url=supabase_url,
             supabase_anon_key=supabase_anon_key,
             pyrus_login=pyrus_login,

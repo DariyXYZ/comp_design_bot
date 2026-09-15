@@ -94,7 +94,7 @@ export async function POST(request: Request, context: Context) {
 
     // Порядок важен: сначала Pyrus. Если он откажет, отдел не получит
     // сообщение о том, чего нет в реестре.
-    await pyrus.comment(id, plan.comment, plan.action);
+    await pyrus.comment(id, plan.comment, plan.action, plan.status);
     const delivered = await notifyDept(plan.chat, env);
 
     return NextResponse.json({ ok: true, delivered }, { headers });

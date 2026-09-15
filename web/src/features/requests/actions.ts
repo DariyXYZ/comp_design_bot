@@ -10,6 +10,8 @@
  * означать разные пути в коде — иначе одно из них однажды забудут довести до
  * Pyrus или до чата.
  */
+import { BOARD_STATUS, type BoardStatus } from "@/lib/board-status";
+
 export const REQUEST_ACTIONS = ["note", "accept", "rework", "cancel"] as const;
 
 export type RequestAction = (typeof REQUEST_ACTIONS)[number];
@@ -25,6 +27,8 @@ export type ActionPlan = {
   chat: string;
   /** Меняется ли состояние задачи. */
   action?: "finished" | "reopened";
+  /** Колонка доски отдела после действия. */
+  status?: BoardStatus;
 };
 
 export function isRequestAction(value: unknown): value is RequestAction {
@@ -79,6 +83,7 @@ export function planAction(
         comment: `Возвращена на доработку ${from}:\n${message}`,
         chat: `${head}\nВозвращена на доработку ${from}:\n${message}`,
         action: "reopened",
+        status: BOARD_STATUS.work,
       };
     case "cancel":
       return {
@@ -89,6 +94,7 @@ export function planAction(
           ? `${head}\nОтменена ${from}:\n${message}`
           : `${head}\nОтменена ${from}`,
         action: "finished",
+        status: BOARD_STATUS.rejected,
       };
   }
 }

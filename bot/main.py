@@ -10,7 +10,6 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, CallbackQuery, ErrorEvent
 
-from . import db
 from .config import config
 from .handlers import register_all
 from .texts import SESSION_RESET
@@ -74,7 +73,6 @@ def check_handlers(dp: Dispatcher) -> None:
         )
 
 async def main() -> None:
-    await db.init_db()
     bot = Bot(token=config.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await bot.set_my_commands(COMMANDS, scope=BotCommandScopeAllPrivateChats())
     dp = Dispatcher()

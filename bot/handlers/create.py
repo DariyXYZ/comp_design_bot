@@ -13,7 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message, User
 
-from .. import db, pyrus
+from .. import pyrus
 from ..config import config
 from ..keyboards import (
     BTN_CAPABILITIES,
@@ -35,6 +35,7 @@ from ..texts import (
     SENT_DEPT_FAILED,
     SENT_NO_DEPT,
     SENT_OK,
+    SENT_PYRUS_FAILED,
     STATUSES,
 )
 
@@ -67,9 +68,18 @@ def author_line(user: User) -> str:
 CAPTION_LIMIT = 1024  # жёсткий лимит Telegram на подпись к фото/альбому
 
 
+def case_eta(case_title: str) -> str:
+    """Ориентир по срокам из карточки темы — по названию, потому что заявка
+    из Pyrus несёт только название темы, а не ключ кейса."""
+    for case in CASES.values():
+        if case.get("title") == case_title:
+            return case.get("eta") or "—"
+    return "—"
+
+
 def request_card(
     req_id: int | None,
-    case_key: str,
+    case_title: str,
     description: str,
     source_path: str | None,
     author: str,
@@ -84,11 +94,14 @@ def request_card(
     actor_line — готовая строка вида "Принял: Имя" / "Завершил: Имя"
     (см. dept.py._actor_display вызовы) или None, если ещё некого показать.
     """
-    case = CASES.get(case_key, {"title": case_key, "eta": "—"})
-    header = f"Заявка №{req_id}" if req_id else "Новая заявка"
+    # Номер заявки = id задачи Pyrus, поэтому заголовок сразу ведёт в неё.
+    if req_id:
+        header = f'<a href="https://pyrus.com/t#id{req_id}">Заявка №{req_id}</a>'
+    else:
+        header = "Новая заявка"
     head_lines = [
-        f"<b>{header} · {case['title']}</b>",
-        f"Ориентир по срокам: {case['eta']}",
+        f"<b>{header} · {html.escape(case_title)}</b>",
+        f"Ориентир по срокам: {case_eta(case_title)}",
         f"От: {html.escape(author)}",
         "",
     ]
@@ -368,7 +381,7 @@ async def show_preview(message: Message, state: FSMContext, user: User) -> None:
     await state.set_state(NewRequest.preview)
     card = request_card(
         None,
-        data["case_key"],
+        CASES.get(data["case_key"], {}).get("title", data["case_key"]),
         data["description"],
         data.get("source_path"),
         author_line(user),
@@ -413,12 +426,33 @@ async def _attach_photos_to_pyrus(bot: Bot, task_id: int, file_ids: list[str]) -
 @router.callback_query(NewRequest.preview, F.data == "req:send")
 async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     user = callback.from_user
-    # Лок + очистка состояния внутри лока: двойной тап по «Отправить»
-    # не создаст дубль — второй колбэк увидит пустые данные.
+    author = author_line(user)
+    # Лок на весь путь до задачи в Pyrus: двойной тап по «Отправить» не
+    # создаст дубль — второй колбэк либо ждёт и видит пустые данные, либо
+    # видит уже очищенное состояние.
     async with _lock(user.id):
         data = await state.get_data()
         if not data.get("case_key"):
             await callback.answer("Заявка уже отправлена")
+            return
+        case_title = CASES.get(data["case_key"], {}).get("title", data["case_key"])
+
+        # Pyrus — единственное хранилище: пока задачи нет, заявки нет. Не
+        # создалась — состояние не трогаем, человек нажмёт «Отправить» ещё раз.
+        req_id = await pyrus.send_request(
+            case_title=case_title,
+            description=data["description"],
+            author=author,
+            source_path=data.get("source_path"),
+            photos=len(data.get("photos", [])),
+            tg_user_id=user.id,
+            project=data.get("wa_project"),
+            origin=data.get("wa_origin"),
+            origin_path=data.get("wa_origin_path"),
+            deadline=data.get("wa_deadline"),
+        )
+        if not req_id:
+            await callback.answer(SENT_PYRUS_FAILED, show_alert=True)
             return
         await state.clear()
 
@@ -428,47 +462,17 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     except TelegramBadRequest:
         pass
 
-    author = author_line(user)
-    req_id = await db.create_request(
-        user_id=user.id,
-        username=user.username,
-        full_name=user.full_name,
-        case_key=data["case_key"],
-        description=data["description"],
-        photo_file_ids=data.get("photos", []),
-        source_path=data.get("source_path"),
-    )
-
-    # Pyrus — рядом с чатом отдела, а не вместо него: чат остаётся местом
-    # разговора, Pyrus — реестром. Ошибка внешнего сервиса гасится внутри и
-    # не мешает заявке уйти в чат.
-    task_id = await pyrus.send_request(
-        req_id=req_id,
-        case_title=CASES.get(data["case_key"], {}).get("title", data["case_key"]),
-        description=data["description"],
-        author=author,
-        source_path=data.get("source_path"),
-        photos=len(data.get("photos", [])),
-        tg_user_id=user.id,
-        project=data.get("wa_project"),
-        origin=data.get("wa_origin"),
-        origin_path=data.get("wa_origin_path"),
-        deadline=data.get("wa_deadline"),
-    )
-    if task_id:
-        await db.set_pyrus_task(req_id, task_id)
-        # Картинки — отдельным шагом: Pyrus принимает файлы только по guid,
-        # который выдаёт `files/upload`, а качать их из Telegram надо по одному.
-        # Заявка к этому моменту уже создана, поэтому сбой загрузки её не рушит.
-        await _attach_photos_to_pyrus(bot, task_id, data.get("photos", []))
-        await pyrus.attach_uploaded(task_id, data.get("pyrus_photo_guids", []))
+    # Картинки — отдельным шагом: Pyrus принимает файлы только по guid,
+    # который выдаёт `files/upload`, а качать их из Telegram надо по одному.
+    # Заявка к этому моменту уже создана, поэтому сбой загрузки её не рушит.
+    await _attach_photos_to_pyrus(bot, req_id, data.get("photos", []))
+    await pyrus.attach_uploaded(req_id, data.get("pyrus_photo_guids", []))
 
     if config.dept_chat_id is None:
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))
         return
 
     photos: list[str] = data.get("photos", [])
-    case_key = data["case_key"]
     description = data["description"]
     source_path = data.get("source_path")
     buttons = dept_status_buttons(req_id)
@@ -477,12 +481,12 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     try:
         if not photos:
             # 0 фото: текст + кнопки в одном сообщении — как и раньше.
-            card = request_card(req_id, case_key, description, source_path, author)
+            card = request_card(req_id, case_title, description, source_path, author)
             dept_msg = await bot.send_message(config.dept_chat_id, card, reply_markup=buttons, **thread)
         elif len(photos) == 1:
             # 1 фото: подпись к фото = вся карточка + кнопки — тоже одно сообщение.
             caption = request_card(
-                req_id, case_key, description, source_path, author, max_len=CAPTION_LIMIT
+                req_id, case_title, description, source_path, author, max_len=CAPTION_LIMIT
             )
             dept_msg = await bot.send_photo(
                 config.dept_chat_id, photo=photos[0], caption=caption, reply_markup=buttons, **thread
@@ -492,13 +496,13 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
             # к первому фото альбома (визуально один блок), кнопки — короткой
             # строкой статуса следом, без дублирования всего текста заявки.
             caption = request_card(
-                req_id, case_key, description, source_path, author, max_len=CAPTION_LIMIT
+                req_id, case_title, description, source_path, author, max_len=CAPTION_LIMIT
             )
             media = [InputMediaPhoto(media=photos[0], caption=caption)] + [
                 InputMediaPhoto(media=fid) for fid in photos[1:10]
             ]
             album_msgs = await bot.send_media_group(config.dept_chat_id, media, **thread)
-            short = f"Заявка №{req_id} · {CASES[case_key]['title']}\n{STATUSES['new']}"
+            short = f"Заявка №{req_id} · {html.escape(case_title)}\n{STATUSES['new']}"
             dept_msg = await bot.send_message(
                 config.dept_chat_id,
                 short,
@@ -507,18 +511,14 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
                 **thread,
             )
     except Exception:
-        # Заявка уже в БД (req_id) — не теряем её молча, а честно говорим пользователю.
-        log.exception("Заявка №%s сохранена, но не доставлена в чат отдела", req_id)
+        # Заявка уже в Pyrus — не теряем её молча, а честно говорим пользователю.
+        log.exception("Заявка №%s создана, но не доставлена в чат отдела", req_id)
         await callback.message.answer(SENT_DEPT_FAILED.format(req_id=req_id))
         return
 
-    # Отдельно от отправки: карточка в чат отдела УЖЕ ушла и рабочая (кнопки
-    # есть) — если этот чисто вспомогательный write в БД упадёт, заявителю
-    # нельзя врать про SENT_DEPT_FAILED (он увидит рабочую карточку в отделе,
-    # но получит сообщение "не доставлено" — ложная тревога, дубль заявки).
-    try:
-        await db.set_dept_message_id(req_id, dept_msg.message_id)
-    except Exception:
-        log.warning("Заявка №%s: карточка доставлена, но dept_message_id не сохранён", req_id)
+    # Карточка в чат уже ушла и рабочая (кнопки есть) — если этот
+    # вспомогательный write в Pyrus упадёт, заявителю нельзя врать про
+    # SENT_DEPT_FAILED. Без него не перерисуется карточка со статусом, только.
+    await pyrus.set_chat_message(req_id, dept_msg.message_id)
 
     await callback.message.answer(SENT_OK.format(req_id=req_id))

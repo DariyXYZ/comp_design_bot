@@ -17,12 +17,14 @@
   и тогда заявки начали бы уезжать в чужие поля молча. Названия при этом
   видны человеку в конструкторе, поэтому расхождение сразу заметно. Схема
   формы читается один раз и кэшируется на время жизни процесса.
-* **Одна форма — доска отдела.** Заявка создаётся в форме канбан-доски
-  «Вычислительное Проектирование задачи»: её видит весь отдел, и в ней же
-  лежат «Telegram ID» и «Номер заявки в боте», по которым личный кабинет
-  отбирает заявки человека. Колонки доски — поле «Статус»: новая заявка
-  встаёт в «Новая задача», «Готово» в чате закрывает задачу и ставит
-  «Выполнено» одним комментарием.
+* **Одна форма — доска отдела, и она же единственное хранилище.** Заявка
+  создаётся в форме канбан-доски «Вычислительное Проектирование задачи» и
+  дальше живёт только там: у бота нет своей базы. Номер заявки — id задачи
+  Pyrus; карточка в чате отдела находится по полю «ID сообщения в чате»;
+  статусы кнопок в чате — поле «Статус» (колонки доски); кто принял, кто
+  завершил, причина отказа, оценка заявителя — комментарии к задаче.
+  «Готово»/«Отклонена» закрывают задачу, откат в промежуточный статус —
+  переоткрывает.
 """
 from __future__ import annotations
 
@@ -54,11 +56,25 @@ FIELD_AUTHOR = "Telegram"
 FIELD_TG_ID = "Telegram ID"
 FIELD_REQUEST_NO = "Номер заявки в боте"
 FIELD_STATUS = "Статус"
+FIELD_CHAT_MESSAGE = "ID сообщения в чате"
 
 # Колонки канбана. Промежуточные статусы бот не трогает — их отдел ведёт
 # руками на доске, у бота свои в чате.
 STATUS_NEW = "Новая задача"
+STATUS_WORK = "В работе"
 STATUS_DONE = "Выполнено"
+STATUS_REJECTED = "Отклонена"
+
+# Статус кнопки в чате → колонка доски и что делать с задачей. Кнопок в чате
+# больше, чем колонок («принята» и «в работе» — одна колонка): колонка говорит
+# отделу, где задача, а кто её принял — в комментарии и на карточке.
+CHAT_TO_BOARD: dict[str, tuple[str, str | None]] = {
+    "new": (STATUS_NEW, "reopened"),
+    "accepted": (STATUS_WORK, "reopened"),
+    "in_progress": (STATUS_WORK, "reopened"),
+    "done": (STATUS_DONE, "finished"),
+    "rejected": (STATUS_REJECTED, "finished"),
+}
 
 
 def _flatten(fields: list[dict]) -> list[dict]:
@@ -301,27 +317,13 @@ class Pyrus:
         tasks = (body or {}).get("tasks", [])
         mine = []
         for task in tasks:
-            values = {}
-            for field in _task_fields(task):
-                value = field.get("value")
-                if isinstance(value, dict):
-                    names = value.get("choice_names")
-                    value = names[0] if names else value.get("choice_value")
-                values[field.get("id")] = value
-                values[field.get("name")] = value
-            if str(values.get(tg_field)) != str(tg_user_id):
+            item = self._as_request(task)
+            if item["user_id"] != tg_user_id:
                 continue
-            mine.append({
-                "task_id": task.get("id"),
-                "number": values.get(FIELD_REQUEST_NO),
-                "topic": values.get(FIELD_TOPIC),
-                "project": values.get(FIELD_PROJECT),
-                "description": values.get(FIELD_DESCRIPTION),
-                "origin": values.get(FIELD_ORIGIN),
-                "deadline": values.get(FIELD_DEADLINE),
-                "created": task.get("create_date"),
-                "closed": bool(task.get("is_closed") or task.get("close_date")),
-            })
+            # Кабинет и старый API ждут эти имена — оставлены как были.
+            item["number"] = item["task_id"]
+            item["topic"] = item["case_title"]
+            mine.append(item)
         # Свежие сверху: человек ищет последнюю заявку, а не первую.
         mine.sort(key=lambda item: item.get("created") or "", reverse=True)
         return mine
@@ -345,72 +347,80 @@ class Pyrus:
         log.info("Pyrus: к задаче %s привязано файлов из Mini App: %s", task_id, len(guids))
         return len(guids)
 
-    async def close_task(self, task_id: int, note: str) -> bool:
-        """Закрывает задачу — заявка отработана.
+    async def comment(
+        self,
+        task_id: int,
+        text: str = "",
+        set_fields: dict[str, object] | None = None,
+        action: str | None = None,
+    ) -> dict | None:
+        """Комментарий к задаче — единственный способ её изменить.
 
-        Единственное, что переносится из чата в Pyrus. Статусы отдел ведёт в
-        Telegram (кнопки под карточкой — с телефона удобнее). Закрытие —
-        исключение: незакрытая задача висит в списках и портит отчёты, а
-        «Готово» в чате означает ровно то же, что «закрыта» здесь.
-
-        Закрывается комментарием с `action: finished` — отдельного метода
-        закрытия у Pyrus нет. Тем же комментарием `field_updates` переводит
-        «Статус» в «Выполнено»: колонки канбана идут по этому полю, и
-        закрытая задача иначе осталась бы в «Новая задача». Закрытие требует
-        прав администратора формы у аккаунта бота — иначе Pyrus отвечает
-        `access_denied_close_task`, и статус тоже не применяется.
-
-        Реестр читается с `include_archived`, поэтому из личного кабинета
-        заявка не исчезает.
+        Отдельных методов «закрыть», «переоткрыть», «поменять поле» у Pyrus
+        нет: всё это — один комментарий с `action` и/или `field_updates`.
+        `action`: `finished` закрывает, `reopened` открывает снова. Закрытие
+        требует прав администратора формы у аккаунта бота — иначе Pyrus
+        отвечает `access_denied_close_task`, и поля тоже не применяются.
+        Возвращает задачу из ответа или None.
         """
-        payload: dict[str, object] = {"text": note, "action": "finished"}
-        updates = await self._field_values({FIELD_STATUS: STATUS_DONE})
-        if updates:
-            payload["field_updates"] = updates
-        result = await self._call(f"/tasks/{task_id}/comments", payload)
-        if result is None:
-            log.warning("Pyrus: не удалось закрыть задачу %s", task_id)
-            return False
-        log.info("Pyrus: задача %s закрыта", task_id)
-        return True
+        payload: dict[str, object] = {}
+        if text:
+            payload["text"] = text
+        if set_fields:
+            updates = await self._field_values(set_fields)
+            if updates:
+                payload["field_updates"] = updates
+        if action:
+            payload["action"] = action
+        if not payload:
+            return None
+        return await self._call(f"/tasks/{task_id}/comments", payload)
 
-    async def create_text_task(self, text: str) -> int | None:
-        """Обычная задача с текстом — путь на случай, когда формы нет."""
-        body = await self._call("/tasks", {"text": text})
-        task_id = ((body or {}).get("task") or {}).get("id")
-        if task_id:
-            log.info("Pyrus: создана задача %s текстом", task_id)
-        return task_id
+    async def get_task(self, task_id: int) -> dict | None:
+        """Задача как заявка: поля формы под своими именами + служебное.
+
+        Возвращает словарь, которым живут обработчики бота (карточка в чате,
+        уведомления, оценка) — раньше это была строка SQLite.
+        """
+        body = await self._call(f"/tasks/{task_id}")
+        task = (body or {}).get("task")
+        if not task:
+            return None
+        return self._as_request(task)
+
+    @staticmethod
+    def _as_request(task: dict) -> dict:
+        values: dict[str, object] = {}
+        for field in _task_fields(task):
+            value = field.get("value")
+            if isinstance(value, dict):
+                if "fields" in value:
+                    continue
+                names = value.get("choice_names")
+                value = names[0] if names else value.get("choice_value")
+            values[field.get("name")] = value
+        tg_id = values.get(FIELD_TG_ID)
+        chat_message = values.get(FIELD_CHAT_MESSAGE)
+        return {
+            "task_id": task.get("id"),
+            "user_id": int(tg_id) if tg_id not in (None, "") else None,
+            "author": values.get(FIELD_AUTHOR) or "",
+            "case_title": values.get(FIELD_TOPIC) or "",
+            "description": values.get(FIELD_DESCRIPTION) or "",
+            "source_path": values.get(FIELD_SOURCE),
+            "project": values.get(FIELD_PROJECT),
+            "origin": values.get(FIELD_ORIGIN),
+            "deadline": values.get(FIELD_DEADLINE),
+            "board_status": values.get(FIELD_STATUS) or "",
+            "chat_message_id": int(chat_message) if chat_message not in (None, "") else None,
+            "photos": len(task.get("attachments") or []),
+            "created": task.get("create_date"),
+            "closed": bool(task.get("is_closed") or task.get("close_date")),
+        }
+
 
 
 pyrus = Pyrus()
-
-
-def request_text(
-    req_id: int,
-    case_title: str,
-    description: str,
-    author: str,
-    source_path: str | None,
-    photos: int,
-) -> str:
-    """Текст задачи в Pyrus, когда форма не подключена.
-
-    Отдельно от карточки для Telegram: там HTML-разметка и эмодзи статусов,
-    здесь нужен простой текст. Номер заявки в первой строке — по нему задача
-    находится поиском и связывается с сообщением в чате отдела.
-    """
-    lines = [
-        f"Заявка №{req_id} · {case_title}",
-        f"От: {author}",
-        "",
-        description,
-    ]
-    if source_path:
-        lines += ["", f"Исходники: {source_path}"]
-    if photos:
-        lines += ["", f"Картинок в заявке: {photos} (в чате бота)"]
-    return "\n".join(lines)
 
 
 async def attach_photos(
@@ -441,19 +451,79 @@ async def attach_uploaded(task_id: int, guids: list[str]) -> int:
         return 0
 
 
-async def close_task(task_id: int, note: str) -> bool:
-    """Закрытие задачи. Никогда не бросает: в чате заявка уже переведена, и
-    падать из-за внешнего сервиса нельзя."""
+async def get_request(task_id: int) -> dict | None:
+    """Заявка по номеру. Никогда не бросает: нет задачи или Pyrus лёг — None."""
+    if not pyrus.enabled or not task_id:
+        return None
+    try:
+        return await pyrus.get_task(task_id)
+    except Exception:  # noqa: BLE001 — см. docstring
+        log.exception("Pyrus: не удалось прочитать задачу %s", task_id)
+        return None
+
+
+async def list_user_requests(tg_user_id: int) -> list[dict]:
+    """Заявки человека, свежие сверху. Никогда не бросает."""
+    if not pyrus.enabled:
+        return []
+    try:
+        return await pyrus.list_user_tasks(tg_user_id)
+    except Exception:  # noqa: BLE001
+        log.exception("Pyrus: не удалось получить заявки для %s", tg_user_id)
+        return []
+
+
+async def set_chat_message(task_id: int, message_id: int) -> bool:
+    """Запоминает в задаче карточку в чате отдела — по ней её перерисовывают."""
     if not pyrus.enabled or not task_id:
         return False
     try:
-        return await pyrus.close_task(task_id, note)
-    except Exception:  # noqa: BLE001 — см. docstring
-        log.exception("Pyrus: не удалось закрыть задачу %s", task_id)
+        result = await pyrus.comment(task_id, set_fields={FIELD_CHAT_MESSAGE: message_id})
+        return result is not None
+    except Exception:  # noqa: BLE001
+        log.exception("Pyrus: не удалось записать карточку чата в задачу %s", task_id)
         return False
 
+
+async def set_status(task_id: int, chat_status: str, note: str, closed: bool) -> bool:
+    """Переводит задачу в колонку по статусу кнопки в чате.
+
+    «Готово»/«Отклонена» закрывают задачу; любой другой статус у закрытой
+    задачи переоткрывает её — иначе она ушла бы из активных на доске, оставаясь
+    «в работе» в чате. Открытую задачу `reopened` не трогает. Никогда не
+    бросает: в чате статус уже сменён.
+    """
+    if not pyrus.enabled or not task_id:
+        return False
+    board, action = CHAT_TO_BOARD.get(chat_status, (None, None))
+    if board is None:
+        return False
+    if action == "reopened" and not closed:
+        action = None
+    try:
+        result = await pyrus.comment(task_id, note, {FIELD_STATUS: board}, action)
+        if result is None:
+            log.warning("Pyrus: задача %s не переведена в «%s»", task_id, board)
+            return False
+        log.info("Pyrus: задача %s → «%s»%s", task_id, board, f" ({action})" if action else "")
+        return True
+    except Exception:  # noqa: BLE001
+        log.exception("Pyrus: не удалось сменить статус задачи %s", task_id)
+        return False
+
+
+async def add_comment(task_id: int, text: str) -> bool:
+    """Запись в историю задачи (кто принял, причина отказа, оценка). Никогда не бросает."""
+    if not pyrus.enabled or not task_id or not text:
+        return False
+    try:
+        return (await pyrus.comment(task_id, text)) is not None
+    except Exception:  # noqa: BLE001
+        log.exception("Pyrus: не удалось добавить комментарий к задаче %s", task_id)
+        return False
+
+
 async def send_request(
-    req_id: int,
     case_title: str,
     description: str,
     author: str,
@@ -465,33 +535,27 @@ async def send_request(
     origin_path: str | None = None,
     deadline: str | None = None,
 ) -> int | None:
-    """Отправляет заявку на доску отдела в Pyrus. Возвращает id задачи или None.
-
-    Никогда не бросает: заявка к этому моменту уже принята, и падение из-за
-    внешнего сервиса было бы худшим из вариантов.
+    """Создаёт заявку на доске отдела. Возвращает id задачи — он же номер
+    заявки везде дальше — или None, если Pyrus не ответил.
 
     Заявки из чата (без Mini App) приходят без проекта, основы и срока — эти
     поля просто остаются пустыми, форма их не требует.
     """
-    if not pyrus.enabled:
+    if not pyrus.enabled or not config.pyrus_form_id:
         return None
     try:
-        if config.pyrus_form_id:
-            return await pyrus.create_form_task({
-                FIELD_TOPIC: case_title,
-                FIELD_PROJECT: project,
-                FIELD_DESCRIPTION: description,
-                FIELD_ORIGIN: origin,
-                FIELD_SOURCE: source_path,
-                FIELD_ORIGIN_PATH: origin_path,
-                FIELD_DEADLINE: deadline,
-                FIELD_AUTHOR: author,
-                FIELD_TG_ID: tg_user_id,
-                FIELD_REQUEST_NO: req_id,
-                FIELD_STATUS: STATUS_NEW,
-            })
-        text = request_text(req_id, case_title, description, author, source_path, photos)
-        return await pyrus.create_text_task(text)
+        return await pyrus.create_form_task({
+            FIELD_TOPIC: case_title,
+            FIELD_PROJECT: project,
+            FIELD_DESCRIPTION: description,
+            FIELD_ORIGIN: origin,
+            FIELD_SOURCE: source_path,
+            FIELD_ORIGIN_PATH: origin_path,
+            FIELD_DEADLINE: deadline,
+            FIELD_AUTHOR: author,
+            FIELD_TG_ID: tg_user_id,
+            FIELD_STATUS: STATUS_NEW,
+        })
     except Exception:  # noqa: BLE001 — намеренно широко, см. docstring
-        log.exception("Pyrus: не удалось создать задачу для заявки %s", req_id)
+        log.exception("Pyrus: не удалось создать задачу для заявки от %s", author)
         return None

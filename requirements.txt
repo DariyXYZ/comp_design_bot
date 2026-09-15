@@ -1,5 +1,4 @@
 aiogram>=3.13
-aiosqlite>=0.20
 # API для Mini App (api/): обмен initData на токен, заявки из Pyrus.
 fastapi>=0.115
 uvicorn>=0.30

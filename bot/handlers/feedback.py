@@ -9,11 +9,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .. import db
+from .. import pyrus
 from ..config import config
 from ..keyboards import feedback_review_only_button
 from ..texts import (
-    CASES,
     FEEDBACK_ASK_COMMENT,
     FEEDBACK_ASK_REVIEW,
     FEEDBACK_COMMENT_THANKS,
@@ -42,7 +41,7 @@ async def rate_request(callback: CallbackQuery, bot: Bot, state: FSMContext) -> 
         await callback.answer("Ошибка", show_alert=True)
         return
 
-    req = await db.get_request(req_id)
+    req = await pyrus.get_request(req_id)
     # Кнопки уходят персонально автору заявки личным сообщением — но на
     # всякий случай не доверяем чужому callback.from_user.id вслепую.
     if req is None or callback.from_user.id != req["user_id"]:
@@ -66,11 +65,9 @@ async def rate_request(callback: CallbackQuery, bot: Bot, state: FSMContext) -> 
     if value not in _LABELS:
         await callback.answer("Неизвестная оценка")
         return
-    if req.get("feedback"):
-        await callback.answer("Уже оценено, спасибо!")
-        return
-
-    await db.set_feedback(req_id, value)
+    # Повторная оценка не проверяется по базе: после первой кнопки 👍/👎
+    # исчезают из сообщения, а в истории задачи вторая запись не вредит.
+    await pyrus.add_comment(req_id, f"Оценка заявителя: {_LABELS[value]}")
     try:
         # 👍/👎 больше не нажать (уже сохранено), но «Оставить отзыв» оставляем.
         await callback.message.edit_reply_markup(reply_markup=feedback_review_only_button(req_id))
@@ -79,7 +76,7 @@ async def rate_request(callback: CallbackQuery, bot: Bot, state: FSMContext) -> 
     await callback.answer("Спасибо за оценку!")
 
     if config.dept_chat_id:
-        case_title = CASES.get(req["case_key"], {}).get("title", req["case_key"])
+        case_title = req["case_title"]
         thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
         try:
             await bot.send_message(
@@ -105,7 +102,7 @@ async def capture_feedback_comment(message: Message, state: FSMContext, bot: Bot
     if not req_id or not text:
         return
 
-    await db.set_feedback_comment(req_id, text)
+    await pyrus.add_comment(req_id, f"Отзыв заявителя: {text}")
     await message.answer(FEEDBACK_COMMENT_THANKS)
 
     if config.dept_chat_id:

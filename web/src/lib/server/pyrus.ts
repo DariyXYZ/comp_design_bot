@@ -13,6 +13,8 @@
  *   `forms/{id}/register` Pyrus молча игнорирует (проверено — фильтр по
  *   несуществующему id возвращает весь реестр).
  */
+import type { BoardStatus } from "@/lib/board-status";
+
 const AUTH_URL = "https://api.pyrus.com/v4/auth";
 const DEFAULT_API = "https://api.pyrus.com/v4";
 
@@ -28,6 +30,7 @@ export const FIELD = {
   author: "Telegram",
   telegramId: "Telegram ID",
   requestNo: "Номер заявки в боте",
+  status: "Статус",
 } as const;
 
 export type PyrusRequest = {
@@ -40,6 +43,8 @@ export type PyrusRequest = {
   deadline: string | null;
   created: string | null;
   closed: boolean;
+  /** Колонка доски отдела. */
+  status: string | null;
 };
 
 type FieldValue =
@@ -50,7 +55,12 @@ type FieldValue =
 
 type PyrusField = { id: number; name?: string; value?: FieldValue };
 
-type SchemaField = { id: number; name?: string; info?: { fields?: SchemaField[] } };
+type SchemaOption = { choice_id: number; choice_value?: string; deleted?: boolean };
+type SchemaField = {
+  id: number;
+  name?: string;
+  info?: { fields?: SchemaField[]; options?: SchemaOption[] };
+};
 
 /**
  * Поля формы одним списком, включая вложенные в разделы: на доске отдела
@@ -81,6 +91,8 @@ export class Pyrus {
   private token: string | null = null;
   private api = DEFAULT_API;
   private schema: Map<string, number> | null = null;
+  /** «название поля» → «подпись варианта» → choice_id — для полей выбора. */
+  private choices = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly login: string,
@@ -138,7 +150,16 @@ export class Pyrus {
     const map = new Map<string, number>();
     for (const field of flattenSchema(body.fields ?? [])) {
       const name = field.name?.trim();
-      if (name) map.set(name, field.id);
+      if (!name) continue;
+      map.set(name, field.id);
+      // Удалённые варианты приходят с флагом deleted — их брать нельзя.
+      const options = (field.info?.options ?? []).filter((o) => !o.deleted);
+      if (options.length) {
+        this.choices.set(
+          name,
+          new Map(options.map((o) => [o.choice_value?.trim() ?? "", o.choice_id])),
+        );
+      }
     }
     this.schema = map;
     return map;
@@ -172,10 +193,12 @@ export class Pyrus {
       if (field.id === tgFieldId) telegram = value;
     }
     if (telegram !== String(telegramId)) return null;
+    // Номер заявки — id задачи Pyrus; поле «Номер заявки в боте» осталось
+    // у старых задач.
     const number = byName.get(FIELD.requestNo);
     return {
       taskId: task.id,
-      number: number ? Number(number) : null,
+      number: number ? Number(number) : task.id,
       topic: byName.get(FIELD.topic) ?? null,
       project: byName.get(FIELD.project) ?? null,
       description: byName.get(FIELD.description) ?? null,
@@ -183,6 +206,7 @@ export class Pyrus {
       deadline: byName.get(FIELD.deadline) ?? null,
       created: task.create_date ?? null,
       closed: task.is_closed ?? Boolean(task.close_date),
+      status: byName.get(FIELD.status) ?? null,
     };
   }
 
@@ -229,9 +253,19 @@ export class Pyrus {
     taskId: number,
     text: string,
     action?: "finished" | "reopened",
+    status?: BoardStatus,
   ): Promise<boolean> {
     const payload: Record<string, unknown> = { text };
     if (action) payload.action = action;
+    if (status) {
+      // Колонка доски — поле выбора: принимает не текст, а choice_id.
+      const fields = await this.fields();
+      const fieldId = fields.get(FIELD.status);
+      const choiceId = this.choices.get(FIELD.status)?.get(status);
+      if (fieldId && choiceId !== undefined) {
+        payload.field_updates = [{ id: fieldId, value: { choice_id: choiceId } }];
+      }
+    }
     await this.call(`/tasks/${taskId}/comments`, payload);
     return true;
   }

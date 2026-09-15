@@ -1,6 +1,7 @@
 """Старт, меню, инфо, мои заявки, /id."""
 from __future__ import annotations
 
+import html
 import logging
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile, Message
 
-from .. import db
+from .. import pyrus
 from ..keyboards import BTN_INFO, BTN_MY, app_button, main_menu
 from ..texts import CASES, INFO, NO_REQUESTS, OPEN_APP, STATUSES, WELCOME
 
@@ -94,6 +95,17 @@ _HEADER_KEYS = ("Проект:", "Основа:", "Срок:", "Картинки
 EXCERPT_LIMIT = 70
 
 
+def board_status_label(board_status: str, closed: bool) -> str:
+    """Колонка доски → подпись статуса, как на кнопках в чате."""
+    if board_status == pyrus.STATUS_REJECTED:
+        return STATUSES["rejected"]
+    if closed or board_status == pyrus.STATUS_DONE:
+        return STATUSES["done"]
+    if board_status == pyrus.STATUS_WORK:
+        return STATUSES["in_progress"]
+    return STATUSES["new"]
+
+
 def request_excerpt(description: str | None) -> str:
     """Короткая суть заявки для списка.
 
@@ -123,16 +135,16 @@ async def render_user_requests(user_id: int) -> str:
     type 'Message' is not supported`, и кнопка «Мои заявки» в чате молча не
     отвечала. Регистрация ниже, у `my_requests`.
     """
-    requests = await db.list_user_requests(user_id)
+    requests = await pyrus.list_user_requests(user_id)
     if not requests:
         return NO_REQUESTS
     lines = []
     for r in requests:
-        case_title = CASES.get(r["case_key"], {}).get("title", r["case_key"])
-        status = STATUSES.get(r["status"], r["status"])
-        excerpt = request_excerpt(r["description"])
-        head = f"№{r['id']} · {case_title}"
-        tail = f"{status} · {r['created_at'][:10]}"
+        case_title = html.escape(r["case_title"])
+        status = board_status_label(r["board_status"], r["closed"])
+        excerpt = html.escape(request_excerpt(r["description"]))
+        head = f"№{r['task_id']} · {case_title}"
+        tail = f"{status} · {(r['created'] or '')[:10]}"
         lines.append(f"{head}\n{excerpt}\n{tail}" if excerpt else f"{head}\n{tail}")
     return "\n\n".join(lines)
 
