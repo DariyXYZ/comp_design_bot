@@ -42,6 +42,15 @@ describe("действия по заявке", () => {
     expect(planAction("accept", request, "")?.action).toBeUndefined();
   });
 
+  it("колонка доски: ответ и доработка — в работу, отмена — отклонена", () => {
+    expect(planAction("answer", request, "Двор — второй вариант")?.status).toBe("В работе");
+    expect(planAction("answer", request, "Двор — второй вариант")?.action).toBeUndefined();
+    expect(planAction("answer", request, "  ")).toBeNull();
+    expect(planAction("rework", request, "Не тот двор")?.status).toBe("В работе");
+    expect(planAction("cancel", request, "")?.status).toBe("Отклонена");
+    expect(planAction("note", request, "Привет")?.status).toBeUndefined();
+  });
+
   it("длинное сообщение обрезается, а не отвергается", () => {
     const plan = planAction("note", request, "я".repeat(MESSAGE_LIMIT + 500));
     expect(plan?.comment).toContain("я".repeat(MESSAGE_LIMIT));

@@ -13,7 +13,7 @@
  *   `forms/{id}/register` Pyrus молча игнорирует (проверено — фильтр по
  *   несуществующему id возвращает весь реестр).
  */
-import type { BoardStatus } from "@/lib/board-status";
+import { BOARD_STATUS, type BoardStatus } from "@/lib/board-status";
 
 const AUTH_URL = "https://api.pyrus.com/v4/auth";
 const DEFAULT_API = "https://api.pyrus.com/v4";
@@ -45,6 +45,8 @@ export type PyrusRequest = {
   closed: boolean;
   /** Колонка доски отдела. */
   status: string | null;
+  /** Последний вопрос отдела, пока задача в колонке «Требуется уточнение». */
+  question: string | null;
 };
 
 type FieldValue =
@@ -85,7 +87,22 @@ type PyrusTask = {
   close_date?: string | null;
   is_closed?: boolean;
   fields?: PyrusField[];
+  comments?: { text?: string }[];
 };
+
+/**
+ * Договорённость с ботом: вопрос отдела уходит в задачу комментарием с этим
+ * началом. Кабинет показывает последний такой комментарий как вопрос.
+ */
+const QUESTION_PREFIX = "Вопрос заявителю:";
+
+function lastQuestion(task: PyrusTask): string | null {
+  for (const comment of [...(task.comments ?? [])].reverse()) {
+    const text = comment.text?.trim() ?? "";
+    if (text.startsWith(QUESTION_PREFIX)) return text.slice(QUESTION_PREFIX.length).trim();
+  }
+  return null;
+}
 
 export class Pyrus {
   private token: string | null = null;
@@ -207,6 +224,7 @@ export class Pyrus {
       created: task.create_date ?? null,
       closed: task.is_closed ?? Boolean(task.close_date),
       status: byName.get(FIELD.status) ?? null,
+      question: byName.get(FIELD.status) === BOARD_STATUS.clarify ? lastQuestion(task) : null,
     };
   }
 

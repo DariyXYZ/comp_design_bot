@@ -18,10 +18,14 @@ from aiogram.types import CallbackQuery, Message, User
 
 from .. import pyrus
 from ..config import config
-from ..keyboards import dept_status_buttons, feedback_buttons
+from ..keyboards import app_button, dept_status_buttons, feedback_buttons
 from ..texts import (
     ACCEPTED_CONTACT_LINE,
+    ASK_CLARIFY_QUESTION,
     ASK_REJECTION_REASON,
+    CLARIFY_QUESTION_NOTIFY,
+    CLARIFY_QUESTION_SAVED,
+    CLARIFY_STATUS_LINE,
     DONE_CONTACT_LINE,
     REJECTION_REASON_NOTIFY,
     REJECTION_REASON_SAVED,
@@ -49,6 +53,7 @@ class DeptReply(StatesGroup):
     # даже в групповом чате ловит именно того, кого спросили. Расплата за
     # отказ от реплая — не переживает рестарт бота (MemoryStorage).
     reason = State()
+    question = State()
 
 
 def mention(user: User) -> str:
@@ -126,6 +131,9 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
         elif new_status == "rejected":
             actor_line = _actor_from_card(callback.message)
             note = f"Отклонена в чате отдела: {who}"
+        elif new_status == "clarify":
+            actor_line = _actor_from_card(callback.message)
+            note = f"Требуется уточнение у заявителя — спрашивает {who}"
         else:
             actor_line = _actor_from_card(callback.message)
             note = f"Статус в чате: {STATUSES[new_status]} — {who}"
@@ -138,7 +146,9 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
         await callback.answer(f"Статус: {STATUSES[new_status]}")
 
         if new_status == "rejected":
-            await _ask_rejection_reason(callback, req_id, state)
+            await _ask_followup(callback, req_id, state, DeptReply.reason, ASK_REJECTION_REASON)
+        elif new_status == "clarify":
+            await _ask_followup(callback, req_id, state, DeptReply.question, ASK_CLARIFY_QUESTION)
 
         # Перерисовываем тем же рендерером, что и при создании. Способ зависит
         # от того, каким сообщением ушла заявка (см. create.send_request):
@@ -179,6 +189,8 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
             notify += ACCEPTED_CONTACT_LINE.format(contact=mention(actor))
         elif new_status == "done":
             notify += DONE_CONTACT_LINE.format(contact=mention(actor))
+        elif new_status == "clarify":
+            notify += CLARIFY_STATUS_LINE
         # Оценку просим только у «Готово» — на промежуточных статусах оценивать нечего.
         feedback_markup = feedback_buttons(req_id) if new_status == "done" else None
         try:
@@ -187,19 +199,21 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
             log.info("Заявка №%s: автору не доставлено уведомление (закрыл личку?)", req_id)
 
 
-async def _ask_rejection_reason(callback: CallbackQuery, req_id: int, state: FSMContext) -> None:
-    """Отклонение без причины заявителю ничего не объясняет — просим коротко
-    пояснить обычным текстом. Если у этого же человека уже открыт вопрос по
-    другой заявке, не перезаписываем его молча."""
+async def _ask_followup(
+    callback: CallbackQuery, req_id: int, state: FSMContext, target: State, prompt: str
+) -> None:
+    """Статус, которому нужен текст (причина отказа, вопрос заявителю), —
+    просим его обычным сообщением. Если у этого же человека уже открыт вопрос
+    по другой заявке, не перезаписываем его молча."""
     if await state.get_state() is not None:
         log.info(
-            "Заявка №%s: не спросили причину отклонения у %s — уже открыт вопрос по другой заявке",
+            "Заявка №%s: не спросили текст у %s — уже открыт вопрос по другой заявке",
             req_id, callback.from_user.id,
         )
         return
-    await state.set_state(DeptReply.reason)
+    await state.set_state(target)
     await state.update_data(req_id=req_id)
-    await callback.message.answer(ASK_REJECTION_REASON.format(req_id=req_id))
+    await callback.message.answer(prompt.format(req_id=req_id))
 
 
 @router.message(DeptReply.reason, F.text)
@@ -227,3 +241,35 @@ async def capture_rejection_reason(message: Message, state: FSMContext, bot: Bot
 @router.message(DeptReply.reason)
 async def rejection_reason_wrong_type(message: Message) -> None:
     await message.answer("Пришли причину текстом, пожалуйста.")
+
+
+@router.message(DeptReply.question, F.text)
+async def capture_clarify_question(message: Message, state: FSMContext, bot: Bot) -> None:
+    data = await state.get_data()
+    req_id = data.get("req_id")
+    await state.clear()
+    text = message.text.strip()
+    if not req_id or not text:
+        return
+
+    # Префикс — договорённость с кабинетом: он показывает заявителю последний
+    # комментарий с таким началом как вопрос отдела.
+    await pyrus.add_comment(req_id, f"Вопрос заявителю: {text}")
+    await message.reply(CLARIFY_QUESTION_SAVED.format(req_id=req_id))
+    req = await pyrus.get_request(req_id)
+    if req and req["user_id"]:
+        try:
+            await bot.send_message(
+                req["user_id"],
+                CLARIFY_QUESTION_NOTIFY.format(req_id=req_id, question=html.escape(text)),
+                # Кнопка с кодом входа: имя берём из поля «Telegram» задачи —
+                # объекта User здесь нет, а ник для входа не нужен.
+                reply_markup=app_button(User(id=req["user_id"], is_bot=False, first_name=req["author"])),
+            )
+        except Exception:
+            log.info("Заявка №%s: вопрос не доставлен автору", req_id)
+
+
+@router.message(DeptReply.question)
+async def clarify_question_wrong_type(message: Message) -> None:
+    await message.answer("Пришли вопрос текстом, пожалуйста.")

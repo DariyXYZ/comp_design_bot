@@ -101,6 +101,8 @@ def board_status_label(board_status: str, closed: bool) -> str:
         return STATUSES["rejected"]
     if closed or board_status == pyrus.STATUS_DONE:
         return STATUSES["done"]
+    if board_status == pyrus.STATUS_CLARIFY:
+        return STATUSES["clarify"]
     if board_status == pyrus.STATUS_WORK:
         return STATUSES["in_progress"]
     return STATUSES["new"]

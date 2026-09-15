@@ -6,6 +6,7 @@
 export const BOARD_STATUS = {
   new: "Новая задача",
   work: "В работе",
+  clarify: "Требуется уточнение",
   done: "Выполнено",
   rejected: "Отклонена",
 } as const;

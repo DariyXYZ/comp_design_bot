@@ -12,7 +12,7 @@
  */
 import { BOARD_STATUS, type BoardStatus } from "@/lib/board-status";
 
-export const REQUEST_ACTIONS = ["note", "accept", "rework", "cancel"] as const;
+export const REQUEST_ACTIONS = ["note", "answer", "accept", "rework", "cancel"] as const;
 
 export type RequestAction = (typeof REQUEST_ACTIONS)[number];
 
@@ -37,7 +37,7 @@ export function isRequestAction(value: unknown): value is RequestAction {
 
 /** Нужен ли этому действию текст от человека. */
 export function needsText(action: RequestAction): boolean {
-  return action === "note" || action === "rework";
+  return action === "note" || action === "answer" || action === "rework";
 }
 
 export type RequestRef = {
@@ -70,6 +70,17 @@ export function planAction(
       return {
         comment: `Сообщение ${from}:\n${message}`,
         chat: `${head}\nСообщение ${from}:\n${message}`,
+      };
+    case "answer":
+      // Ответ на вопрос отдела: задача возвращается из «Требуется уточнение»
+      // в работу — ждать больше нечего.
+      return {
+        comment: `Ответ заявителя:
+${message}`,
+        chat: `${head}
+Ответ ${from}:
+${message}`,
+        status: BOARD_STATUS.work,
       };
     case "accept":
       // Задача уже закрыта переходом в «Готово» — состояние не меняем, но

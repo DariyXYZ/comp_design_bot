@@ -7,6 +7,7 @@ import { Screen } from "@/components/layout/screen";
 import { routes } from "@/config/navigation";
 import { RESTART_HINT } from "@/config/copy";
 import { MESSAGE_LIMIT, type RequestAction } from "@/features/requests/actions";
+import { StatusTag } from "@/features/requests/components/status-tag";
 import { actOnRequest, fetchRequest } from "@/lib/client/api";
 import { askLeave, setLeaveGuard } from "@/lib/client/leave-guard";
 import type { PyrusRequest } from "@/lib/server/pyrus";
@@ -113,6 +114,9 @@ export function RequestCard() {
 
   const request = state.request;
   const ready = text.trim().length > 0;
+  // Ход за заявителем: отдел задал вопрос и ждёт. Поле ввода то же, меняется
+  // смысл главной кнопки — ответ возвращает задачу в работу.
+  const asked = request.question !== null;
 
   return (
     <>
@@ -122,9 +126,7 @@ export function RequestCard() {
         backHref={routes.myRequests}
       >
         <div className="row-meta">
-          <span className={request.closed ? "tag" : "tag tag-work"}>
-            {request.closed ? "Завершена" : "В работе"}
-          </span>
+          <StatusTag request={request} />
           {request.deadline ? (
             <span className="row-dim">срок {request.deadline}</span>
           ) : null}
@@ -145,6 +147,13 @@ export function RequestCard() {
           </div>
         ) : null}
 
+        {asked ? (
+          <div className="banner">
+            <strong>Отдел просит уточнить</strong>
+            <span>{request.question}</span>
+          </div>
+        ) : null}
+
         {done ? (
           <div className="banner banner-quiet">
             <strong>{done}</strong>
@@ -160,13 +169,17 @@ export function RequestCard() {
         ) : null}
 
         <label className="field">
-          <span>Написать по заявке</span>
+          <span>{asked ? "Ответ отделу" : "Написать по заявке"}</span>
           <textarea
             rows={4}
             value={text}
             maxLength={MESSAGE_LIMIT}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Дополнить задачу, задать вопрос, уточнить сроки"
+            placeholder={
+              asked
+                ? "Ответьте на вопрос — заявка вернётся в работу"
+                : "Дополнить задачу, задать вопрос, уточнить сроки"
+            }
           />
         </label>
 
@@ -228,9 +241,9 @@ export function RequestCard() {
       </Screen>
 
       <ActionBar
-        label={busy ? "Отправляем…" : "Отправить отделу"}
+        label={busy ? "Отправляем…" : asked ? "Ответить отделу" : "Отправить отделу"}
         note={ready ? undefined : "Напишите сообщение — оно уйдёт в чат отдела"}
-        onClick={() => void act("note")}
+        onClick={() => void act(asked ? "answer" : "note")}
         disabled={!ready || busy}
       />
     </>
@@ -239,6 +252,7 @@ export function RequestCard() {
 
 const DONE_NOTE: Record<RequestAction, string> = {
   note: "Сообщение отправлено",
+  answer: "Ответ отправлен, заявка снова в работе",
   accept: "Результат принят",
   rework: "Возвращена на доработку",
   cancel: "Заявка отменена",

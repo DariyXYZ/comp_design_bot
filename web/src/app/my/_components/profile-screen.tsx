@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusTag } from "@/features/requests/components/status-tag";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Chevron } from "@/components/ui/chevron";
@@ -158,11 +159,7 @@ export function ProfileScreen() {
                   {request.number ? (
                     <span className="row-dim">№ {request.number}</span>
                   ) : null}
-                  {/* Статус заявки ведётся в чате отдела, в Pyrus уходит
-                      только закрытие — поэтому здесь ровно два состояния. */}
-                  <span className={request.closed ? "tag" : "tag tag-work"}>
-                    {request.closed ? "Завершена" : "В работе"}
-                  </span>
+                  <StatusTag request={request} />
                   {request.deadline ? (
                     <span className="row-dim">срок {request.deadline}</span>
                   ) : null}

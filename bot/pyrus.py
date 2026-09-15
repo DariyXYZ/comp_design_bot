@@ -63,6 +63,7 @@ FIELD_CHAT_MESSAGE = "ID сообщения в чате"
 # руками на доске, у бота свои в чате.
 STATUS_NEW = "Новая задача"
 STATUS_WORK = "В работе"
+STATUS_CLARIFY = "Требуется уточнение"
 STATUS_DONE = "Выполнено"
 STATUS_REJECTED = "Отклонена"
 
@@ -73,6 +74,7 @@ CHAT_TO_BOARD: dict[str, tuple[str, str | None]] = {
     "new": (STATUS_NEW, "reopened"),
     "accepted": (STATUS_WORK, "reopened"),
     "in_progress": (STATUS_WORK, "reopened"),
+    "clarify": (STATUS_CLARIFY, "reopened"),
     "done": (STATUS_DONE, "finished"),
     "rejected": (STATUS_REJECTED, "finished"),
 }
