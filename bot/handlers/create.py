@@ -463,29 +463,6 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         await _attach_photos_to_pyrus(bot, task_id, data.get("photos", []))
         await pyrus.attach_uploaded(task_id, data.get("pyrus_photo_guids", []))
 
-    # Доска отдела — зеркало реестра: заявку должен видеть весь отдел, а не
-    # только тот, кому открыт реестр. Отдельным вызовом и независимо от того,
-    # создалась ли задача в реестре: одно не должно утягивать за собой другое.
-    board_task_id = await pyrus.send_to_board(
-        req_id=req_id,
-        case_title=CASES.get(data["case_key"], {}).get("title", data["case_key"]),
-        description=data["description"],
-        author=author,
-        source_path=data.get("source_path"),
-        photos=len(data.get("photos", [])),
-        project=data.get("wa_project"),
-        origin=data.get("wa_origin"),
-        origin_path=data.get("wa_origin_path"),
-        deadline=data.get("wa_deadline"),
-    )
-    if board_task_id:
-        await db.set_pyrus_board_task(req_id, board_task_id)
-        await _attach_photos_to_pyrus(bot, board_task_id, data.get("photos", []))
-        # Картинки из Mini App: guid одноразовый и уже ушёл в реестр, поэтому
-        # на доску они переносятся из задачи реестра, а не тем же guid.
-        if task_id and data.get("pyrus_photo_guids"):
-            await pyrus.copy_attachments(task_id, board_task_id)
-
     if config.dept_chat_id is None:
         await callback.message.answer(SENT_NO_DEPT.format(req_id=req_id))
         return

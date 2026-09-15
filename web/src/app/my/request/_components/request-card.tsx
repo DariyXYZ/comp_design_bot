@@ -209,7 +209,7 @@ export function RequestCard() {
             <div className="rows">
               <button
                 type="button"
-                className="row-action"
+                className="row-action danger"
                 disabled={busy}
                 onClick={() => {
                   void askLeave().then((confirmed) => {

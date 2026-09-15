@@ -60,7 +60,7 @@ _NEW_COLUMNS = {
     "feedback": "TEXT",  # 'up' / 'down', пусто пока не оценили
     "feedback_comment": "TEXT",
     "pyrus_task_id": "INTEGER",  # задача в Pyrus, если интеграция включена
-    "pyrus_board_task_id": "INTEGER",  # её же копия на доске отдела
+    "pyrus_board_task_id": "INTEGER",  # было зеркало на доске; колонка осталась в старых базах
 }
 
 # Единственные два префикса, которые когда-либо подставляются в SQL как имена
@@ -86,17 +86,6 @@ async def set_pyrus_task(request_id: int, task_id: int) -> None:
         await _setup(db)
         await db.execute(
             "UPDATE requests SET pyrus_task_id = ?, updated_at = ? WHERE id = ?",
-            (task_id, _now(), request_id),
-        )
-        await db.commit()
-
-
-async def set_pyrus_board_task(request_id: int, task_id: int) -> None:
-    """Запоминает копию заявки на доске отдела — по ней её потом закрывать."""
-    async with _connect() as db:
-        await _setup(db)
-        await db.execute(
-            "UPDATE requests SET pyrus_board_task_id = ?, updated_at = ? WHERE id = ?",
             (task_id, _now(), request_id),
         )
         await db.commit()

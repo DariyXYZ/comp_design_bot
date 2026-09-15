@@ -16,15 +16,16 @@
 const AUTH_URL = "https://api.pyrus.com/v4/auth";
 const DEFAULT_API = "https://api.pyrus.com/v4";
 
+/** Поля формы канбан-доски отдела «Вычислительное Проектирование задачи». */
 export const FIELD = {
   topic: "Тема",
   project: "Проект",
-  description: "Описание и ожидаемый результат",
+  description: "Описание задачи",
   origin: "Основа заявки",
-  source: "Путь к исходникам",
+  source: "Путь к проекту",
   originPath: "Путь к решению-источнику",
   deadline: "Дата",
-  author: "Автор в Telegram",
+  author: "Telegram",
   telegramId: "Telegram ID",
   requestNo: "Номер заявки в боте",
 } as const;
@@ -41,9 +42,32 @@ export type PyrusRequest = {
   closed: boolean;
 };
 
-type FieldValue = string | number | null | { choice_names?: string[]; choice_value?: string };
+type FieldValue =
+  | string
+  | number
+  | null
+  | { choice_names?: string[]; choice_value?: string; fields?: PyrusField[] };
 
 type PyrusField = { id: number; name?: string; value?: FieldValue };
+
+type SchemaField = { id: number; name?: string; info?: { fields?: SchemaField[] } };
+
+/**
+ * Поля формы одним списком, включая вложенные в разделы: на доске отдела
+ * поля лежат внутри разделов («Инфо», «Задача»), и плоский обход их не видит.
+ */
+function flattenSchema(fields: SchemaField[]): SchemaField[] {
+  return fields.flatMap((field) => [field, ...flattenSchema(field.info?.fields ?? [])]);
+}
+
+/** Поля задачи одним списком: у поля-раздела значение — `{ fields: [...] }`. */
+function flattenTask(fields: PyrusField[]): PyrusField[] {
+  return fields.flatMap((field) => {
+    const nested =
+      field.value && typeof field.value === "object" ? (field.value.fields ?? []) : [];
+    return [field, ...flattenTask(nested)];
+  });
+}
 
 type PyrusTask = {
   id: number;
@@ -110,11 +134,9 @@ export class Pyrus {
 
   private async fields(): Promise<Map<string, number>> {
     if (this.schema) return this.schema;
-    const body = await this.call<{ fields?: { id: number; name?: string }[] }>(
-      `/forms/${this.formId}`,
-    );
+    const body = await this.call<{ fields?: SchemaField[] }>(`/forms/${this.formId}`);
     const map = new Map<string, number>();
-    for (const field of body.fields ?? []) {
+    for (const field of flattenSchema(body.fields ?? [])) {
       const name = field.name?.trim();
       if (name) map.set(name, field.id);
     }
@@ -144,7 +166,7 @@ export class Pyrus {
   ): PyrusRequest | null {
     const byName = new Map<string, string | null>();
     let telegram: string | null = null;
-    for (const field of task.fields ?? []) {
+    for (const field of flattenTask(task.fields ?? [])) {
       const value = Pyrus.plain(field.value);
       if (field.name) byName.set(field.name.trim(), value);
       if (field.id === tgFieldId) telegram = value;

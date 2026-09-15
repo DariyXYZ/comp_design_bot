@@ -17,12 +17,12 @@
   и тогда заявки начали бы уезжать в чужие поля молча. Названия при этом
   видны человеку в конструкторе, поэтому расхождение сразу заметно. Схема
   формы читается один раз и кэшируется на время жизни процесса.
-* **Заявка уходит в две формы сразу.** Реестр заявок (`PYRUS_FORM_ID`) —
-  мастер: только там есть «Telegram ID», по которому личный кабинет отбирает
-  заявки человека. Доска отдела (`PYRUS_BOARD_ID`) — зеркало: её видит весь
-  отдел, но полей под тему, срок и Telegram ID у неё нет, поэтому всё
-  складывается в «Описание задачи» текстом. Зеркало необязательно и никогда не
-  ломает основную заявку: не создалось — ушло в лог, и только.
+* **Одна форма — доска отдела.** Заявка создаётся в форме канбан-доски
+  «Вычислительное Проектирование задачи»: её видит весь отдел, и в ней же
+  лежат «Telegram ID» и «Номер заявки в боте», по которым личный кабинет
+  отбирает заявки человека. Колонки доски — поле «Статус»: новая заявка
+  встаёт в «Новая задача», «Готово» в чате закрывает задачу и ставит
+  «Выполнено» одним комментарием.
 """
 from __future__ import annotations
 
@@ -40,32 +40,26 @@ AUTH_URL = "https://api.pyrus.com/v4/auth"
 DEFAULT_API = "https://api.pyrus.com/v4"
 TIMEOUT = aiohttp.ClientTimeout(total=20)
 
-# Названия полей в форме «Заявка в отдел вычислительного проектирования».
+# Названия полей формы доски «Вычислительное Проектирование задачи».
 # Переименуют поле в Pyrus — значение перестанет заполняться, и это видно в
 # логе; ломать заявку такое расхождение не должно.
 FIELD_TOPIC = "Тема"
 FIELD_PROJECT = "Проект"
-FIELD_DESCRIPTION = "Описание и ожидаемый результат"
+FIELD_DESCRIPTION = "Описание задачи"
 FIELD_ORIGIN = "Основа заявки"
-FIELD_SOURCE = "Путь к исходникам"
+FIELD_SOURCE = "Путь к проекту"
 FIELD_ORIGIN_PATH = "Путь к решению-источнику"
 FIELD_DEADLINE = "Дата"
-FIELD_AUTHOR = "Автор в Telegram"
+FIELD_AUTHOR = "Telegram"
 FIELD_TG_ID = "Telegram ID"
 FIELD_REQUEST_NO = "Номер заявки в боте"
+FIELD_STATUS = "Статус"
 
-# Названия полей доски «Вычислительное Проектирование задачи». Доска плоская:
-# ни темы, ни срока, ни Telegram ID у неё нет — всё, что не влезло в отдельные
-# поля, уходит текстом в «Описание задачи» (см. board_description).
-BOARD_DESCRIPTION = "Описание задачи"
-BOARD_PATH = "Путь к проекту"
-BOARD_TELEGRAM = "Telegram"
-BOARD_STATUS = "Статус"
+# Колонки канбана. Промежуточные статусы бот не трогает — их отдел ведёт
+# руками на доске, у бота свои в чате.
+STATUS_NEW = "Новая задача"
+STATUS_DONE = "Выполнено"
 
-# Статус, с которым задача появляется на доске. Дальше её ведёт отдел руками:
-# промежуточные статусы бот не трогает, у него свои — в чате.
-BOARD_STATUS_NEW = "Новая задача"
-BOARD_STATUS_DONE = "Выполнено"
 
 def _flatten(fields: list[dict]) -> list[dict]:
     """Поля формы одним списком, включая вложенные в разделы.
@@ -81,6 +75,17 @@ def _flatten(fields: list[dict]) -> list[dict]:
         nested = (field.get("info") or {}).get("fields") or []
         if nested:
             flat.extend(_flatten(nested))
+    return flat
+
+
+def _task_fields(task: dict) -> list[dict]:
+    """Поля задачи одним списком: у поля-раздела значение — `{fields: [...]}`."""
+    flat: list[dict] = []
+    for field in task.get("fields", []):
+        flat.append(field)
+        value = field.get("value")
+        if isinstance(value, dict) and value.get("fields"):
+            flat.extend(_task_fields({"fields": value["fields"]}))
     return flat
 
 
@@ -297,7 +302,7 @@ class Pyrus:
         mine = []
         for task in tasks:
             values = {}
-            for field in task.get("fields", []):
+            for field in _task_fields(task):
                 value = field.get("value")
                 if isinstance(value, dict):
                     names = value.get("choice_names")
@@ -340,79 +345,33 @@ class Pyrus:
         log.info("Pyrus: к задаче %s привязано файлов из Mini App: %s", task_id, len(guids))
         return len(guids)
 
-    async def copy_attachments(self, from_task: int, to_task: int, text: str) -> int:
-        """Переносит вложения одной задачи в другую. Возвращает число файлов.
-
-        Guid загруженного файла Pyrus принимает один раз: картинки из Mini
-        App уже ушли в реестр, и приложить те же guid к копии на доске нельзя
-        (`The attachment file ... already attached`). Поэтому файлы читаются
-        из задачи-источника и заливаются заново.
-        """
-        body = await self._call(f"/tasks/{from_task}")
-        attachments = ((body or {}).get("task") or {}).get("attachments") or []
-        if not attachments:
-            return 0
-        files: list[tuple[str, bytes]] = []
-        async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
-            token = self._token or await self._authorize(session)
-            if not token:
-                return 0
-            headers = {"Authorization": f"Bearer {token}"}
-            for att in attachments:
-                url = att.get("url") or f"{self._api}/files/download/{att.get('id')}"
-                async with session.get(url, headers=headers) as resp:
-                    if resp.status != 200:
-                        log.warning("Pyrus: файл %s не скачался (%s)", att.get("name"), resp.status)
-                        continue
-                    # Имя в ответе Pyrus URL-кодировано (пробелы как %20).
-                    name = unquote(att.get("name") or "file")
-                    files.append((name, await resp.read()))
-        return await self.upload_and_attach(to_task, files, text)
-
     async def close_task(self, task_id: int, note: str) -> bool:
         """Закрывает задачу — заявка отработана.
 
         Единственное, что переносится из чата в Pyrus. Статусы отдел ведёт в
-        Telegram (кнопки под карточкой — с телефона удобнее), а Pyrus
-        остаётся реестром. Закрытие — исключение: незакрытая задача висит в
-        списках и портит отчёты, а «Готово» в чате означает ровно то же, что
-        «закрыта» здесь.
+        Telegram (кнопки под карточкой — с телефона удобнее). Закрытие —
+        исключение: незакрытая задача висит в списках и портит отчёты, а
+        «Готово» в чате означает ровно то же, что «закрыта» здесь.
 
         Закрывается комментарием с `action: finished` — отдельного метода
-        закрытия у Pyrus нет. `note` уходит текстом того же комментария,
-        чтобы в задаче было видно, кем и почему она закрыта.
+        закрытия у Pyrus нет. Тем же комментарием `field_updates` переводит
+        «Статус» в «Выполнено»: колонки канбана идут по этому полю, и
+        закрытая задача иначе осталась бы в «Новая задача». Закрытие требует
+        прав администратора формы у аккаунта бота — иначе Pyrus отвечает
+        `access_denied_close_task`, и статус тоже не применяется.
 
         Реестр читается с `include_archived`, поэтому из личного кабинета
         заявка не исчезает.
         """
-        result = await self._call(
-            f"/tasks/{task_id}/comments", {"text": note, "action": "finished"}
-        )
-        if result is None:
-            log.warning("Pyrus: не удалось закрыть задачу %s", task_id)
-            return False
-        log.info("Pyrus: задача %s закрыта", task_id)
-        return True
-    async def close_with_fields(
-        self, task_id: int, values: dict[str, object], form_id: int, note: str
-    ) -> bool:
-        """Закрывает задачу и тем же комментарием меняет поля (`field_updates`).
-
-        Нужно доске отдела: колонки канбана идут по полю «Статус», и просто
-        закрытая задача осталась бы в «Новая задача». Закрытие требует прав
-        администратора формы у аккаунта бота — иначе Pyrus отвечает
-        `access_denied_close_task`, и тогда не применяется и статус: запрос
-        отклоняется целиком.
-        """
-        updates = await self._field_values(values, form_id)
         payload: dict[str, object] = {"text": note, "action": "finished"}
+        updates = await self._field_values({FIELD_STATUS: STATUS_DONE})
         if updates:
             payload["field_updates"] = updates
         result = await self._call(f"/tasks/{task_id}/comments", payload)
         if result is None:
             log.warning("Pyrus: не удалось закрыть задачу %s", task_id)
             return False
-        log.info("Pyrus: задача %s закрыта, поля: %s", task_id, list(values))
+        log.info("Pyrus: задача %s закрыта", task_id)
         return True
 
     async def create_text_task(self, text: str) -> int | None:
@@ -454,30 +413,6 @@ def request_text(
     return "\n".join(lines)
 
 
-def board_description(
-    req_id: int,
-    case_title: str,
-    description: str,
-    author: str,
-    origin_path: str | None = None,
-) -> str:
-    """Текст в поле «Описание задачи» на доске отдела.
-
-    Доска плоская: отдельных полей под тему и автора у неё нет, а терять их
-    нельзя — отдел смотрит на доску и должен видеть заявку целиком. Номер
-    заявки первой строкой — по нему задача на доске находится поиском и
-    сходится с карточкой в чате отдела. Проект, основа, срок и число
-    картинок сюда не дописываются: заявка из Mini App уже несёт их в шапке
-    самого описания (см. `_describe` в handlers/create.py), и на доске они
-    удваивались.
-    """
-    lines = [f"Заявка №{req_id} · {case_title}", f"От: {author}"]
-    if origin_path:
-        lines.append(f"Решение-источник: {origin_path}")
-    lines += ["", description]
-    return "\n".join(lines)
-
-
 async def attach_photos(
     task_id: int, files: list[tuple[str, bytes]]
 ) -> int:
@@ -506,19 +441,6 @@ async def attach_uploaded(task_id: int, guids: list[str]) -> int:
         return 0
 
 
-async def copy_attachments(from_task: int, to_task: int) -> int:
-    """Переносит картинки из задачи реестра в копию на доске. Никогда не бросает."""
-    if not pyrus.enabled or not from_task or not to_task:
-        return 0
-    try:
-        return await pyrus.copy_attachments(
-            from_task, to_task, "Картинки из заявки (приложены в Mini App)"
-        )
-    except Exception:  # noqa: BLE001 — зеркало не рушит заявку
-        log.exception("Pyrus: не удалось перенести вложения %s → %s", from_task, to_task)
-        return 0
-
-
 async def close_task(task_id: int, note: str) -> bool:
     """Закрытие задачи. Никогда не бросает: в чате заявка уже переведена, и
     падать из-за внешнего сервиса нельзя."""
@@ -529,67 +451,6 @@ async def close_task(task_id: int, note: str) -> bool:
     except Exception:  # noqa: BLE001 — см. docstring
         log.exception("Pyrus: не удалось закрыть задачу %s", task_id)
         return False
-
-async def close_board_task(task_id: int, note: str) -> bool:
-    """Закрывает копию на доске отдела и переводит «Статус» в «Выполнено» —
-    иначе закрытая карточка осталась бы в первой колонке канбана. Аккаунт
-    бота должен быть администратором формы доски. Никогда не бросает."""
-    if not pyrus.enabled or not task_id or not config.pyrus_board_id:
-        return False
-    try:
-        return await pyrus.close_with_fields(
-            task_id, {BOARD_STATUS: BOARD_STATUS_DONE}, config.pyrus_board_id, note
-        )
-    except Exception:  # noqa: BLE001 — см. docstring
-        log.exception("Pyrus: не удалось закрыть задачу %s на доске", task_id)
-        return False
-
-
-async def send_to_board(
-    req_id: int,
-    case_title: str,
-    description: str,
-    author: str,
-    source_path: str | None,
-    photos: int,
-    project: str | None = None,
-    origin: str | None = None,
-    origin_path: str | None = None,
-    deadline: str | None = None,
-) -> int | None:
-    """Зеркалит заявку на доску отдела. Возвращает id задачи или None.
-
-    Зачем отдельно от реестра: доску видит весь отдел, а реестр заявок — нет,
-    и ради этого заявка дублируется. Мастером остаётся реестр — только там
-    есть «Telegram ID», по которому личный кабинет отбирает заявки человека.
-
-    Блок «Инфо» (ФИО, почта, руководитель) не заполняется: он тянется из
-    справочника сотрудников, к которому у бота нет доступа, а сопоставить
-    Telegram-аккаунт с карточкой сотрудника бот и так не может.
-
-    Никогда не бросает: доска — зеркало, и её сбой не должен трогать заявку.
-    """
-    if not pyrus.enabled or not config.pyrus_board_id:
-        return None
-    try:
-        return await pyrus.create_form_task(
-            {
-                BOARD_DESCRIPTION: board_description(
-                    req_id, case_title, description, author, origin_path
-                ),
-                # Путь к проекту на доске один, а в заявке их два: исходники
-                # и путь к решению-источнику. Сюда идут исходники — это то,
-                # с чем отдел работает; источник ушёл в описание.
-                BOARD_PATH: source_path or project,
-                BOARD_TELEGRAM: author,
-                BOARD_STATUS: BOARD_STATUS_NEW,
-            },
-            form_id=config.pyrus_board_id,
-        )
-    except Exception:  # noqa: BLE001 — зеркало не рушит заявку, см. docstring
-        log.exception("Pyrus: не удалось создать задачу на доске для заявки %s", req_id)
-        return None
-
 
 async def send_request(
     req_id: int,
@@ -604,15 +465,13 @@ async def send_request(
     origin_path: str | None = None,
     deadline: str | None = None,
 ) -> int | None:
-    """Отправляет заявку в реестр Pyrus. Возвращает id задачи или None.
+    """Отправляет заявку на доску отдела в Pyrus. Возвращает id задачи или None.
 
     Никогда не бросает: заявка к этому моменту уже принята, и падение из-за
     внешнего сервиса было бы худшим из вариантов.
 
     Заявки из чата (без Mini App) приходят без проекта, основы и срока — эти
     поля просто остаются пустыми, форма их не требует.
-
-    На доску отдела заявка уходит отдельно — см. `send_to_board`.
     """
     if not pyrus.enabled:
         return None
@@ -629,6 +488,7 @@ async def send_request(
                 FIELD_AUTHOR: author,
                 FIELD_TG_ID: tg_user_id,
                 FIELD_REQUEST_NO: req_id,
+                FIELD_STATUS: STATUS_NEW,
             })
         text = request_text(req_id, case_title, description, author, source_path, photos)
         return await pyrus.create_text_task(text)
