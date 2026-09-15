@@ -49,6 +49,7 @@ TIMEOUT = aiohttp.ClientTimeout(total=20)
 FIELD_TOPIC = "Тема"
 FIELD_PROJECT = "Проект"
 FIELD_DESCRIPTION = "Описание задачи"
+FIELD_EXPECTED = "Ожидаемый результат"
 FIELD_ORIGIN = "Основа заявки"
 FIELD_SOURCE = "Путь к проекту"
 FIELD_ORIGIN_PATH = "Путь к решению-источнику"
@@ -444,6 +445,7 @@ class Pyrus:
             "project": values.get(FIELD_PROJECT),
             "origin": values.get(FIELD_ORIGIN),
             "deadline": values.get(FIELD_DEADLINE),
+            "expected": values.get(FIELD_EXPECTED),
             "board_status": values.get(FIELD_STATUS) or "",
             "chat_message_id": int(chat_message) if chat_message not in (None, "") else None,
             "photos": len(task.get("attachments") or []),
@@ -563,6 +565,7 @@ async def send_request(
     source_path: str | None,
     photos: int,
     tg_user_id: int | None = None,
+    expected: str | None = None,
     project: str | None = None,
     project_id: int | None = None,
     origin: str | None = None,
@@ -585,6 +588,7 @@ async def send_request(
             # остаётся пустым, название всё равно есть в шапке описания).
             FIELD_PROJECT: CatalogItem(project, project_id),
             FIELD_DESCRIPTION: description,
+            FIELD_EXPECTED: expected,
             FIELD_ORIGIN: origin,
             FIELD_SOURCE: source_path,
             FIELD_ORIGIN_PATH: origin_path,

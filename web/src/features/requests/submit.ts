@@ -28,6 +28,8 @@ export type RequestDraft = {
   /** id позиции справочника «Проект» — бот пишет его в поле-справочник. */
   projectId?: string;
   description?: string;
+  /** Ожидаемый результат — своё поле в Pyrus, не часть описания. */
+  expected?: string;
   source?: string;
   deadline?: string;
   /**
@@ -39,7 +41,7 @@ export type RequestDraft = {
 };
 
 /** Лимиты бота (`MAX_DESCRIPTION`, `MAX_SOURCE`) — обрезаем до отправки. */
-const LIMITS = { description: 3000, source: 500, short: 200 } as const;
+const LIMITS = { description: 3000, expected: 1500, source: 500, short: 200 } as const;
 
 function clean(value: string | undefined, limit: number): string | undefined {
   const text = value?.trim();
@@ -53,6 +55,7 @@ export function buildRequestPayload(draft: RequestDraft): Record<string, string>
   if (guids.length) payload.photos = guids.join(",");
   const fields: ReadonlyArray<[string, string | undefined, number]> = [
     ["description", draft.description, LIMITS.description],
+    ["expected", draft.expected, LIMITS.expected],
     ["project", draft.project, LIMITS.short],
     ["project_id", draft.projectId, LIMITS.short],
     ["deadline", draft.deadline, LIMITS.short],

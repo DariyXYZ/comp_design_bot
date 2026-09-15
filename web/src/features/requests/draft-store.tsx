@@ -50,6 +50,8 @@ export type DraftFields = {
   /** Позиция справочника проектов Pyrus, если название выбрано из подсказки. */
   projectId: string;
   description: string;
+  /** Что хотят получить на выходе — отдельно от описания, необязательно. */
+  expected: string;
   source: string;
   deadline: string;
 };
@@ -58,6 +60,7 @@ const EMPTY_FIELDS: DraftFields = {
   project: "",
   projectId: "",
   description: "",
+  expected: "",
   source: "",
   deadline: "",
 };
@@ -188,6 +191,7 @@ export function RequestDraftProvider({
   const filled =
     fields.project.trim().length > 0 ||
     fields.description.trim().length > 0 ||
+    fields.expected.trim().length > 0 ||
     fields.source.trim().length > 0 ||
     fields.deadline.length > 0 ||
     photos.length > 0;

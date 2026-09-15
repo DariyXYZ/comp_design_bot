@@ -134,6 +134,13 @@ export function RequestCard() {
 
         {request.description ? <p className="lead">{request.description}</p> : null}
 
+        {request.expected ? (
+          <div className="fact">
+            <span className="fact-key">Ожидаемый результат</span>
+            <span className="fact-value">{request.expected}</span>
+          </div>
+        ) : null}
+
         {request.project ? (
           <div className="fact">
             <span className="fact-key">Проект</span>

@@ -23,6 +23,7 @@ export const FIELD = {
   topic: "Тема",
   project: "Проект",
   description: "Описание задачи",
+  expected: "Ожидаемый результат",
   origin: "Основа заявки",
   source: "Путь к проекту",
   originPath: "Путь к решению-источнику",
@@ -39,6 +40,7 @@ export type PyrusRequest = {
   topic: string | null;
   project: string | null;
   description: string | null;
+  expected: string | null;
   origin: string | null;
   deadline: string | null;
   created: string | null;
@@ -219,6 +221,7 @@ export class Pyrus {
       topic: byName.get(FIELD.topic) ?? null,
       project: byName.get(FIELD.project) ?? null,
       description: byName.get(FIELD.description) ?? null,
+      expected: byName.get(FIELD.expected) ?? null,
       origin: byName.get(FIELD.origin) ?? null,
       deadline: byName.get(FIELD.deadline) ?? null,
       created: task.create_date ?? null,

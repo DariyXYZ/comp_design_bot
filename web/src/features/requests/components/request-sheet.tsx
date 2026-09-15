@@ -116,6 +116,7 @@ export function RequestSheet() {
       project: fields.project,
       projectId: fields.projectId,
       description: fields.description,
+      expected: fields.expected,
       source: fields.source,
       deadline: fields.deadline,
       photoGuids: photos.map((photo) => photo.guid),
@@ -266,13 +267,25 @@ export function RequestSheet() {
             и там должно лежать то, без чего заявку не отправить. */}
         <label className="field">
           <span>
-            Описание задачи и ожидаемый результат <em>обязательно</em>
+            Описание задачи <em>обязательно</em>
           </span>
           <textarea
             rows={3}
             value={fields.description}
             onChange={(e) => setField("description", e.target.value)}
-            placeholder="Что нужно сделать и что хотите получить на выходе"
+            placeholder="Что нужно сделать"
+          />
+        </label>
+
+        <label className="field">
+          <span>
+            Ожидаемый результат <em>необязательно</em>
+          </span>
+          <textarea
+            rows={2}
+            value={fields.expected}
+            onChange={(e) => setField("expected", e.target.value)}
+            placeholder="Что хотите получить на выходе: файл, скрипт, вариант, цифры"
           />
         </label>
 

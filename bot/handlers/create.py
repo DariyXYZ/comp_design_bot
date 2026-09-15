@@ -86,6 +86,7 @@ def request_card(
     status: str = "new",
     max_len: int | None = None,
     actor_line: str | None = None,
+    expected: str | None = None,
 ) -> str:
     """Единственный рендерер карточки. Весь пользовательский текст экранируется.
 
@@ -106,6 +107,8 @@ def request_card(
         "",
     ]
     tail_lines = []
+    if expected:
+        tail_lines += ["", f"🎯 Ожидаемый результат: {html.escape(expected)}"]
     if source_path:
         tail_lines += ["", f"📁 Исходники: <code>{html.escape(source_path)}</code>"]
     tail_lines += ["", STATUSES.get(status, status)]
@@ -144,6 +147,7 @@ async def choose_case(message: Message, state: FSMContext) -> None:
 
 
 MAX_MINIAPP_FIELD = 200  # проект, срок, название основы — короткие строки
+MAX_EXPECTED = 1500  # ожидаемый результат — абзац, не описание целиком
 
 
 def _int_field(data: dict, key: str) -> int | None:
@@ -273,6 +277,7 @@ async def from_webapp(message: Message, state: FSMContext) -> None:
             wa_origin=_field(data, "origin", MAX_MINIAPP_FIELD),
             wa_origin_path=_field(data, "origin_path", MAX_SOURCE),
             wa_deadline=_field(data, "deadline", MAX_MINIAPP_FIELD),
+            wa_expected=_field(data, "expected", MAX_EXPECTED),
         )
         # Картинки уже приложены в приложении — спрашивать их снова значит
         # просить человека сделать то, что он только что сделал.
@@ -458,6 +463,7 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
             origin=data.get("wa_origin"),
             origin_path=data.get("wa_origin_path"),
             deadline=data.get("wa_deadline"),
+            expected=data.get("wa_expected"),
         )
         if not req_id:
             await callback.answer(SENT_PYRUS_FAILED, show_alert=True)
@@ -483,18 +489,22 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     photos: list[str] = data.get("photos", [])
     description = data["description"]
     source_path = data.get("source_path")
+    expected = data.get("wa_expected")
     buttons = dept_status_buttons(req_id)
     thread = {"message_thread_id": config.dept_thread_id} if config.dept_thread_id else {}
 
     try:
         if not photos:
             # 0 фото: текст + кнопки в одном сообщении — как и раньше.
-            card = request_card(req_id, case_title, description, source_path, author)
+            card = request_card(
+                req_id, case_title, description, source_path, author, expected=expected
+            )
             dept_msg = await bot.send_message(config.dept_chat_id, card, reply_markup=buttons, **thread)
         elif len(photos) == 1:
             # 1 фото: подпись к фото = вся карточка + кнопки — тоже одно сообщение.
             caption = request_card(
-                req_id, case_title, description, source_path, author, max_len=CAPTION_LIMIT
+                req_id, case_title, description, source_path, author,
+                max_len=CAPTION_LIMIT, expected=expected,
             )
             dept_msg = await bot.send_photo(
                 config.dept_chat_id, photo=photos[0], caption=caption, reply_markup=buttons, **thread
@@ -504,7 +514,8 @@ async def send_request(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
             # к первому фото альбома (визуально один блок), кнопки — короткой
             # строкой статуса следом, без дублирования всего текста заявки.
             caption = request_card(
-                req_id, case_title, description, source_path, author, max_len=CAPTION_LIMIT
+                req_id, case_title, description, source_path, author,
+                max_len=CAPTION_LIMIT, expected=expected,
             )
             media = [InputMediaPhoto(media=photos[0], caption=caption)] + [
                 InputMediaPhoto(media=fid) for fid in photos[1:10]

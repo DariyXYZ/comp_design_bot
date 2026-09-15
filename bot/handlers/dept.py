@@ -167,12 +167,14 @@ async def change_status(callback: CallbackQuery, bot: Bot, state: FSMContext) ->
                 caption = request_card(
                     req_id, case_title, req["description"], req["source_path"],
                     req["author"], new_status, max_len=CAPTION_LIMIT, actor_line=actor_line,
+                    expected=req["expected"],
                 )
                 await callback.message.edit_caption(caption=caption, reply_markup=new_markup)
             else:
                 new_text = request_card(
                     req_id, case_title, req["description"], req["source_path"],
                     req["author"], new_status, actor_line=actor_line,
+                    expected=req["expected"],
                 )
                 await callback.message.edit_text(new_text, reply_markup=new_markup)
         except TelegramBadRequest as e:
