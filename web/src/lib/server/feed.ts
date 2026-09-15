@@ -136,8 +136,10 @@ export async function loadFeed(): Promise<FeedTask[]> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.tasks;
   const pyrus = pyrusClient();
   const register = await pyrus.register();
+  // Отклонённые в ленту не идут: это доска сделанного, а не корзина.
   const closed = register
     .filter((task) => task.is_closed || task.close_date)
+    .filter((task) => toFeedTask(task as Task).status !== BOARD_STATUS.rejected)
     .sort((a, b) => (b.close_date ?? "").localeCompare(a.close_date ?? ""))
     .slice(0, CLOSED_LIMIT);
   const active = register.filter((task) => !(task.is_closed || task.close_date));

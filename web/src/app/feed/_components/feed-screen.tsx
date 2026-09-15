@@ -29,7 +29,6 @@ const ORDER = [
   BOARD_STATUS.clarify,
   BOARD_STATUS.work,
   BOARD_STATUS.done,
-  BOARD_STATUS.rejected,
 ] as const;
 
 const TITLE: Record<string, string> = {
@@ -37,7 +36,6 @@ const TITLE: Record<string, string> = {
   [BOARD_STATUS.clarify]: "Ждут уточнения",
   [BOARD_STATUS.work]: "Сейчас в работе",
   [BOARD_STATUS.done]: "Сделано",
-  [BOARD_STATUS.rejected]: "Отклонено",
 };
 
 type State =
