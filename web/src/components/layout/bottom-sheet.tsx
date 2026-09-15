@@ -42,7 +42,10 @@ const HALF_RATIO = 0.5;
 const HALF_MIN_BODY_PX = 96;
 
 /** Скорость, после которой отпускание считается броском, а не установкой. */
-const FLING_PX_PER_MS = 0.35;
+/** Короткий бросок: на одно положение в сторону движения. */
+const FLING_PX_PER_MS = 0.3;
+/** Сильный бросок: до упора в сторону движения. */
+const STRONG_FLING_PX_PER_MS = 1.1;
 /** На сколько миллисекунд вперёд проецируется движение при отпускании. */
 const PROJECT_MS = 180;
 
@@ -246,7 +249,16 @@ export function BottomSheet({
     // прокручивается, кнопка отправки всегда над клавиатурой. Пересчёт — только
     // когда фокус пуст и фрейм вернулся.
     const onViewport = (arg?: unknown) => {
-      if (!eventIsStable(arg) || editableFocused()) return;
+      if (!eventIsStable(arg)) return;
+      if (editableFocused()) {
+        // Клавиатура встала, шторку прижал max-height (см. globals.css) —
+        // подводим поле в видимую часть тела. Высоту не трогаем.
+        const el = document.activeElement;
+        if (el instanceof HTMLElement && sheetRef.current?.contains(el)) {
+          el.scrollIntoView({ block: "nearest" });
+        }
+        return;
+      }
       relayout();
     };
     const onFocusOut = () => {
@@ -376,11 +388,18 @@ export function BottomSheet({
       swallowNextClick();
 
       let target: SheetSnap;
-      if (Math.abs(velocity) > FLING_PX_PER_MS) {
-        // Бросок летит до конца в свою сторону: широкий свайп вверх — сразу
-        // в полный размер, а не с остановкой на половине. Половина остаётся
-        // для медленного жеста.
+      const speed = Math.abs(velocity);
+      if (speed > STRONG_FLING_PX_PER_MS) {
+        // Сильный бросок летит до упора: размашистый свайп вверх — сразу в
+        // полный размер, вниз — в сложенное.
         target = velocity > 0 ? "peek" : "full";
+      } else if (speed > FLING_PX_PER_MS) {
+        // Короткий бросок — на одно положение в сторону движения: из
+        // сложенного до половины, из половины до полного. Так половина
+        // достижима лёгким жестом, а не только медленным доведением.
+        const step = velocity > 0 ? -1 : 1;
+        const index = Math.min(ORDER.length - 1, Math.max(0, ORDER.indexOf(current) + step));
+        target = ORDER[index];
       } else {
         // Медленное движение — магнит к ближайшему положению, но от точки,
         // куда палец «долетел» бы по инерции: так отпускание не ощущается

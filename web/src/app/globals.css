@@ -11,7 +11,7 @@
   /* Второй и последний семантический цвет — необратимое действие («Отменить
      заявку»). 5.9:1 к --page. Отдельно от --attention: «требуется уточнение»
      зовёт к действию, отмена — предупреждает о потере. */
-  --danger:#b3261e;
+  --danger:#ff3b30;
   /* Поверхность приподнятого элемента (активный сегмент навигации). На светлой
      теме это белая карточка, на тёмной — оттенок СВЕТЛЕЕ фона панели: иначе
      активный сегмент выглядит вдавленным, а не выбранным. */
@@ -74,13 +74,13 @@
         --line:#2a2a2e; --pill:#26262a; --accent:#f0f0ee;
         /* Тот же смысл, читаемый контраст на тёмном (8.9:1). */
         --attention:#e5a95c;
-        --danger:#f2857d;
+        --danger:#ff453a;
         --raised:#34343c}
 }
 *{box-sizing:border-box;margin:0;min-width:0;-webkit-tap-highlight-color:transparent}
 :root[data-theme="dark"]{
   color-scheme:dark;--ink:#f0f0ee;--sub:#94949a;--page:#101012;--card:#1b1b1e;
-  --line:#2a2a2e;--pill:#26262a;--accent:#f0f0ee;--attention:#e5a95c;--danger:#f2857d;--raised:#34343c;
+  --line:#2a2a2e;--pill:#26262a;--accent:#f0f0ee;--attention:#e5a95c;--danger:#ff453a;--raised:#34343c;
 }
 html,body{height:100%;width:100%;max-width:100vw;overflow:hidden;overscroll-behavior:none}
 body{
@@ -954,7 +954,11 @@ body{
   box-shadow:0 -10px 28px -22px rgba(0,0,0,.18);
   padding-bottom:calc(var(--s2) + env(safe-area-inset-bottom));
   touch-action:none;
-  transition:height .3s var(--ease);
+  /* Клавиатура: фрейм ужат, и клиент пишет живую высоту в свою переменную.
+     Верхняя граница по ней — шторка не уезжает верхом за экран, шапка и поле
+     ввода остаются видны; переход тот же, что у высоты. */
+  max-height:calc(var(--tg-viewport-height, 100dvh) - 12px);
+  transition:height .3s var(--ease), max-height .3s var(--ease);
   /* Страховка от любой ошибки замера: min-content флекс-колонки — это ручка,
      шапка и подвал (тело сжимается в ноль), то есть ровно нижнее положение
      шторки. Без неё слишком маленькая высота — например, до того как
@@ -976,7 +980,12 @@ body{
 }
 .sheet-grab:active{cursor:grabbing}
 
-.sheet-head{flex:none;padding:0 var(--s4)}
+.sheet-head{
+  flex:none;padding:0 var(--s4);
+  /* За шапку тянут: долгое удержание не должно выделять текст и звать
+     системное меню — на телефоне это выглядело как мигание строки. */
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+}
 /* Тело — единственная скроллящаяся часть. Шапка и подвал остаются на месте
    при любой высоте: по ним тянут шторку и в них лежит главное действие. */
 .sheet-body{
@@ -1038,7 +1047,7 @@ body{
    рядом. Палочка идёт от центра первого кружка к центру второго, под ними. */
 .origin-row{position:relative}
 .origin-row + .origin-row::before{
-  content:"";position:absolute;left:4px;top:-50%;height:100%;width:4px;
+  content:"";position:absolute;left:4.75px;top:-50%;height:100%;width:2.5px;
   background:var(--origin-color, var(--line));
 }
 .origin-body{min-width:0;flex:1;display:flex;flex-direction:column}

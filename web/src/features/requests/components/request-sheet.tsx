@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { RESTART_HINT } from "@/config/copy";
-import { MATERIAL_TYPE_FORMAL, materialById } from "@/features/materials";
+import { materialById } from "@/features/materials";
 import { topicColor } from "@/features/topics/color";
 import { haptic } from "@/lib/client/telegram";
 import { useRequestDraft } from "../draft-store";
@@ -76,7 +76,9 @@ export function RequestSheet() {
 
   const origin = material
     ? {
-        label: `${MATERIAL_TYPE_FORMAL[material.type]} · ${material.title}`,
+        // Только название: слово «Модуль»/«Инструмент» перед ним читалось
+        // как часть названия и сбивало. Тип виден по самому материалу.
+        label: material.title,
         path: material.files as string | undefined,
       }
     : { label: `Тема · ${topic?.title ?? "не выбрана"}`, path: undefined };

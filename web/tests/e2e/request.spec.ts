@@ -162,7 +162,7 @@ test.describe("заявка из Mini App", () => {
     expect(payload.deadline).toBe("2026-08-28");
     // В реестр отдела уходит внутреннее слово («Инструмент»), а не подпись из
     // интерфейса: по нему исполнители ищут в Pyrus.
-    expect(payload.origin).toBe("Инструмент · IND Solar — инсоляция и КЕО");
+    expect(payload.origin).toBe("IND Solar — инсоляция и КЕО");
     expect(payload.origin_path).toContain("CompDesign_Projects");
   });
 
