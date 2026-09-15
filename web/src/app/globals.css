@@ -121,7 +121,7 @@ body{
 .swipe-card{
   position:absolute;inset:0;perspective:1200px;
   border-radius:calc(var(--cu) * 5.5);
-  box-shadow:0 18px 44px -18px rgba(0,0,0,.22);
+  box-shadow:0 10px 24px -14px rgba(0,0,0,.14);
   cursor:grab;will-change:transform;
   transition:transform .46s cubic-bezier(.25,.8,.35,1), opacity .35s ease;
 }
@@ -232,7 +232,7 @@ body{
   font-family:inherit;font-size:.92rem;font-weight:600;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:0 22px;
-  box-shadow:0 14px 30px -12px rgba(0,0,0,.4);
+  box-shadow:0 8px 18px -10px rgba(0,0,0,.18);
 }
 .cta:active{transform:scale(.98)}
 .swipe-hint{text-align:center;font-size:.72rem;color:var(--sub);line-height:1.4;padding:0 32px;margin-top:12px}
@@ -676,7 +676,22 @@ body{
    и на заполненном слоте он врал бы. */
 .slot-filled{border-style:solid;border-color:var(--line);cursor:default}
 .slot-filled img{width:100%;height:100%;object-fit:cover;display:block}
-.slot-busy{color:var(--sub);letter-spacing:.1em}
+/* Загрузка: три точки подпрыгивают по очереди, ровно в центре слота — текстовое
+   «…» сидело на базовой линии и висело ниже середины. */
+.slot-busy{display:flex;align-items:center;justify-content:center;gap:5px}
+.slot-busy i{
+  width:6px;height:6px;border-radius:50%;background:var(--sub);
+  animation:slot-bounce .9s var(--ease) infinite;
+}
+.slot-busy i:nth-child(2){animation-delay:.15s}
+.slot-busy i:nth-child(3){animation-delay:.3s}
+@keyframes slot-bounce{
+  0%,60%,100%{transform:translateY(0)}
+  30%{transform:translateY(-5px)}
+}
+@media (prefers-reduced-motion: reduce){
+  .slot-busy i{animation:none}
+}
 /* Снимок в слоте — кнопка: тап открывает его крупно. */
 .slot-view{
   display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in;
@@ -694,10 +709,7 @@ body{
 /* cover, а не contain: рамка идёт от квадрата миниатюры к пропорциям снимка,
    и по пути снимок должен заполнять рамку, а не плавать в ней. В конечной
    рамке пропорции совпадают, и cover показывает кадр целиком. */
-.lightbox-img{
-  position:absolute;display:block;object-fit:cover;
-  box-shadow:0 24px 60px -20px rgba(0,0,0,.6);
-}
+.lightbox-img{position:absolute;display:block;object-fit:cover}
 .slot-remove{
   position:absolute;top:4px;right:4px;
   width:24px;height:24px;border-radius:50%;
@@ -902,7 +914,7 @@ body{
   display:inline-flex;align-items:center;gap:var(--s2);
   height:36px;padding:0 var(--s3);border-radius:999px;
   background:var(--card);border:1px solid var(--line);
-  box-shadow:0 10px 22px -16px rgba(0,0,0,.55);
+  box-shadow:0 6px 14px -10px rgba(0,0,0,.18);
   color:var(--ink);text-decoration:none;white-space:nowrap;
   font-size:var(--t-small);font-weight:600;
   transition:background .16s var(--ease), border-color .16s var(--ease),
@@ -925,7 +937,7 @@ body{
   background:var(--card);
   border-top:1px solid var(--line);
   border-radius:var(--r4) var(--r4) 0 0;
-  box-shadow:0 -22px 48px -30px rgba(0,0,0,.5);
+  box-shadow:0 -10px 28px -22px rgba(0,0,0,.18);
   padding-bottom:calc(var(--s2) + env(safe-area-inset-bottom));
   touch-action:none;
   transition:height .3s var(--ease);
@@ -1003,9 +1015,18 @@ body{
    кольцо у второй строки означает «решение не выбрано». */
 .origin-mark{
   flex:none;width:12px;height:12px;border-radius:50%;
-  border:2.5px solid var(--sub);background:transparent;
+  border:2.5px solid var(--origin-color, var(--sub));background:var(--card);
+  position:relative;z-index:1;
 }
-.origin-mark-on{border:none}
+.origin-mark-on{border:none;background:var(--origin-color, var(--sub))}
+/* Строка решения соединена со строкой карточки палочкой цвета темы — той же
+   ширины, что ручка шторки (4px): решение принадлежит карточке, а не стоит
+   рядом. Палочка идёт от центра первого кружка к центру второго, под ними. */
+.origin-row{position:relative}
+.origin-row + .origin-row::before{
+  content:"";position:absolute;left:4px;top:-50%;height:100%;width:4px;
+  background:var(--origin-color, var(--line));
+}
 .origin-body{min-width:0;flex:1;display:flex;flex-direction:column}
 .origin-label{
   font-size:.66rem;font-weight:600;color:var(--sub);

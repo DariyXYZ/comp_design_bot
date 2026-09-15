@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  editableFocused,
-  eventIsStable,
-  keyboardSettled,
-  liveFrameHeight,
-  markKeyboardSettled,
-  stableFrameHeight,
-} from "@/lib/client/viewport";
+import { editableFocused, eventIsStable, stableFrameHeight } from "@/lib/client/viewport";
 import { useCallback, useEffect, useRef } from "react";
 import type { SheetSnap } from "@/features/requests/draft-store";
 
@@ -49,7 +42,9 @@ const HALF_RATIO = 0.5;
 const HALF_MIN_BODY_PX = 96;
 
 /** Скорость, после которой отпускание считается броском, а не установкой. */
-const FLING_PX_PER_MS = 0.5;
+const FLING_PX_PER_MS = 0.35;
+/** На сколько миллисекунд вперёд проецируется движение при отпускании. */
+const PROJECT_MS = 180;
 
 /** Люфт, в пределах которого движение по ручке ещё считается тапом. */
 const TAP_SLOP_PX = 6;
@@ -82,16 +77,13 @@ const ORDER: readonly SheetSnap[] = ["peek", "half", "full"];
 type Sizes = { peek: number; half: number; full: number };
 
 /**
- * Высота фрейма для расчёта положений.
+ * Высота фрейма для расчёта положений — всегда без клавиатуры.
  *
- * Пока человек пишет в поле шторки, фрейм ужат клавиатурой, и развёрнутая
- * шторка должна уместиться над ней — иначе поле и кнопка уходят под
- * клавиатуру. Но нижнее положение и половина считаются от высоты БЕЗ
- * клавиатуры: от них зависит карточка под шторкой, и дёргать её каждым
- * появлением клавиатуры нельзя (см. lib/client/viewport).
+ * С клавиатурой шторка не перекладывается вовсе (см. эффект ниже): вебвью
+ * поджимает фрейм, и стоящая на нижнем краю шторка поднимается сама.
  */
 function frameHeight(): number {
-  return editableFocused() && keyboardSettled() ? liveFrameHeight() : stableFrameHeight();
+  return stableFrameHeight();
 }
 
 export function BottomSheet({
@@ -239,71 +231,43 @@ export function BottomSheet({
   // высоту само, без события окна.
   useEffect(() => {
     const relayout = () => {
-      if (draggingRef.current) return;
+      // Во время жеста и при открытой клавиатуре высота не трогается —
+      // ResizeObserver ниже срабатывает и на рост textarea под пальцами.
+      if (draggingRef.current || editableFocused()) return;
       applySnap(snapRef.current);
     };
-    // Клавиатура: фрейм меняется серией событий, часть из них — кадры
-    // анимации клиента. Перекладываемся только по стабильным, иначе шторка
-    // прыгает за каждым кадром. Появление поля ввода в фокусе разворачивает
-    // шторку целиком: над клавиатурой места мало, и половина превращается в
-    // полоску с одной строкой.
-    // Поле получило фокус, клавиатура ещё не поднялась. Перекладываться
-    // сейчас нельзя: высота фрейма пока старая, шторка выросла бы на весь
-    // экран и через полсекунды съехала бы под клавиатуру — то самое
-    // «пролистнулось вверх и обратно». Ждём стабильного события клиента
-    // (или таймаут — в браузере без Telegram событий нет) и перекладываемся
-    // один раз, сразу в высоту над клавиатурой.
-    let settleTimer: number | null = null;
-    const settle = () => {
-      if (settleTimer !== null) window.clearTimeout(settleTimer);
-      settleTimer = null;
-      markKeyboardSettled(true);
-      if (snapRef.current !== "full") commitSnap("full");
-      relayout();
-      // Поле — в поле зрения: тело шторки прокручивается само, страница нет.
-      const el = document.activeElement;
-      if (el instanceof HTMLElement && sheetRef.current?.contains(el)) {
-        el.scrollIntoView({ block: "nearest" });
-      }
-    };
+    // Клавиатура. Шторка НЕ перекладывается, пока в фокусе поле ввода.
+    // Любая перекладка в этот момент — это движение на глазах у человека:
+    // фрейм меняется серией событий, часть из них — кадры анимации клиента,
+    // и что бы мы ни выбрали для расчёта, шторка ехала бы вверх и обратно.
+    // Вместо этого высота остаётся прежней, а вебвью сам поджимает фрейм под
+    // клавиатуру: шторка стоит на нижнем краю (`position: fixed; bottom: 0`)
+    // и поднимается вместе с ним — как поле ввода в мессенджере. Тело шторки
+    // прокручивается, кнопка отправки всегда над клавиатурой. Пересчёт — только
+    // когда фокус пуст и фрейм вернулся.
     const onViewport = (arg?: unknown) => {
-      if (!eventIsStable(arg)) return;
-      if (settleTimer !== null) settle();
-      else relayout();
-    };
-    const onFocusIn = (e: FocusEvent) => {
-      const sheet = sheetRef.current;
-      if (!sheet || !(e.target instanceof Node) || !sheet.contains(e.target)) return;
-      if (!editableFocused()) return;
-      if (settleTimer !== null) return;
-      markKeyboardSettled(false);
-      settleTimer = window.setTimeout(settle, 450);
+      if (!eventIsStable(arg) || editableFocused()) return;
+      relayout();
     };
     const onFocusOut = () => {
-      if (settleTimer !== null) window.clearTimeout(settleTimer);
-      settleTimer = null;
-      markKeyboardSettled(false);
-      // Клавиатура уходит: фрейм вернётся событием, но blur приходит раньше —
-      // перекладываемся и сами, когда фокус точно пуст.
+      // Клавиатура уходит; blur приходит раньше события фрейма — перекладываемся
+      // и сами, чуть позже, когда фокус точно пуст.
       window.setTimeout(() => {
         if (!editableFocused()) relayout();
-      }, 60);
+      }, 80);
     };
     const observer = new ResizeObserver(relayout);
     for (const el of [headRef.current, footRef.current, bodyRef.current]) {
       if (el) observer.observe(el);
     }
     window.addEventListener("resize", onViewport);
-    document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
     const tg = window.Telegram?.WebApp;
     tg?.onEvent?.("viewportChanged", onViewport);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", onViewport);
-      document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
-      if (settleTimer !== null) window.clearTimeout(settleTimer);
       tg?.offEvent?.("viewportChanged", onViewport);
       document.documentElement.style.removeProperty("--sheet-peek");
     };
@@ -413,17 +377,17 @@ export function BottomSheet({
 
       let target: SheetSnap;
       if (Math.abs(velocity) > FLING_PX_PER_MS) {
-        // Бросок: шаг в сторону броска, независимо от того, докуда дотянули.
-        const step = velocity > 0 ? -1 : 1;
-        const index = Math.min(
-          ORDER.length - 1,
-          Math.max(0, ORDER.indexOf(current) + step),
-        );
-        target = ORDER[index];
+        // Бросок летит до конца в свою сторону: широкий свайп вверх — сразу
+        // в полный размер, а не с остановкой на половине. Половина остаётся
+        // для медленного жеста.
+        target = velocity > 0 ? "peek" : "full";
       } else {
-        // Медленное движение — магнит к ближайшему положению.
+        // Медленное движение — магнит к ближайшему положению, но от точки,
+        // куда палец «долетел» бы по инерции: так отпускание не ощущается
+        // как откат назад.
+        const projected = height - velocity * PROJECT_MS;
         target = ORDER.reduce((best, candidate) =>
-          Math.abs(sizes![candidate] - height) < Math.abs(sizes![best] - height)
+          Math.abs(sizes![candidate] - projected) < Math.abs(sizes![best] - projected)
             ? candidate
             : best,
         );

@@ -9,9 +9,9 @@
  *
  * Решение: пока открыта клавиатура (в фокусе поле ввода), «базовая» высота
  * фрейма заморожена на последнем значении без клавиатуры. От неё считается всё,
- * что клавиатуре не подчиняется (карточка, нижнее положение шторки). Живую
- * высоту с клавиатурой берёт только тот, кому она нужна, — развёрнутая шторка,
- * чтобы поле ввода и кнопка не ушли под клавиатуру.
+ * что клавиатуре не подчиняется (карточка, положения шторки): пока она
+ * открыта, ничего не перекладывается — вебвью поджимает фрейм сам, и шторка,
+ * стоящая на нижнем краю, поднимается вместе с ним.
  *
  * Значение публикуется в `--app-h` для CSS: там оно заменяет `100svh` и
  * `--tg-viewport-stable-height`, которые в вебвью меняются вместе с
@@ -20,21 +20,6 @@
 
 let baseHeight = 0;
 let installed = false;
-let settled = false;
-
-/**
- * Дошла ли клавиатура до своей высоты. Между фокусом в поле и стабильным
- * событием клиента живая высота фрейма — либо старая, либо промежуточная;
- * считать от неё раскладку — показать её прыжок.
- */
-export function keyboardSettled(): boolean {
-  return settled;
-}
-
-export function markKeyboardSettled(value: boolean): void {
-  settled = value;
-}
-
 export function editableFocused(): boolean {
   const el = document.activeElement;
   if (!el) return false;
@@ -45,12 +30,6 @@ export function editableFocused(): boolean {
     tag === "SELECT" ||
     (el as HTMLElement).isContentEditable === true
   );
-}
-
-/** Высота фрейма прямо сейчас — с учётом открытой клавиатуры. */
-export function liveFrameHeight(): number {
-  const reported = window.Telegram?.WebApp?.viewportHeight;
-  return typeof reported === "number" && reported > 0 ? reported : window.innerHeight;
 }
 
 /** Высота фрейма без клавиатуры: последнее значение, снятое при пустом фокусе. */
@@ -83,15 +62,6 @@ function publish() {
   document.documentElement.style.setProperty("--app-h", `${stableFrameHeight()}px`);
 }
 
-/**
- * Страница не прокручивается — но вебвью iOS всё равно сдвигает её, чтобы
- * показать поле под клавиатурой, а потом клиент возвращает. Держим ноль:
- * раскладка сама ставит поле в поле зрения, сдвиг страницы только дёргает.
- */
-function pin() {
-  if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
-}
-
 /** Один раз на приложение: следит за фреймом и держит `--app-h` актуальным. */
 export function installViewport(): () => void {
   if (installed) return () => {};
@@ -102,8 +72,6 @@ export function installViewport(): () => void {
     publish();
   };
   window.addEventListener("resize", onChange);
-  window.addEventListener("scroll", pin, { passive: true });
-  window.visualViewport?.addEventListener("scroll", pin);
   // Клавиатура закрылась: фокус ушёл, и следующее событие уже без неё. Но
   // событие может прийти раньше blur — перепубликуем и на blur тоже.
   const onBlur = () => window.setTimeout(publish, 50);
@@ -113,8 +81,6 @@ export function installViewport(): () => void {
   return () => {
     installed = false;
     window.removeEventListener("resize", onChange);
-    window.removeEventListener("scroll", pin);
-    window.visualViewport?.removeEventListener("scroll", pin);
     document.removeEventListener("focusout", onBlur);
     tg?.offEvent?.("viewportChanged", onChange);
   };

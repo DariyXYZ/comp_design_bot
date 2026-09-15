@@ -182,7 +182,10 @@ export function RequestSheet() {
       }}
       label="Заявка в отдел"
       head={
-        <div className="sheet-origin">
+        <div
+          className="sheet-origin"
+          style={{ "--origin-color": topicColor(topicKey) } as React.CSSProperties}
+        >
           {/* Тему называем только когда знаем её название. По прямой ссылке на
               решение колода ещё не загружалась, и звать листать её на экране,
               где её нет, — враньё; решение в такой ситуации и так полностью
@@ -193,11 +196,7 @@ export function RequestSheet() {
             className="origin-row"
             onClick={() => setSnap(snap === "peek" ? "half" : snap)}
           >
-            <span
-              className="origin-mark origin-mark-on"
-              style={{ background: topicColor(topicKey) }}
-              aria-hidden="true"
-            />
+            <span className="origin-mark origin-mark-on" aria-hidden="true" />
             <span className="origin-body">
               <span className="origin-label">Карточка</span>
               <span className="origin-title">
@@ -357,7 +356,11 @@ export function RequestSheet() {
                 </button>
               </div>
             ))}
-            {uploading > 0 ? <div className="slot slot-busy">…</div> : null}
+            {uploading > 0 ? (
+              <div className="slot slot-busy" aria-label="Загружаем картинку">
+                <i /><i /><i />
+              </div>
+            ) : null}
             {photos.length + uploading < MAX_PHOTOS ? (
               <button
                 type="button"
