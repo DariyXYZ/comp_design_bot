@@ -119,7 +119,10 @@ body{
 .deck{position:relative;width:var(--card-w);aspect-ratio:5/7}
 
 .swipe-card{
-  position:absolute;inset:0;perspective:1200px;
+  /* 2000, а не 1200: при повороте ближний край карточки выпирает за её
+     рамку на p/(p−w/2), и с 1200 верхний угол вылезал за экран прокрутки
+     и срезался. */
+  position:absolute;inset:0;perspective:2000px;
   border-radius:calc(var(--cu) * 5.5);
   box-shadow:0 10px 24px -14px rgba(0,0,0,.14);
   cursor:grab;will-change:transform;
