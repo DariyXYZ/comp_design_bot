@@ -1,5 +1,6 @@
 "use client";
 
+import { installViewport } from "@/lib/client/viewport";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { isSameRoute, routes } from "@/config/navigation";
@@ -37,6 +38,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
   useEffect(() => {
     initTelegramViewport();
+    const uninstall = installViewport();
     // Вход подтверждается здесь, на старте приложения, а не на экране профиля.
     // Причина: код входа лежит в адресе кнопки (`?c=`), а бот открывает
     // приложение на первом экране. Переход между экранами — клиентская
@@ -53,6 +55,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         inTelegram: true,
       });
     });
+    return uninstall;
   }, []);
 
   // На вложенных экранах «назад» рисует сам Telegram в своей шапке — это

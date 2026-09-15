@@ -39,7 +39,7 @@ async function stubCases(page: Page) {
 
 const sendButton = (page: Page) => page.locator(".sheet-foot .btn");
 const description = (page: Page) =>
-  page.getByPlaceholder("Что нужно сделать и что хотите получить на выходе");
+  page.getByPlaceholder("Что нужно сделать");
 
 async function openForm(page: Page, query: string) {
   await page.route("**/telegram-web-app.js", (route) => route.abort());
@@ -140,10 +140,10 @@ test.describe("заявка из Mini App", () => {
   }) => {
     await openForm(page, "item=tool-insolation");
 
-    await type(page, "1-19-2026 МР Верейская БЦ", "2-04-2026 МФК Ленинский");
+    await type(page, "1-19-2026 MR Group АГК БЦ Верейская", "2-04-2026 МФК Ленинский");
     await type(
       page,
-      "Что нужно сделать и что хотите получить на выходе",
+      "Что нужно сделать",
       "Посчитать инсоляцию двух вариантов двора",
     );
     await page.locator('input[type="date"]').fill("2026-08-28");
@@ -170,7 +170,7 @@ test.describe("заявка из Mini App", () => {
     page,
   }) => {
     await openForm(page, "topic=revit&t=Revit");
-    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад");
+    await type(page, "Что нужно сделать", "Передать фасад");
     await sendButton(page).click();
 
     expect(await sentPayloads(page)).toHaveLength(1);
@@ -188,7 +188,7 @@ test.describe("заявка из Mini App", () => {
     await stubCases(page);
     await page.goto(`${APP_PATH}request/?topic=revit&t=Revit`);
 
-    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад в Revit");
+    await type(page, "Что нужно сделать", "Передать фасад в Revit");
     await sendButton(page).click();
 
     await expect(page.locator(".sheet-foot .banner")).toContainText(
@@ -201,7 +201,7 @@ test.describe("заявка из Mini App", () => {
     // теряла состояние на любом уходе — поэтому уход спрашивал «выйти?».
     // Спрашивать больше не о чем, и вопроса быть не должно.
     await openForm(page, "topic=revit&t=Revit");
-    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад");
+    await type(page, "Что нужно сделать", "Передать фасад");
 
     await page.locator(".pill").first().click();
     await expect(page).toHaveURL(/\/feed\/$/);
@@ -241,7 +241,7 @@ test.describe("заявка из Mini App", () => {
     await openForm(page, "topic=revit&t=Revit");
     expect(await flag()).toBe(false);
 
-    await type(page, "Что нужно сделать и что хотите получить на выходе", "Передать фасад");
+    await type(page, "Что нужно сделать", "Передать фасад");
     expect(await flag()).toBe(true);
   });
 });

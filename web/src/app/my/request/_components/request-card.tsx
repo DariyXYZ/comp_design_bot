@@ -116,7 +116,7 @@ export function RequestCard() {
   const ready = text.trim().length > 0;
   // Ход за заявителем: отдел задал вопрос и ждёт. Поле ввода то же, меняется
   // смысл главной кнопки — ответ возвращает задачу в работу.
-  const asked = request.question !== null;
+  const asked = Boolean(request.question);
 
   return (
     <>

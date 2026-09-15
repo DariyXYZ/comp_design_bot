@@ -198,7 +198,7 @@ test.describe("колода кейсов", () => {
     // заявки. Шторку для этого надо раскрыть — по умолчанию она сложена.
     await page.locator(".sheet-foot .btn").click();
     await page
-      .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
+      .getByPlaceholder("Что нужно сделать")
       .click();
     await page.keyboard.press("ArrowRight");
     await expect(topCard(page)).toHaveAttribute("data-idx", "1");

@@ -1,5 +1,6 @@
 "use client";
 
+import { editableFocused } from "@/lib/client/viewport";
 import { useEffect, useRef } from "react";
 import { topicColor } from "@/features/topics/color";
 import { RESTART_HINT } from "@/config/copy";
@@ -142,6 +143,9 @@ export function CaseDeck({
      * которая в него влезает, его размер не меняет.
      */
     function sizeCard() {
+      // Клавиатура ужимает фрейм, но карточка под шторкой к ней отношения не
+      // имеет: пересчёт в этот момент — то самое «уехало и вернулось».
+      if (editableFocused()) return;
       const wrapStyle = getComputedStyle(deckWrap!);
       const insets =
         (parseFloat(wrapStyle.paddingTop) || 0) +

@@ -16,9 +16,14 @@ import { Pyrus } from "@/lib/server/pyrus";
  * заводят в справочнике не каждый час.
  */
 export const runtime = "nodejs";
-export const revalidate = 600;
+// Не статика: клиент Pyrus ходит с `cache: no-store`, и попытка Next
+// пререндерить роут на сборке падала бы. Кэш — свой, в памяти инстанса.
+export const dynamic = "force-dynamic";
 
 export type ProjectOption = { id: number; name: string };
+
+const TTL_MS = 10 * 60 * 1000;
+let cached: { at: number; projects: ProjectOption[] } | null = null;
 
 export async function GET() {
   try {
@@ -27,7 +32,10 @@ export async function GET() {
     if (!pyrus.enabled) {
       return NextResponse.json({ error: "Pyrus не подключён" }, { status: 503 });
     }
-    const projects = await pyrus.catalogItems(env.pyrusProjectCatalogId);
+    if (!cached || Date.now() - cached.at > TTL_MS) {
+      cached = { at: Date.now(), projects: await pyrus.catalogItems(env.pyrusProjectCatalogId) };
+    }
+    const { projects } = cached;
     return NextResponse.json(
       { projects },
       { headers: { "Cache-Control": "public, max-age=600, stale-while-revalidate=3600" } },

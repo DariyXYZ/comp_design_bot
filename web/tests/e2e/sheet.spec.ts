@@ -154,7 +154,7 @@ test.describe("жест шторки", () => {
 
     // И на всю высоту тоже: карточку она закрывает, но не пересчитывает.
     await page
-      .getByPlaceholder("Что нужно сделать и что хотите получить на выходе")
+      .getByPlaceholder("Что нужно сделать")
       .click();
     await page.waitForTimeout(400);
     expect(await cardWidth()).toBe(collapsed);

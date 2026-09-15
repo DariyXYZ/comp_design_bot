@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  editableFocused,
+  eventIsStable,
+  liveFrameHeight,
+  stableFrameHeight,
+} from "@/lib/client/viewport";
 import { useCallback, useEffect, useRef } from "react";
 import type { SheetSnap } from "@/features/requests/draft-store";
 
@@ -74,15 +80,16 @@ const ORDER: readonly SheetSnap[] = ["peek", "half", "full"];
 type Sizes = { peek: number; half: number; full: number };
 
 /**
- * Высота фрейма.
+ * Высота фрейма для расчёта положений.
  *
- * У клиента Telegram она своя и меняется вместе с клавиатурой, а
- * `window.innerHeight` про клавиатуру не знает — на его значении развёрнутая
- * форма уезжала бы кнопкой отправки под клавиатуру.
+ * Пока человек пишет в поле шторки, фрейм ужат клавиатурой, и развёрнутая
+ * шторка должна уместиться над ней — иначе поле и кнопка уходят под
+ * клавиатуру. Но нижнее положение и половина считаются от высоты БЕЗ
+ * клавиатуры: от них зависит карточка под шторкой, и дёргать её каждым
+ * появлением клавиатуры нельзя (см. lib/client/viewport).
  */
 function frameHeight(): number {
-  const reported = window.Telegram?.WebApp?.viewportHeight;
-  return typeof reported === "number" && reported > 0 ? reported : window.innerHeight;
+  return editableFocused() ? liveFrameHeight() : stableFrameHeight();
 }
 
 export function BottomSheet({
@@ -189,11 +196,12 @@ export function BottomSheet({
       footMain.offsetHeight +
       padBottom;
     const frame = frameHeight();
+    const stable = stableFrameHeight();
     const limit = Math.max(peek, frame - TOP_GAP_PX);
     const full = Math.min(limit, peek + body.scrollHeight);
     const half = Math.min(
       full,
-      Math.max(peek + HALF_MIN_BODY_PX, Math.round(frame * HALF_RATIO)),
+      Math.max(peek + HALF_MIN_BODY_PX, Math.round(stable * HALF_RATIO)),
     );
     return { peek, half: Math.max(peek, half), full };
   }, []);
@@ -232,20 +240,41 @@ export function BottomSheet({
       if (draggingRef.current) return;
       applySnap(snapRef.current);
     };
+    // Клавиатура: фрейм меняется серией событий, часть из них — кадры
+    // анимации клиента. Перекладываемся только по стабильным, иначе шторка
+    // прыгает за каждым кадром. Появление поля ввода в фокусе разворачивает
+    // шторку целиком: над клавиатурой места мало, и половина превращается в
+    // полоску с одной строкой.
+    const onViewport = (arg?: unknown) => {
+      if (eventIsStable(arg)) relayout();
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      const sheet = sheetRef.current;
+      if (!sheet || !(e.target instanceof Node) || !sheet.contains(e.target)) return;
+      if (!editableFocused()) return;
+      if (snapRef.current !== "full") commitSnap("full");
+      // Клиент ещё не ужал фрейм — дождёмся его события; но на всякий случай
+      // перекладываемся и сами, чуть позже.
+      window.setTimeout(relayout, 300);
+    };
     const observer = new ResizeObserver(relayout);
     for (const el of [headRef.current, footRef.current, bodyRef.current]) {
       if (el) observer.observe(el);
     }
-    window.addEventListener("resize", relayout);
+    window.addEventListener("resize", onViewport);
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onViewport);
     const tg = window.Telegram?.WebApp;
-    tg?.onEvent?.("viewportChanged", relayout);
+    tg?.onEvent?.("viewportChanged", onViewport);
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", relayout);
-      tg?.offEvent?.("viewportChanged", relayout);
+      window.removeEventListener("resize", onViewport);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onViewport);
+      tg?.offEvent?.("viewportChanged", onViewport);
       document.documentElement.style.removeProperty("--sheet-peek");
     };
-  }, [applySnap]);
+  }, [applySnap, commitSnap]);
 
   // Перетаскивание. Слушатели на window, а не на ручке: палец легко уводит за
   // её границы, а жест обязан продолжаться.

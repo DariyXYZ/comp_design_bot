@@ -45,6 +45,8 @@ interface TelegramWebApp {
    * уезжает кнопкой отправки под клавиатуру.
    */
   viewportHeight?: number;
+  /** Высота фрейма без промежуточных значений анимации разворачивания. */
+  viewportStableHeight?: number;
   offEvent?(event: string, handler: (...args: unknown[]) => void): void;
   /**
    * Кнопка «назад» в шапке клиента. Рисует её сам Telegram, поэтому своя

@@ -7,7 +7,8 @@ import { MATERIAL_TYPE_FORMAL, materialById } from "@/features/materials";
 import { topicColor } from "@/features/topics/color";
 import { haptic } from "@/lib/client/telegram";
 import { useRequestDraft } from "../draft-store";
-import { uploadPhoto } from "../photos";
+import { uploadPhoto, type UploadedPhoto } from "../photos";
+import { PhotoLightbox } from "./photo-lightbox";
 import { ProjectField } from "./project-field";
 import { submitRequest } from "../submit";
 
@@ -48,6 +49,10 @@ export function RequestSheet() {
     filled,
     reset,
   } = useRequestDraft();
+
+  // Снимок, открытый крупно, и откуда он вырос — для обратной анимации.
+
+  const [zoomed, setZoomed] = useState<{ photo: UploadedPhoto; from: DOMRect } | null>(null);
 
   const [problem, setProblem] = useState<string | null>(null);
   const [uploading, setUploading] = useState(0);
@@ -328,10 +333,20 @@ export function RequestSheet() {
           <div className="slots">
             {photos.map((photo) => (
               <div key={photo.id} className="slot slot-filled">
-                {/* Обычный img, а не next/image: это локальный object URL
-                    выбранного файла, оптимизатору его нечего оптимизировать. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.preview} alt="" />
+                {/* Тап по снимку открывает его крупно — проверить, что
+                    приложил то. Обычный img, а не next/image: это локальный
+                    object URL выбранного файла, оптимизировать нечего. */}
+                <button
+                  type="button"
+                  className="slot-view"
+                  onClick={(e) =>
+                    setZoomed({ photo, from: e.currentTarget.getBoundingClientRect() })
+                  }
+                  aria-label={`Открыть ${photo.name} крупно`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.preview} alt="" />
+                </button>
                 <button
                   type="button"
                   className="slot-remove"
@@ -365,6 +380,14 @@ export function RequestSheet() {
               event.target.value = "";
             }}
           />
+          {zoomed ? (
+            <PhotoLightbox
+              src={zoomed.photo.preview}
+              alt={zoomed.photo.name}
+              from={zoomed.from}
+              onClose={() => setZoomed(null)}
+            />
+          ) : null}
           <p className="sheet-note">
             Отметьте на снимке проблемное место — так отдел поймёт задачу
             быстрее. До шести штук; уходят сразу в задачу, до отправки заявки.

@@ -54,7 +54,7 @@
   --card-w:min(
     88vw,
     400px,
-    calc((var(--tg-viewport-stable-height, 100dvh) - var(--chrome-h)) * 5 / 7)
+    calc((var(--app-h, 100dvh) - var(--chrome-h)) * 5 / 7)
   );
   /* Сотая доля ширины карточки — внутренние размеры считаются от неё, чтобы
      содержимое уменьшалось вместе с карточкой, а не вылезало за её край.
@@ -677,6 +677,26 @@ body{
 .slot-filled{border-style:solid;border-color:var(--line);cursor:default}
 .slot-filled img{width:100%;height:100%;object-fit:cover;display:block}
 .slot-busy{color:var(--sub);letter-spacing:.1em}
+/* Снимок в слоте — кнопка: тап открывает его крупно. */
+.slot-view{
+  display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in;
+}
+.slot-view img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* Картинка крупно. Подложка гасит экран, снимок лежит там, куда его положил
+   расчёт (left/top/width/height), а анимация идёт только по transform —
+   из миниатюры и обратно в неё. */
+.lightbox{
+  position:fixed;inset:0;z-index:60;
+  background:rgba(0,0,0,0);cursor:zoom-out;touch-action:none;
+}
+.lightbox-open{background:rgba(0,0,0,.82)}
+.lightbox-img{
+  position:absolute;display:block;object-fit:contain;
+  border-radius:var(--r2);transform-origin:center;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,.6);
+  will-change:transform;
+}
 .slot-remove{
   position:absolute;top:4px;right:4px;
   width:24px;height:24px;border-radius:50%;
@@ -858,7 +878,7 @@ body{
    карточке перестаёт помещаться. */
 .stage .deck-wrap{
   flex:none;
-  height:clamp(230px, calc(100svh - var(--sheet-peek) - 150px), 520px);
+  height:clamp(230px, calc(var(--app-h, 100svh) - var(--sheet-peek) - 150px), 520px);
 }
 /* Точки и подсказка отбиты от карточки полным шагом сетки: они меньше и тише
    карточки, и на тесном отступе читались её продолжением, а не соседями. */
