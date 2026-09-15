@@ -11,3 +11,5 @@ bot.err.log
 
 # Разовая выгрузка переменных для вставки в Vercel — секреты, не коммитить.
 vercel-env.txt
+bot.err.old.log
+*.bak
