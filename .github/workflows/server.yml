@@ -1,7 +1,10 @@
 # C#-сервер (server/) + статика Mini App (web/): проверка, публикация, деплой на AI01.
 #
-# verify — на любом пуше и PR: dotnet build/test/format, npm lint/typecheck/test,
-#          статический экспорт, dotnet publish → артефакт server-publish.
+# Ветки: development — рабочая, main — только для деплоя (туда попадает мержем).
+#
+# verify — на пуше в main/development и на любом PR: dotnet build/test/format,
+#          npm lint/typecheck/test, статический экспорт, dotnet publish →
+#          артефакт server-publish.
 # deploy — только main и только когда в репозитории задана переменная
 #          DEPLOY_ENABLED=true: self-hosted runner на AI01 останавливает службу,
 #          раскладывает артефакт, запускает и проверяет /health.
@@ -10,7 +13,7 @@ name: server
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
     paths: ["server/**", "web/**", ".github/workflows/server.yml"]
   pull_request:
     paths: ["server/**", "web/**", ".github/workflows/server.yml"]

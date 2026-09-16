@@ -29,9 +29,9 @@ concurrency:
 
 jobs:
   deploy:
-    # Только рабочий репозиторий: в репозитории черновика ветка main — это
-    # черновик, и публиковать его боевым workflow нельзя.
-    if: github.repository == 'DariyXYZ/comp_design_bot'
+    # Только рабочий репозиторий (после передачи — ind-studio; имя владельца
+    # GitHub отдаёт каноническим, поэтому прежний DariyXYZ условие ломал).
+    if: github.repository == 'ind-studio/comp_design_bot'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
