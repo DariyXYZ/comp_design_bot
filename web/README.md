@@ -64,8 +64,9 @@ npm run dev
 | Команда | Что делает |
 | --- | --- |
 | `npm run dev` | Дев-сервер |
-| `npm run build` | Продакшен-сборка, статика в `out/` |
-| `npm start` | **Не применима**: при `output: 'export'` сервера нет, Next скажет об этом сам. Для локального просмотра сборки — любой статический сервер над `out/`, раздающий её по пути `/comp_design_bot/` |
+| `npm run build` | Продакшен-сборка для Vercel (экраны + API-роуты) |
+| `npm run build:static` | Статический экспорт в `out/` для C#-сервера (`../server`): только экраны, `/api/*` отвечает сервер |
+| `npm start` | Локальный запуск продакшен-сборки Vercel-режима |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test` | Юнит-тесты (vitest) |
@@ -75,13 +76,18 @@ npm run dev
 
 ## Сборка и публикация
 
-Статика собирается в `out/` и публикуется на GitHub Pages workflow'ом
-[`.github/workflows/deploy-webapp.yml`](../.github/workflows/deploy-webapp.yml)
-при каждом пуше в `main`, который трогает `web/**`. Источник Pages в настройках
-репозитория — `GitHub Actions`.
+Два режима, пока идёт переезд на C#-сервер (решение Петра, 2026-09-16):
 
-Живой адрес: <https://dariyxyz.github.io/comp_design_bot/> — тот же, что в
-`WEBAPP_URL` у бота.
+- **Vercel** (сейчас в проде): `npm run build`, API-роуты `src/app/api` живут
+  рядом с экранами, деплой по пушу в `main`.
+- **C#-сервер** (`../server`): `npm run build:static` → `out/`, которую сервер
+  раздаёт из `wwwroot`, а `/api/*` и webhook бота отвечает сам. Переключатель —
+  `NEXT_OUTPUT=export` в `next.config.ts`: в этом режиме Next видит только
+  `.tsx`-файлы приложения, и `route.ts` выпадают из сборки. Клиентский код
+  одинаков в обоих режимах (`NEXT_PUBLIC_API_BASE` пустой = тот же домен).
+
+После переключения webhook на C#-сервер `src/app/api`, `src/lib/server` и
+переключатель удаляются, Vercel-проект отключается.
 
 ## Архитектурные решения
 

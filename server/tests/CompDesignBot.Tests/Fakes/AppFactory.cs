@@ -24,8 +24,19 @@ public sealed class AppFactory : WebApplicationFactory<Program>
 
     public SessionTokens Tokens { get; } = new(BotToken);
 
+    /// <summary>Заглушка статического экспорта: три файла, чтобы проверить раздачу.</summary>
+    public string WebRoot { get; } = Path.Combine(Path.GetTempPath(), "comp-design-bot-wwwroot-" + Guid.NewGuid().ToString("N"));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        Directory.CreateDirectory(Path.Combine(WebRoot, "feed"));
+        File.WriteAllText(Path.Combine(WebRoot, "index.html"), "<title>Решения и заявки</title>");
+        File.WriteAllText(Path.Combine(WebRoot, "feed", "index.html"), "<title>Поток</title>");
+        File.WriteAllText(Path.Combine(WebRoot, "404.html"), "<title>Нет такой страницы</title>");
+        builder.UseWebRoot(WebRoot);
+        // Не Development: иначе SDK подмешивает настоящий wwwroot проекта (static web
+        // assets), и заглушка выше проигрывает ему.
+        builder.UseEnvironment("Testing");
         builder.UseSetting("TELEGRAM_TOKEN", BotToken);
         builder.UseSetting("TELEGRAM_WEBHOOK_SECRET", WebhookSecret);
         builder.UseSetting("WEBAPP_URL", "https://bot.example.test/");
@@ -42,6 +53,15 @@ public sealed class AppFactory : WebApplicationFactory<Program>
             services.RemoveAll<ITelegramBotClient>();
             services.AddSingleton<ITelegramBotClient>(Bot);
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing && Directory.Exists(WebRoot))
+        {
+            Directory.Delete(WebRoot, recursive: true);
+        }
     }
 
     public string TokenFor(long id, string name = "Тест Тестов", string? handle = "@tester") => Tokens.IssueToken(new Viewer(id, name, handle));

@@ -5,6 +5,7 @@ using System.Text.Json;
 using CompDesignBot.Endpoints;
 using CompDesignBot.Features.Requests;
 using CompDesignBot.Tests.Fakes;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Telegram.Bot.Requests;
 
 namespace CompDesignBot.Tests;
@@ -16,7 +17,8 @@ public sealed class ApiTests : IDisposable
 
     public ApiTests()
     {
-        _client = _app.CreateClient();
+        // Без автоследования: тест на редирект должен видеть сам 301.
+        _client = _app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
     }
 
     public void Dispose()
@@ -51,6 +53,25 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(8, rows.GetArrayLength());
         Assert.Equal("unique", rows[0].GetProperty("key").GetString());
         Assert.Equal("/topics/unique.jpg", rows[0].GetProperty("image_front").GetString());
+    }
+
+    [Fact]
+    public async Task Static_export_is_served_with_slash_redirect_and_404_page()
+    {
+        var root = await _client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.OK, root.StatusCode);
+        Assert.Contains("Решения и заявки", await root.Content.ReadAsStringAsync());
+
+        var noSlash = await _client.GetAsync("/feed?x=1");
+        Assert.Equal(HttpStatusCode.MovedPermanently, noSlash.StatusCode);
+        Assert.Equal("/feed/?x=1", noSlash.Headers.Location?.ToString());
+
+        var feed = await _client.GetAsync("/feed/");
+        Assert.Contains("Поток", await feed.Content.ReadAsStringAsync());
+
+        var missing = await _client.GetAsync("/nope/");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Contains("Нет такой страницы", await missing.Content.ReadAsStringAsync());
     }
 
     [Fact]

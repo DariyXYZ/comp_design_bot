@@ -58,15 +58,6 @@ var app = builder.Build();
 
 app.UseSerilogRequestLogging();
 
-app.MapGet("/health", () => Results.Ok(new { ok = true }));
-app.MapTelegram();
-
-var api = app.MapGroup("/api").AddEndpointFilter<ApiErrorFilter>();
-api.MapAuth();
-api.MapRequests();
-api.MapFeed();
-api.MapCatalogs();
-
 // Mini App — статический экспорт Next.js из wwwroot. Экспорт со слэшем на конце
 // (`feed/index.html`), а клиент иногда открывает `/feed` — переводим на слэш,
 // как делал бы сам Next.
@@ -87,6 +78,19 @@ app.Use(async (context, next) =>
 });
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+// Маршрутизация — после статики: иначе fallback-эндпоинт ниже совпадает первым,
+// и middleware статических файлов уступает ему любой путь.
+app.UseRouting();
+
+app.MapGet("/health", () => Results.Ok(new { ok = true }));
+app.MapTelegram();
+
+var api = app.MapGroup("/api").AddEndpointFilter<ApiErrorFilter>();
+api.MapAuth();
+api.MapRequests();
+api.MapFeed();
+api.MapCatalogs();
 
 // Всё, что не нашлось, — страница 404 экспорта, если она есть.
 app.MapFallback(async (HttpContext context) =>
