@@ -1,0 +1,8 @@
+bin/
+obj/
+publish/
+logs/
+*.user
+.vs/
+# Статика Mini App копируется из web/out при сборке — не источник.
+src/CompDesignBot/wwwroot/

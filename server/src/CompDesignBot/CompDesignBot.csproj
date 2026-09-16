@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>CompDesignBot</RootNamespace>
+    <UserSecretsId>comp-design-bot</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Тесты видят internal-хелперы разбора payload Mini App. -->
+    <InternalsVisibleTo Include="CompDesignBot.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Telegram.Bot" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Картинка приветствия живёт в promo/ репозитория — один источник для
+         Python-бота и для этого сервиса, пока оба существуют. -->
+    <Content Include="../../../promo/welcome.jpg" Link="Assets/welcome.jpg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
