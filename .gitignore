@@ -9,6 +9,11 @@ requests.sqlite3-wal
 bot.log
 bot.err.log
 
+# Рабочие копии (git worktree) Claude Code лежат внутри репозитория. Без этой
+# строки вложенный репозиторий попадает в коммит как gitlink — «фантомный
+# сабмодуль», которого потом нет ни у кого при клонировании.
+.claude/worktrees/
+
 # Разовая выгрузка переменных для вставки в Vercel — секреты, не коммитить.
 vercel-env.txt
 bot.err.old.log
