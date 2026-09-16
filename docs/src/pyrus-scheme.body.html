@@ -13,7 +13,7 @@
 <h2><span class="n">01</span>Контур: кто с кем говорит</h2>
 <figure>
 <div class="sheet">
-<svg viewBox="0 0 820 372" role="img" aria-label="Два входа — диалог в боте и Mini App — сходятся в задачу Pyrus; чат отдела и Mini App меняют её комментариями; кабинет и лента читают реестр формы">
+<svg viewBox="0 0 880 372" role="img" aria-label="Два входа — диалог в боте и Mini App — сходятся в задачу Pyrus; чат отдела и Mini App меняют её комментариями; кабинет и лента читают реестр формы">
  <defs>
   <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
   <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d9481c"/></marker>
@@ -35,24 +35,24 @@
   <text x="332" y="280" font-weight="600" fill="#fff">Сервер Mini App</text><text x="332" y="299" class="m" fill="#fff" opacity=".7">Vercel · ключ Pyrus</text>
 
   <!-- Pyrus -->
-  <rect x="612" y="118" width="188" height="108" rx="6" fill="#d9481c"/>
+  <rect x="612" y="118" width="248" height="108" rx="6" fill="#d9481c"/>
   <text x="628" y="146" font-weight="600" fill="#fff" font-size="15">Задача Pyrus</text>
   <text x="628" y="167" class="m" fill="#fff" opacity=".85">форма 2457342</text>
   <text x="628" y="186" class="m" fill="#fff" opacity=".85">поля · вложения · комментарии</text>
   <text x="628" y="211" fill="#fff" font-weight="600" font-size="12">единственное хранилище</text>
-  <rect x="612" y="30" width="188" height="58" rx="6" fill="none" stroke="#d9481c" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <rect x="612" y="30" width="248" height="58" rx="6" fill="none" stroke="#d9481c" stroke-width="1.4" stroke-dasharray="4 3"/>
   <text x="628" y="54" font-weight="600" fill="#d9481c">Канбан отдела</text><text x="628" y="73" class="m" fill="#d9481c" opacity=".85">колонки = поле «Статус»</text>
-  <line x1="706" y1="118" x2="706" y2="90" stroke="#d9481c" stroke-width="1.2" marker-end="url(#a2)"/>
+  <line x1="736" y1="118" x2="736" y2="90" stroke="#d9481c" stroke-width="1.2" marker-end="url(#a2)"/>
 
   <!-- A → бот -->
   <path d="M208,59 H314" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)" marker-start="url(#d1)"/>
   <text x="261" y="51" text-anchor="middle" class="m">шаги диалога</text>
   <!-- B → бот -->
   <path d="M208,272 H262 V70 H314" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)" marker-start="url(#d1)"/>
-  <text x="256" y="176" class="m" transform="rotate(-90 256 176)" text-anchor="middle">sendData · JSON ≤ 4 КБ</text>
+  <text x="250" y="176" class="m" text-anchor="end">sendData · JSON ≤ 4 КБ</text>
   <!-- бот → Pyrus: создать -->
   <path d="M504,50 C560,50 560,140 610,140" fill="none" stroke="#d9481c" stroke-width="1.8" marker-end="url(#a2)" marker-start="url(#d1)"/>
-  <text x="556" y="104" text-anchor="middle" class="m" fill="#d9481c" transform="rotate(-62 556 104)">POST /tasks · 12 полей</text>
+  <text x="558" y="20" text-anchor="middle" class="m" fill="#d9481c">создать: POST /tasks · 12 полей</text>
   <!-- бот ↔ чат -->
   <line x1="372" y1="88" x2="372" y2="141" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"/>
   <text x="365" y="118" text-anchor="end" class="m">карточка</text>
@@ -60,7 +60,7 @@
   <text x="455" y="118" class="m">кнопка статуса</text>
   <!-- чат → Pyrus: статус -->
   <path d="M504,172 H610" fill="none" stroke="#d9481c" stroke-width="1.8" marker-end="url(#a2)" marker-start="url(#d1)"/>
-  <text x="557" y="164" text-anchor="middle" class="m" fill="#d9481c">колонка + finished/reopened</text>
+  <text x="557" y="164" text-anchor="middle" class="m" fill="#d9481c">статус · закрыть</text>
   <!-- B ↔ сервер -->
   <path d="M208,296 H314" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)" marker-start="url(#a1)"/>
   <text x="261" y="330" text-anchor="middle" class="m">мои заявки · действия · фото · лента</text>
@@ -69,10 +69,10 @@
   <text x="417" y="234" class="m">сообщение в ветку</text>
   <!-- сервер ↔ Pyrus -->
   <path d="M504,290 C560,290 560,205 610,205" fill="none" stroke="#d9481c" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a2)" marker-start="url(#a2)"/>
-  <text x="628" y="252" class="m" fill="#d9481c">register → фильтр по Telegram ID</text>
-  <text x="628" y="270" class="m" fill="#d9481c">комментарий · finished · reopened</text>
-  <text x="628" y="288" class="m" fill="#d9481c">files/upload → guid · вложения → обложки</text>
-  <text x="628" y="306" class="m" fill="#d9481c">подписка = комментарий «Подписка: tg:id»</text>
+  <text x="612" y="252" class="m" fill="#d9481c">чтение: register → фильтр по Telegram ID</text>
+  <text x="612" y="270" class="m" fill="#d9481c">запись: комментарий · закрыть/открыть</text>
+  <text x="612" y="288" class="m" fill="#d9481c">файлы: upload → guid · вложения → обложки</text>
+  <text x="612" y="306" class="m" fill="#d9481c">подписка = комментарий «Подписка: tg:id»</text>
   <text x="20" y="352" class="m" opacity=".7">Supabase (карточки тем) читают и бот при старте, и сервер Mini App — на схеме не показан, заявок не хранит.</text>
  </g>
 </svg>
