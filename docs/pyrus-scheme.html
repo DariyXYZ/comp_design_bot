@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Контур заявок Pyrus</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Схемы comp_design_bot — общий стиль. Технический лист: сетка точек,
+   тонкие линии-«размеры», моноширинные подписи, один сигнальный цвет. */
+:root{
+  color-scheme:light;
+  --paper:#f6f5f1;--paper-2:#fbfaf7;--ink:#161a22;--ink-2:#4a5160;--line:#cfd2cb;--grid:#dcdfd8;
+  --acc:#d9481c;--acc-ink:#fff;--teal:#116b6b;--soft:#ecebe5;
+  --display:"Unbounded",system-ui,sans-serif;--body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--paper:#121417;--paper-2:#181b1f;--ink:#eef0ea;--ink-2:#a3a9b3;--line:#2e333a;--grid:#23272d;--acc:#ff6a3d;--teal:#5fc2bd;--soft:#1f2329}}
+:root[data-theme="dark"]{color-scheme:dark;--paper:#121417;--paper-2:#181b1f;--ink:#eef0ea;--ink-2:#a3a9b3;--line:#2e333a;--grid:#23272d;--acc:#ff6a3d;--teal:#5fc2bd;--soft:#1f2329}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;
+  background:var(--paper) radial-gradient(var(--grid) 1px, transparent 1px) 0 0/22px 22px;
+  padding-block:44px 88px;padding-inline:20px}
+main{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:44px}
+header{display:flex;flex-direction:column;gap:12px;padding-bottom:22px;border-bottom:1.5px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);display:flex;gap:14px;flex-wrap:wrap}
+.eyebrow b{color:var(--acc);font-weight:500}
+h1{font-family:var(--display);font-size:clamp(26px,4.6vw,38px);line-height:1.12;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--display);font-size:17px;font-weight:600;margin:0 0 14px;display:flex;align-items:center;gap:12px}
+h2 .n{font-family:var(--mono);font-size:12px;color:var(--acc);font-weight:500;letter-spacing:.08em}
+p{margin:0;max-width:64ch}
+.lede{font-size:18px;color:var(--ink-2);max-width:58ch}
+.thesis{border-left:3px solid var(--acc);padding:4px 0 4px 18px;font-size:18px;font-weight:500;max-width:60ch}
+code{font-family:var(--mono);font-size:.86em;background:var(--soft);padding:1px 6px;border-radius:3px}
+figure{margin:0;display:flex;flex-direction:column;gap:10px}
+.sheet{background:var(--paper-2);border:1px solid var(--line);border-radius:4px;padding:18px;overflow-x:auto;position:relative}
+.sheet::before,.sheet::after{content:"";position:absolute;width:14px;height:14px;border-color:var(--ink);border-style:solid}
+.sheet::before{top:6px;left:6px;border-width:1.5px 0 0 1.5px}
+.sheet::after{bottom:6px;right:6px;border-width:0 1.5px 1.5px 0}
+figure svg{max-width:100%;height:auto;display:block;color:var(--ink);font-family:var(--body)}
+figure svg .m{font-family:var(--mono);font-size:10.5px;letter-spacing:.02em}
+figcaption{font-size:14px;color:var(--ink-2);max-width:70ch}
+.legend{display:flex;flex-wrap:wrap;gap:18px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:26px;height:0;border-top:2px solid var(--ink)}
+.sw.acc{border-color:var(--acc)}.sw.dash{border-top-style:dashed}.sw.teal{border-color:var(--teal)}
+.tbl{overflow-x:auto;background:var(--paper-2);border:1px solid var(--line);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:500}
+td:first-child{white-space:nowrap;font-weight:500}
+tr:last-child td{border-bottom:0}
+.keep{color:var(--teal);font-weight:600}
+ol.steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;counter-reset:n;max-width:66ch}
+ol.steps li{display:grid;grid-template-columns:36px 1fr;gap:12px;counter-increment:n}
+ol.steps li::before{content:counter(n,decimal-leading-zero);font-family:var(--mono);font-size:12px;color:var(--acc);padding-top:4px}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.field{background:var(--paper-2);border:1px solid var(--line);border-radius:4px;padding:9px 11px;font-size:14px;display:flex;flex-direction:column;gap:2px}
+.field .name{font-family:var(--mono);font-size:13px}
+.field .from{color:var(--ink-2);font-size:13px}
+.field.new{border-color:var(--acc)}
+.field.new .name::after{content:" · добавить";color:var(--acc);font-family:var(--body);font-size:12px}
+pre{margin:0;background:var(--ink);color:var(--paper);border-radius:4px;padding:14px 16px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow-x:auto}
+pre .c{color:#9aa3b2}
+footer{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:16px}
+@media (prefers-reduced-motion:no-preference){
+  main>*{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+  main>*:nth-child(2){animation-delay:.06s}main>*:nth-child(3){animation-delay:.12s}main>*:nth-child(4){animation-delay:.18s}main>*:nth-child(5){animation-delay:.24s}main>*:nth-child(6){animation-delay:.3s}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+}
+
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="eyebrow"><span>IND · Отдел вычислительного проектирования</span><b>comp_design_bot</b><span>лист 1 · контур заявок · 16.09.2026</span></div>
+  <h1>Как заявка попадает в Pyrus и живёт там</h1>
+  <p class="lede">Схема, на которую ориентируемся при разработке бота и Mini App: откуда приходит заявка, куда пишется, кто и как её меняет, где что хранится.</p>
+</header>
+
+<section>
+  <p class="thesis">Заявка хранится в одном месте — в задаче Pyrus на доске «Вычислительное Проектирование задачи» (форма 2457342). Откуда бы она ни пришла, она создаётся там, читается оттуда и меняется там же. Своей базы у бота нет.</p>
+</section>
+
+<section>
+<h2><span class="n">01</span>Контур: кто с кем говорит</h2>
+<figure>
+<div class="sheet">
+<svg viewBox="0 0 820 372" role="img" aria-label="Два входа — диалог в боте и Mini App — сходятся в задачу Pyrus; чат отдела и Mini App меняют её комментариями; кабинет и лента читают реестр формы">
+ <defs>
+  <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d9481c"/></marker>
+  <marker id="d1" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="5" markerHeight="5"><circle cx="3" cy="3" r="3" fill="currentColor"/></marker>
+ </defs>
+ <g fill="currentColor" font-size="12.5">
+  <!-- входы -->
+  <rect x="20" y="30" width="188" height="58" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="36" y="54" font-weight="600">Диалог в боте</text><text x="36" y="73" class="m" opacity=".7">Telegram · по шагам</text>
+  <rect x="20" y="256" width="188" height="58" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="36" y="280" font-weight="600">Mini App</text><text x="36" y="299" class="m" opacity=".7">форма · кабинет · лента</text>
+
+  <!-- сервисы -->
+  <rect x="316" y="30" width="188" height="58" rx="6" fill="#161a22"/>
+  <text x="332" y="54" font-weight="600" fill="#fff">Бот · Python</text><text x="332" y="73" class="m" fill="#fff" opacity=".7">aiogram · без базы</text>
+  <rect x="316" y="143" width="188" height="58" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="332" y="167" font-weight="600">Чат отдела</text><text x="332" y="186" class="m" opacity=".7">ветка заявок · 6 кнопок</text>
+  <rect x="316" y="256" width="188" height="58" rx="6" fill="#161a22"/>
+  <text x="332" y="280" font-weight="600" fill="#fff">Сервер Mini App</text><text x="332" y="299" class="m" fill="#fff" opacity=".7">Vercel · ключ Pyrus</text>
+
+  <!-- Pyrus -->
+  <rect x="612" y="118" width="188" height="108" rx="6" fill="#d9481c"/>
+  <text x="628" y="146" font-weight="600" fill="#fff" font-size="15">Задача Pyrus</text>
+  <text x="628" y="167" class="m" fill="#fff" opacity=".85">форма 2457342</text>
+  <text x="628" y="186" class="m" fill="#fff" opacity=".85">поля · вложения · комментарии</text>
+  <text x="628" y="211" fill="#fff" font-weight="600" font-size="12">единственное хранилище</text>
+  <rect x="612" y="30" width="188" height="58" rx="6" fill="none" stroke="#d9481c" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="628" y="54" font-weight="600" fill="#d9481c">Канбан отдела</text><text x="628" y="73" class="m" fill="#d9481c" opacity=".85">колонки = поле «Статус»</text>
+  <line x1="706" y1="118" x2="706" y2="90" stroke="#d9481c" stroke-width="1.2" marker-end="url(#a2)"/>
+
+  <!-- A → бот -->
+  <path d="M208,59 H314" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)" marker-start="url(#d1)"/>
+  <text x="261" y="51" text-anchor="middle" class="m">шаги диалога</text>
+  <!-- B → бот -->
+  <path d="M208,272 H262 V70 H314" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)" marker-start="url(#d1)"/>
+  <text x="256" y="176" class="m" transform="rotate(-90 256 176)" text-anchor="middle">sendData · JSON ≤ 4 КБ</text>
+  <!-- бот → Pyrus: создать -->
+  <path d="M504,50 C560,50 560,140 610,140" fill="none" stroke="#d9481c" stroke-width="1.8" marker-end="url(#a2)" marker-start="url(#d1)"/>
+  <text x="556" y="104" text-anchor="middle" class="m" fill="#d9481c" transform="rotate(-62 556 104)">POST /tasks · 12 полей</text>
+  <!-- бот ↔ чат -->
+  <line x1="372" y1="88" x2="372" y2="141" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"/>
+  <text x="365" y="118" text-anchor="end" class="m">карточка</text>
+  <line x1="448" y1="143" x2="448" y2="90" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"/>
+  <text x="455" y="118" class="m">кнопка статуса</text>
+  <!-- чат → Pyrus: статус -->
+  <path d="M504,172 H610" fill="none" stroke="#d9481c" stroke-width="1.8" marker-end="url(#a2)" marker-start="url(#d1)"/>
+  <text x="557" y="164" text-anchor="middle" class="m" fill="#d9481c">колонка + finished/reopened</text>
+  <!-- B ↔ сервер -->
+  <path d="M208,296 H314" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)" marker-start="url(#a1)"/>
+  <text x="261" y="330" text-anchor="middle" class="m">мои заявки · действия · фото · лента</text>
+  <!-- сервер → чат -->
+  <line x1="410" y1="256" x2="410" y2="203" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"/>
+  <text x="417" y="234" class="m">сообщение в ветку</text>
+  <!-- сервер ↔ Pyrus -->
+  <path d="M504,290 C560,290 560,205 610,205" fill="none" stroke="#d9481c" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a2)" marker-start="url(#a2)"/>
+  <text x="628" y="252" class="m" fill="#d9481c">register → фильтр по Telegram ID</text>
+  <text x="628" y="270" class="m" fill="#d9481c">комментарий · finished · reopened</text>
+  <text x="628" y="288" class="m" fill="#d9481c">files/upload → guid · вложения → обложки</text>
+  <text x="628" y="306" class="m" fill="#d9481c">подписка = комментарий «Подписка: tg:id»</text>
+  <text x="20" y="352" class="m" opacity=".7">Supabase (карточки тем) читают и бот при старте, и сервер Mini App — на схеме не показан, заявок не хранит.</text>
+ </g>
+</svg>
+</div>
+<div class="legend"><span><i class="sw acc"></i>запись в Pyrus</span><span><i class="sw acc dash"></i>чтение из Pyrus</span><span><i class="sw"></i>Telegram / внутреннее</span></div>
+<figcaption>Два входа сходятся в один вызов <code>POST /tasks</code>. Всё, что меняет заявку потом, — комментарии к той же задаче: и «Готово» из чата, и «Отменить» из Mini App. Кабинет и лента ничего не хранят — каждый раз читают реестр формы.</figcaption>
+</figure>
+</section>
+
+<section>
+<h2><span class="n">02</span>Путь заявки по доске</h2>
+<figure>
+<div class="sheet">
+<svg viewBox="0 0 820 210" role="img" aria-label="Пять колонок доски: Новая задача, Требуется уточнение, В работе, Выполнено, Отклонена; кто и чем переводит">
+ <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+ <g fill="currentColor" font-size="12.5">
+  <rect x="20" y="50" width="140" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="90" y="76" text-anchor="middle" font-weight="600">Новая задача</text><text x="90" y="96" text-anchor="middle" class="m" opacity=".7">ставит бот</text>
+  <rect x="200" y="50" width="140" height="64" rx="6" fill="none" stroke="#d9481c" stroke-width="1.4"/>
+  <text x="270" y="72" text-anchor="middle" font-weight="600" fill="#d9481c">Требуется</text><text x="270" y="88" text-anchor="middle" font-weight="600" fill="#d9481c">уточнение</text><text x="270" y="106" text-anchor="middle" class="m" opacity=".7">ход за заявителем</text>
+  <rect x="380" y="50" width="140" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="450" y="76" text-anchor="middle" font-weight="600">В работе</text><text x="450" y="96" text-anchor="middle" class="m" opacity=".7">чат или доска</text>
+  <rect x="560" y="50" width="120" height="64" rx="6" fill="#161a22"/>
+  <text x="620" y="76" text-anchor="middle" font-weight="600" fill="#fff">Выполнено</text><text x="620" y="96" text-anchor="middle" class="m" fill="#fff" opacity=".7">закрыта</text>
+  <rect x="700" y="50" width="100" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="750" y="76" text-anchor="middle" font-weight="600">Отклонена</text><text x="750" y="96" text-anchor="middle" class="m" opacity=".7">закрыта</text>
+
+  <line x1="160" y1="82" x2="198" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"/>
+  <line x1="340" y1="82" x2="378" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"/>
+  <line x1="520" y1="82" x2="558" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"/>
+  <text x="270" y="32" text-anchor="middle" class="m">«Уточнить» в чате → вопрос → ответ из кабинета</text>
+  <path d="M450,114 V150 H620 V116" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#a3)"/>
+  <text x="535" y="166" text-anchor="middle" class="m">«Вернуть на доработку» из кабинета → снова В работе</text>
+  <path d="M90,114 V190 H750 V116" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#a3)"/>
+  <text x="420" y="204" text-anchor="middle" class="m" opacity=".8">«Отклонена» в чате или «Отменить» в кабинете — из любой колонки</text>
+ </g>
+</svg>
+</div>
+<figcaption>Кнопки в чате отдела: пауза → Новая задача, принята / в работе → В работе, уточнить → Требуется уточнение, готово → Выполнено (задача закрывается), отклонена → Отклонена (закрывается). Откат из закрытой назад переоткрывает задачу. Кто нажал, причина отказа, вопрос и ответ, оценка заявителя — комментарии к задаче.</figcaption>
+</figure>
+</section>
+
+<section>
+<h2><span class="n">03</span>Что где хранится</h2>
+<div class="tbl"><table>
+<thead><tr><th>Где</th><th>Что</th><th>Роль</th></tr></thead>
+<tbody>
+<tr><td>Pyrus, задача</td><td>все поля заявки, картинки, история комментариев (кто принял, вопросы, ответы, оценка, подписки), колонка доски, открыта / закрыта, id карточки в чате</td><td class="keep">источник правды</td></tr>
+<tr><td>Бот</td><td>ничего на диске — только <code>.env</code></td><td>процесс без состояния</td></tr>
+<tr><td>Supabase</td><td>карточки тем и кейсов (тексты, картинки)</td><td>контент витрины</td></tr>
+<tr><td>Mini App</td><td>токен сессии в браузере, кэш ленты и справочника проектов на 2–10 минут</td><td>ничего про заявки</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<h2><span class="n">04</span>Поля формы</h2>
+<p>Поля ищутся по названию: коды полей API Pyrus не отдаёт. Переименовали поле в конструкторе — значение перестало заполняться, в логе бота предупреждение, заявка при этом создаётся.</p>
+<div class="fields" style="margin-top:12px">
+  <div class="field"><span class="name">Тема</span><span class="from">выбор, 8 вариантов = темы карточек</span></div>
+  <div class="field"><span class="name">Проект</span><span class="from">подсказка из справочника бюро «Проект»</span></div>
+  <div class="field"><span class="name">Описание задачи</span><span class="from">текст; из Mini App — с шапкой «Проект / Основа / Срок»</span></div>
+  <div class="field"><span class="name">Ожидаемый результат</span><span class="from">необязательно</span></div>
+  <div class="field"><span class="name">Основа заявки</span><span class="from">тема или материал, от которого шли</span></div>
+  <div class="field"><span class="name">Путь к решению-источнику</span><span class="from">если от готового кейса</span></div>
+  <div class="field"><span class="name">Путь к проекту</span><span class="from">исходники на X:</span></div>
+  <div class="field"><span class="name">Дата</span><span class="from">желаемый срок</span></div>
+  <div class="field"><span class="name">Telegram · Telegram ID</span><span class="from">автор; по ID кабинет отбирает «мои»</span></div>
+  <div class="field"><span class="name">ID сообщения в чате</span><span class="from">карточка в чате отдела</span></div>
+  <div class="field"><span class="name">Статус</span><span class="from">колонка доски</span></div>
+  <div class="field"><span class="name">Файл</span><span class="from">картинки — комментарием; первая = обложка в ленте</span></div>
+</div>
+</section>
+
+<section>
+<h2><span class="n">05</span>Нюансы, на которых ловились</h2>
+<ol class="steps">
+<li><span></span><span><b>Закрытие требует администратора формы.</b> Иначе <code>access_denied_close_task</code>, и весь комментарий отклоняется вместе со сменой статуса.</span></li>
+<li><span></span><span><b>Guid загруженного файла — одноразовый.</b> Один guid к двум задачам не приложить.</span></li>
+<li><span></span><span><b><code>filters</code> в <code>register</code> игнорируется молча.</b> «Мои заявки» отбираются на нашей стороне по Telegram ID — единственная защита от чужих.</span></li>
+<li><span></span><span><b>Поля доски вложены в разделы</b> (<code>info.fields</code> / <code>value.fields</code>); реестр не отдаёт вложений и комментариев — для ленты задача читается целиком.</span></li>
+<li><span></span><span><b>Новую задачу реестр отдаёт с задержкой в секунды.</b></span></li>
+<li><span></span><span><b>Схема формы кэшируется</b> на время жизни процесса: добавили поле — перезапустить бота.</span></li>
+<li><span></span><span><b>Автор всех задач — аккаунт из <code>.env</code>.</b> Нужен служебный аккаунт с правами администратора формы.</span></li>
+<li><span></span><span><b><code>sendData</code> ≤ 4096 байт и без файлов</b> — картинки идут через сервер Mini App заранее.</span></li>
+<li><span></span><span><b>Telegram иногда отдаёт пустой <code>initData</code></b> — вход в кабинет через код в адресе кнопки.</span></li>
+</ol>
+</section>
+
+<footer>Код: bot/pyrus.py · web/src/lib/server/pyrus.ts · web/src/lib/server/feed.ts · лист 2 — развёртывание</footer>
+</main>
+
+</body>
+</html>
