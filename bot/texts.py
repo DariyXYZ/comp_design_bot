@@ -1,60 +1,14 @@
 """Все пользовательские тексты бота."""
 from __future__ import annotations
 
-import json
 import logging
-import time
-import urllib.request
 
-from .config import config
 
 log = logging.getLogger(__name__)
 
 
-def _load_cases(attempts: int = 3, delay: float = 2.0) -> dict[str, dict[str, str]]:
-    """Кейсы читаются из Supabase (таблица `cases`) — единый источник с
-    Mini App (docs/index.html), чтобы не редактировать одно и то же в двух
-    местах и не гонять правки через git. Запрос — один раз при импорте
-    модуля (при старте бота); новый текст бот увидит только после
-    следующего рестарта (Mini App подхватывает его сразу же, без рестарта —
-    там свой fetch на каждое открытие).
+from .cases import CASES  # noqa: E402 — карточки тем локально, см. cases.py
 
-    Несколько попыток с паузой — раньше источником был локальный файл,
-    который не мог быть недоступен; теперь это сеть, и один короткий сбой
-    при старте не должен ронять бота в краш-цикл, если Supabase ответит
-    секунд через пять.
-    """
-    url = (
-        f"{config.supabase_url}/rest/v1/cases"
-        "?select=key,title,hint,eta&order=sort_order"
-    )
-    req = urllib.request.Request(
-        url,
-        headers={
-            "apikey": config.supabase_anon_key,
-            "Authorization": f"Bearer {config.supabase_anon_key}",
-        },
-    )
-    last_error: Exception | None = None
-    for attempt in range(1, attempts + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                rows = json.loads(resp.read().decode("utf-8"))
-            if not rows:
-                raise RuntimeError("Supabase вернул пустой список кейсов")
-            return {
-                r["key"]: {"title": r["title"], "hint": r.get("hint") or "", "eta": r["eta"]}
-                for r in rows
-            }
-        except Exception as e:  # noqa: BLE001 — при старте важно не упасть молча на первом же сбое сети
-            last_error = e
-            log.warning("Попытка %s/%s загрузить кейсы из Supabase не удалась: %s", attempt, attempts, e)
-            if attempt < attempts:
-                time.sleep(delay)
-    raise RuntimeError(f"Не удалось загрузить кейсы из Supabase после {attempts} попыток") from last_error
-
-
-CASES: dict[str, dict[str, str]] = _load_cases()
 
 STATUSES: dict[str, str] = {
     "new": "⏸️ На паузе",
@@ -106,7 +60,7 @@ ASK_DESCRIPTION = (
 # Дописывается к ASK_DESCRIPTION — конкретные вопросы под тип задачи, чтобы
 # отдел сразу получал точный сигнал, а заявителю не пришлось гадать, что
 # важно упомянуть. Статичный текст логики бота (не витринный контент вроде
-# CASES), поэтому просто словарь в коде, не поле в Supabase.
+# CASES), поэтому просто словарь в коде.
 CLARIFYING_HINT_BLOCK = "\n\nЧто обычно важно уточнить:\n{clarifying_hint}"
 
 # Каждый вопрос — отдельный элемент, потому что показываются они по одному на

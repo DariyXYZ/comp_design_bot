@@ -68,7 +68,7 @@
   <text x="106" y="378" class="m" fill="#fff" opacity=".85">/api/auth — код из кнопки бота → сессия</text>
   <text x="106" y="395" class="m" fill="#fff" opacity=".85">/api/requests — заявки · /api/uploads — фото</text>
   <text x="106" y="412" class="m" fill="#fff" opacity=".85">/api/feed — доска лентой · /api/projects — проекты</text>
-  <text x="106" y="429" class="m" fill="#fff" opacity=".85">/api/topics — карточки тем из Supabase</text>
+  <text x="106" y="429" class="m" fill="#fff" opacity=".85">/api/topics — карточки тем</text>
 
   <rect x="500" y="330" width="384" height="120" rx="6" fill="#161a22"/>
   <text x="516" y="354" font-weight="600" fill="#fff">Бот</text><text x="548" y="354" class="m" fill="#fff" opacity=".7">Python · aiogram · без базы</text>
@@ -90,10 +90,10 @@
 
   <!-- данные -->
   <rect x="90" y="512" width="240" height="90" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
-  <text x="106" y="536" font-weight="600">Supabase</text>
-  <text x="106" y="558" class="m">cases — 8 тем, тексты, картинки</text>
-  <text x="106" y="575" class="m">только чтение · правка в дашборде</text>
-  <text x="106" y="592" class="m" opacity=".7">материалы (36) — пока в коде</text>
+  <text x="106" y="536" font-weight="600">Карточки тем — в коде</text>
+  <text x="106" y="558" class="m">8 тем: тексты, картинки — в репозитории</text>
+  <text x="106" y="575" class="m">правка = коммит, деплой по пушу</text>
+  <text x="106" y="592" class="m" opacity=".7">материалы (36) — там же</text>
 
   <rect x="360" y="512" width="520" height="90" rx="6" fill="#d9481c"/>
   <text x="376" y="536" font-weight="600" fill="#fff" font-size="15">Pyrus</text><text x="436" y="536" class="m" fill="#fff" opacity=".85">единственное хранилище заявок</text>
@@ -105,7 +105,7 @@
   <line x1="210" y1="450" x2="210" y2="510" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#m1)"/>
   <line x1="380" y1="450" x2="440" y2="510" stroke="#d9481c" stroke-width="1.6" marker-end="url(#m2)" marker-start="url(#m2)"/>
   <line x1="700" y1="450" x2="700" y2="510" stroke="#d9481c" stroke-width="1.6" marker-end="url(#m2)" marker-start="url(#m2)"/>
-  <text x="90" y="614" class="m" opacity=".7">Supabase читает и бот — один раз при старте, карточки тем.</text>
+  <text x="90" y="614" class="m" opacity=".7">У бота своя копия восьми тем (bot/cases.py) — ключи общие с Mini App.</text>
 
   <!-- хостинг -->
   <rect x="90" y="636" width="240" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"/>
@@ -117,8 +117,8 @@
  </g>
 </svg>
 </div>
-<div class="legend"><span><i class="sw acc"></i>Pyrus — запись и чтение</span><span><i class="sw dash"></i>только чтение</span><span><i class="sw"></i>Telegram / HTTPS</span></div>
-<figcaption>Один принцип на всю схему: заявка живёт только в Pyrus. Бот и сервер Mini App — без состояния, их можно перезапустить или перенести в любой момент; Supabase хранит витрину, не заявки.</figcaption>
+<div class="legend"><span><i class="sw acc"></i>Pyrus — запись и чтение</span><span><i class="sw dash"></i>чтение</span><span><i class="sw"></i>Telegram / HTTPS</span></div>
+<figcaption>Один принцип на всю схему: заявка живёт только в Pyrus. Бот и сервер Mini App — без состояния, их можно перезапустить или перенести в любой момент; витрина (темы, материалы) — в коде, внешних баз кроме Pyrus нет.</figcaption>
 </figure>
 </section>
 
@@ -131,7 +131,7 @@
 <tr><td>Сервер Mini App</td><td>API-роуты Next · Vercel</td><td>вход по коду из бота, загрузка фото в Pyrus, чтение заявок и доски, справочник проектов; ключи только здесь</td></tr>
 <tr><td>Бот</td><td>Python 3.12 · aiogram</td><td>заявка из диалога или из Mini App → задача Pyrus; карточка и кнопки в чате отдела; уведомления</td></tr>
 <tr><td>Pyrus</td><td>форма 2457342 · доска</td><td class="keep">хранилище заявок: поля, файлы, история, статусы, подписки</td></tr>
-<tr><td>Supabase</td><td>Postgres + Storage</td><td>8 тем с текстами и картинками; общий источник для бота и Mini App</td></tr>
+<tr><td>Карточки тем</td><td>код Mini App + копия в боте</td><td>8 тем с текстами и картинками; внешней базы нет</td></tr>
 <tr><td>Telegram</td><td>Bot API</td><td>доставка сообщений, кнопки, файлы; Mini App открывается из кнопки бота</td></tr>
 </tbody></table></div>
 </section>
@@ -152,8 +152,7 @@
 <thead><tr><th>Где</th><th>Что</th></tr></thead>
 <tbody>
 <tr><td>Pyrus</td><td>заявки целиком; id карточки в чате; кто принял / завершил; вопросы, ответы, причины; оценки; подписки; колонка и закрытость</td></tr>
-<tr><td>Supabase</td><td>карточки тем (ключ, название, подсказка, срок, картинки)</td></tr>
-<tr><td>Код Mini App</td><td>36 материалов: кейсы, инструменты, модули с путями на X: — кандидат на перенос в Supabase</td></tr>
+<tr><td>Код</td><td>карточки тем (ключ, название, подсказка, срок, картинки) и 36 материалов</td></tr>
 <tr><td>Бот</td><td>ничего на диске, только <code>.env</code></td></tr>
 <tr><td>Браузер</td><td>токен сессии; кэш ленты и справочника на минуты</td></tr>
 </tbody></table></div>

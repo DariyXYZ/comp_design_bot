@@ -30,8 +30,6 @@ class Config:
     dept_chat_id: int | None
     dept_thread_id: int | None
     webapp_url: str
-    supabase_url: str
-    supabase_anon_key: str
     # Pyrus: пустые значения означают «интеграции нет» — бот работает как
     # раньше, заявки живут только в чате отдела и в своей базе.
     pyrus_login: str
@@ -58,13 +56,6 @@ class Config:
             )
             webapp_url = ""
 
-        # Тексты и картинки карточек (CASES) читаются из Supabase — единый
-        # источник с Mini App (docs/index.html), см. bot/texts.py.
-        supabase_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
-        supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
-        if not supabase_url or not supabase_anon_key:
-            raise RuntimeError("SUPABASE_URL / SUPABASE_ANON_KEY не заданы в .env")
-
         pyrus_login = os.environ.get("PYRUS_LOGIN", "").strip()
         pyrus_security_key = os.environ.get("PYRUS_SECURITY_KEY", "").strip()
         pyrus_form_id = _int_or_none("PYRUS_FORM_ID")
@@ -74,8 +65,6 @@ class Config:
             dept_chat_id=_int_or_none("DEPT_CHAT_ID"),
             dept_thread_id=_int_or_none("DEPT_THREAD_ID"),
             webapp_url=webapp_url,
-            supabase_url=supabase_url,
-            supabase_anon_key=supabase_anon_key,
             pyrus_login=pyrus_login,
             pyrus_security_key=pyrus_security_key,
             pyrus_form_id=pyrus_form_id,

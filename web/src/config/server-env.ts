@@ -26,10 +26,6 @@ export function serverEnv() {
     // Общий справочник проектов бюро «Проект» — источник подсказки в поле
     // «Проект». Id постоянный, переменная — на случай переезда справочника.
     pyrusProjectCatalogId: Number(process.env.PYRUS_PROJECT_CATALOG_ID ?? "278856"),
-    // Те же значения, что у бота. Без префикса NEXT_PUBLIC_ они не попадают в
-    // браузер — и это правильно: карточки читает серверный роут, а не клиент.
-    supabaseUrl: required("SUPABASE_URL").replace(/\/$/, ""),
-    supabaseAnonKey: required("SUPABASE_ANON_KEY"),
     // Чат отдела и ветка заявок. Необязательные: без них действия из кабинета
     // всё равно попадают в задачу Pyrus, просто в чат сообщение не уходит.
     deptChatId: process.env.DEPT_CHAT_ID,
