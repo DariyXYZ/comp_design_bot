@@ -1,0 +1,163 @@
+<main>
+<header>
+  <div class="eyebrow"><span>IND · Отдел вычислительного проектирования</span><b>comp_design_bot</b><span>карта сервиса · 16.09.2026</span></div>
+  <h1>Из чего состоит сервис заявок</h1>
+  <p class="lede">Все части в одном месте: кто пользуется, через что заходит, что делает каждый компонент, где лежат данные и на чём это крутится.</p>
+</header>
+
+<section>
+<figure>
+<div class="sheet">
+<svg viewBox="0 0 900 700" role="img" aria-label="Карта сервиса: люди сверху, Telegram и Mini App как входы, бот и сервер Mini App как логика, Pyrus и Supabase как данные, хостинг снизу">
+ <defs>
+  <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d9481c"/></marker>
+ </defs>
+ <g fill="currentColor" font-size="12.5">
+  <!-- слои -->
+  <g class="m" opacity=".55">
+   <text x="16" y="34">ЛЮДИ</text>
+   <text x="16" y="146">ВХОДЫ</text>
+   <text x="16" y="318">ЛОГИКА</text>
+   <text x="16" y="500">ДАННЫЕ</text>
+   <text x="16" y="646">ХОСТИНГ</text>
+  </g>
+  <line x1="16" y1="120" x2="884" y2="120" stroke="currentColor" stroke-width=".6" stroke-dasharray="2 5" opacity=".5"/>
+  <line x1="16" y1="292" x2="884" y2="292" stroke="currentColor" stroke-width=".6" stroke-dasharray="2 5" opacity=".5"/>
+  <line x1="16" y1="474" x2="884" y2="474" stroke="currentColor" stroke-width=".6" stroke-dasharray="2 5" opacity=".5"/>
+  <line x1="16" y1="620" x2="884" y2="620" stroke="currentColor" stroke-width=".6" stroke-dasharray="2 5" opacity=".5"/>
+
+  <!-- люди -->
+  <rect x="90" y="44" width="200" height="56" rx="28" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="190" y="67" text-anchor="middle" font-weight="600">Архитектор</text><text x="190" y="86" text-anchor="middle" class="m" opacity=".7">заявитель · любой в бюро</text>
+  <rect x="350" y="44" width="200" height="56" rx="28" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="450" y="67" text-anchor="middle" font-weight="600">Отдел</text><text x="450" y="86" text-anchor="middle" class="m" opacity=".7">исполнители · чат</text>
+  <rect x="610" y="44" width="200" height="56" rx="28" fill="none" stroke="#d9481c" stroke-width="1.4"/>
+  <text x="710" y="67" text-anchor="middle" font-weight="600" fill="#d9481c">Руководитель</text><text x="710" y="86" text-anchor="middle" class="m" opacity=".7">смотрит доску Pyrus</text>
+
+  <!-- входы -->
+  <rect x="90" y="158" width="380" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="106" y="182" font-weight="600">Mini App</text><text x="176" y="182" class="m" opacity=".7">Next.js · Vercel</text>
+  <text x="106" y="204" class="m">Темы (8) → Материалы: кейсы · инструменты · модули</text>
+  <text x="106" y="221" class="m">Шторка заявки: тема · проект · описание · фото · срок</text>
+  <text x="106" y="238" class="m">Задачи отдела — доска лентой · подписка на задачу</text>
+  <text x="106" y="255" class="m">Мои заявки: ответить · принять · доработка · отмена</text>
+
+  <rect x="500" y="158" width="180" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="516" y="182" font-weight="600">Чат с ботом</text>
+  <text x="516" y="204" class="m">/start · кнопка приложения</text>
+  <text x="516" y="221" class="m">диалог заявки по шагам</text>
+  <text x="516" y="238" class="m">уведомления о статусах</text>
+  <text x="516" y="255" class="m">оценка после «Готово»</text>
+
+  <rect x="704" y="158" width="180" height="110" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="720" y="182" font-weight="600">Чат отдела</text>
+  <text x="720" y="204" class="m">карточка заявки в ветке</text>
+  <text x="720" y="221" class="m">6 кнопок статуса</text>
+  <text x="720" y="238" class="m">вопрос · причина отказа</text>
+  <text x="720" y="255" class="m">сообщения из кабинета</text>
+
+  <!-- люди → входы -->
+  <line x1="190" y1="100" x2="190" y2="156" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)"/>
+  <path d="M230,100 C300,100 520,110 560,156" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)"/>
+  <line x1="450" y1="100" x2="780" y2="156" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)"/>
+
+  <!-- логика -->
+  <rect x="90" y="330" width="380" height="120" rx="6" fill="#161a22"/>
+  <text x="106" y="354" font-weight="600" fill="#fff">Сервер Mini App</text><text x="236" y="354" class="m" fill="#fff" opacity=".7">Vercel · API-роуты</text>
+  <text x="106" y="378" class="m" fill="#fff" opacity=".85">/api/auth — код из кнопки бота → сессия</text>
+  <text x="106" y="395" class="m" fill="#fff" opacity=".85">/api/requests — заявки · /api/uploads — фото</text>
+  <text x="106" y="412" class="m" fill="#fff" opacity=".85">/api/feed — доска лентой · /api/projects — проекты</text>
+  <text x="106" y="429" class="m" fill="#fff" opacity=".85">/api/topics — карточки тем из Supabase</text>
+
+  <rect x="500" y="330" width="384" height="120" rx="6" fill="#161a22"/>
+  <text x="516" y="354" font-weight="600" fill="#fff">Бот</text><text x="548" y="354" class="m" fill="#fff" opacity=".7">Python · aiogram · без базы</text>
+  <text x="516" y="378" class="m" fill="#fff" opacity=".85">принимает заявку: диалог или sendData из Mini App</text>
+  <text x="516" y="395" class="m" fill="#fff" opacity=".85">создаёт задачу Pyrus · карточка в чате отдела</text>
+  <text x="516" y="412" class="m" fill="#fff" opacity=".85">кнопка → колонка доски · закрыть / переоткрыть</text>
+  <text x="516" y="429" class="m" fill="#fff" opacity=".85">уведомляет автора и подписчиков · вопрос ↔ ответ</text>
+
+  <!-- входы → логика -->
+  <line x1="280" y1="268" x2="280" y2="328" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)" marker-start="url(#m1)"/>
+  <text x="288" y="302" class="m">HTTPS · токен сессии</text>
+  <path d="M400,268 C400,300 560,300 600,328" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)"/>
+  <text x="470" y="290" class="m" text-anchor="middle">sendData</text>
+  <line x1="590" y1="268" x2="640" y2="328" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)" marker-start="url(#m1)"/>
+  <line x1="794" y1="268" x2="760" y2="328" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)" marker-start="url(#m1)"/>
+  <text x="820" y="302" class="m">Bot API</text>
+  <path d="M470,410 C490,410 490,410 498,410" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#m1)"/>
+  <text x="484" y="400" class="m" text-anchor="middle">чат</text>
+
+  <!-- данные -->
+  <rect x="90" y="512" width="240" height="90" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <text x="106" y="536" font-weight="600">Supabase</text>
+  <text x="106" y="558" class="m">cases — 8 тем, тексты, картинки</text>
+  <text x="106" y="575" class="m">только чтение · правка в дашборде</text>
+  <text x="106" y="592" class="m" opacity=".7">материалы (36) — пока в коде</text>
+
+  <rect x="360" y="512" width="520" height="90" rx="6" fill="#d9481c"/>
+  <text x="376" y="536" font-weight="600" fill="#fff" font-size="15">Pyrus</text><text x="436" y="536" class="m" fill="#fff" opacity=".85">единственное хранилище заявок</text>
+  <text x="376" y="558" class="m" fill="#fff" opacity=".9">форма 2457342: 12 полей · вложения · комментарии как история</text>
+  <text x="376" y="575" class="m" fill="#fff" opacity=".9">колонки: Новая · Требуется уточнение · В работе · Выполнено · Отклонена</text>
+  <text x="376" y="592" class="m" fill="#fff" opacity=".9">справочник «Проект» 278856 — подсказка названий проектов бюро</text>
+
+  <!-- логика → данные -->
+  <line x1="210" y1="450" x2="210" y2="510" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#m1)"/>
+  <line x1="380" y1="450" x2="440" y2="510" stroke="#d9481c" stroke-width="1.6" marker-end="url(#m2)" marker-start="url(#m2)"/>
+  <line x1="700" y1="450" x2="700" y2="510" stroke="#d9481c" stroke-width="1.6" marker-end="url(#m2)" marker-start="url(#m2)"/>
+  <text x="90" y="614" class="m" opacity=".7">Supabase читает и бот — один раз при старте, карточки тем.</text>
+
+  <!-- хостинг -->
+  <rect x="90" y="636" width="240" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="106" y="656" font-weight="600">Vercel</text><text x="106" y="673" class="m" opacity=".7">Mini App + API · деплой по пушу</text>
+  <rect x="360" y="636" width="240" height="46" rx="6" fill="none" stroke="#d9481c" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="376" y="656" font-weight="600" fill="#d9481c">Бот: ПК Дария → bot.ai.ind.studio</text><text x="376" y="673" class="m" opacity=".7">один процесс · .env · автоперезапуск</text>
+  <rect x="630" y="636" width="254" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="646" y="656" font-weight="600">GitHub</text><text x="646" y="673" class="m" opacity=".7">DariyXYZ/comp_design_bot · main</text>
+ </g>
+</svg>
+</div>
+<div class="legend"><span><i class="sw acc"></i>Pyrus — запись и чтение</span><span><i class="sw dash"></i>только чтение</span><span><i class="sw"></i>Telegram / HTTPS</span></div>
+<figcaption>Один принцип на всю схему: заявка живёт только в Pyrus. Бот и сервер Mini App — без состояния, их можно перезапустить или перенести в любой момент; Supabase хранит витрину, не заявки.</figcaption>
+</figure>
+</section>
+
+<section>
+<h2><span class="n">01</span>Компоненты</h2>
+<div class="tbl"><table>
+<thead><tr><th>Компонент</th><th>Технология · где</th><th>Отвечает за</th></tr></thead>
+<tbody>
+<tr><td>Mini App</td><td>Next.js 16 · Vercel</td><td>витрина тем и материалов, форма заявки, лента доски, кабинет заявителя</td></tr>
+<tr><td>Сервер Mini App</td><td>API-роуты Next · Vercel</td><td>вход по коду из бота, загрузка фото в Pyrus, чтение заявок и доски, справочник проектов; ключи только здесь</td></tr>
+<tr><td>Бот</td><td>Python 3.12 · aiogram</td><td>заявка из диалога или из Mini App → задача Pyrus; карточка и кнопки в чате отдела; уведомления</td></tr>
+<tr><td>Pyrus</td><td>форма 2457342 · доска</td><td class="keep">хранилище заявок: поля, файлы, история, статусы, подписки</td></tr>
+<tr><td>Supabase</td><td>Postgres + Storage</td><td>8 тем с текстами и картинками; общий источник для бота и Mini App</td></tr>
+<tr><td>Telegram</td><td>Bot API</td><td>доставка сообщений, кнопки, файлы; Mini App открывается из кнопки бота</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<h2><span class="n">02</span>Четыре потока</h2>
+<ol class="steps">
+<li><span><b>Заявка.</b> Архитектор выбирает тему или материал → шторка → <code>sendData</code> в бот → бот создаёт задачу Pyrus (12 полей, фото комментарием) → карточка с кнопками в чат отдела → заявителю «принята, №…».</span></li>
+<li><span><b>Статус.</b> Отдел нажимает кнопку в чате → бот переводит колонку доски, при «Готово»/«Отклонена» закрывает задачу → уведомление автору и подписчикам; статус виден в кабинете и ленте.</span></li>
+<li><span><b>Уточнение и приёмка.</b> «Уточнить» в чате → вопрос комментарием → заявителю в чат с ботом → ответ из кабинета → задача снова «В работе». После «Готово» заявитель принимает или возвращает с замечаниями (переоткрытие).</span></li>
+<li><span><b>Лента и подписка.</b> Сервер Mini App читает реестр доски, показывает задачи по колонкам с обложками; «Следить» пишет в задачу комментарий «Подписка: tg:id», бот шлёт подписчикам изменения.</span></li>
+</ol>
+</section>
+
+<section>
+<h2><span class="n">03</span>Где что хранится</h2>
+<div class="tbl"><table>
+<thead><tr><th>Где</th><th>Что</th></tr></thead>
+<tbody>
+<tr><td>Pyrus</td><td>заявки целиком; id карточки в чате; кто принял / завершил; вопросы, ответы, причины; оценки; подписки; колонка и закрытость</td></tr>
+<tr><td>Supabase</td><td>карточки тем (ключ, название, подсказка, срок, картинки)</td></tr>
+<tr><td>Код Mini App</td><td>36 материалов: кейсы, инструменты, модули с путями на X: — кандидат на перенос в Supabase</td></tr>
+<tr><td>Бот</td><td>ничего на диске, только <code>.env</code></td></tr>
+<tr><td>Браузер</td><td>токен сессии; кэш ленты и справочника на минуты</td></tr>
+</tbody></table></div>
+</section>
+
+<footer>Код: github.com/DariyXYZ/comp_design_bot · развёртывание бота — лист «bot-deploy»</footer>
+</main>
