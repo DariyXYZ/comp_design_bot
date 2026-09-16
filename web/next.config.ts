@@ -16,10 +16,8 @@ const staticExport = process.env.NEXT_OUTPUT === "export";
 const nextConfig: NextConfig = {
   output: staticExport ? "export" : undefined,
   pageExtensions: staticExport ? ["tsx"] : undefined,
-  // На Vercel и на C#-сервере приложение живёт в корне домена, поэтому
-  // basePath не нужен. Переменная оставлена для случая, если приложение снова
-  // будут раздавать из подпапки (project pages).
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || undefined,
+  // basePath не задаём: и на Vercel, и на C#-сервере приложение живёт в корне
+  // домена. Раздача из подпапки (project pages) ушла вместе с GitHub Pages.
   trailingSlash: true,
   // Оптимизатор картинок отключён сознательно: своих растровых картинок в
   // приложении нет — карточки тем приходят из Supabase Storage, а места без

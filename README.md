@@ -44,7 +44,7 @@ Telegram-бот `@comp_design_bot` для приёма задач в Отдел 
 
 ```
 bot/            # aiogram 3: handlers, FSM, SQLite
-web/            # Mini App на Next.js -> GitHub Pages (актуальная витрина)
+web/            # Mini App на Next.js (актуальная витрина)
 docs/           # прежняя витрина одним HTML-файлом (legacy, см. ниже)
 run_bot.ps1     # запуск с автоперезапуском
 register_autostart.ps1  # автозапуск при входе в Windows (без админ-прав)
@@ -52,15 +52,15 @@ register_autostart.ps1  # автозапуск при входе в Windows (б�
 
 ### Mini App
 
-Витрина кейсов — Next.js (App Router, TypeScript, `output: 'export'`) в папке
-`web/`. Собирается и публикуется на GitHub Pages workflow'ом
-`.github/workflows/deploy-webapp.yml`.
+Витрина кейсов — Next.js (App Router, TypeScript) в папке `web/`. Сейчас
+публикуется сборкой на Vercel; после переключения webhook её статикой будет
+раздавать C#-сервер (`server/`).
 
 ```powershell
 cd web
 npm install
 Copy-Item .env.example .env.local   # вписать значения Supabase
-npm run dev                         # http://localhost:3000/comp_design_bot
+npm run dev                         # http://localhost:3000
 ```
 
 Подробности — структура, переменные окружения, архитектурные решения и
@@ -69,15 +69,15 @@ npm run dev                         # http://localhost:3000/comp_design_bot
 Карточки берутся из Supabase (таблица `cases`) — тот же источник, что у бота,
 править контент нужно там, а не в коде.
 
-`docs/` — прежняя однофайловая версия витрины. Оставлена как путь отката
-(вернуть в Settings → Pages источником папку `docs`); в проде она больше не
-используется.
+`docs/` — прежняя однофайловая версия витрины и операционные листы отдела;
+здесь же стандарт C#-сервисов (`docs/csharp-standard.md`). В проде витрина из
+`docs/` больше не используется.
 
 ## Настройка
 
 1. Скопировать `.env.example` в `.env`, вписать `TELEGRAM_TOKEN`.
 2. Добавить бота в группу отдела, в нужной ветке дать команду `/id` — вписать `DEPT_CHAT_ID` и `DEPT_THREAD_ID` в `.env`.
-3. Включить GitHub Pages (Settings → Pages → Source: `GitHub Actions`), вписать URL в `WEBAPP_URL`.
+3. Вписать в `WEBAPP_URL` адрес Mini App (у C#-сервера он берётся из `PUBLIC_URL`).
 4. У BotFather: `/setmenubutton` не требуется — Mini App открывается с reply-кнопки «✦ Решения и заявки» и с кнопки в сообщении команды `/app`.
 
 ## Запуск
