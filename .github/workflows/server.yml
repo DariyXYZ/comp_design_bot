@@ -1,0 +1,96 @@
+# C#-сервер (server/) + статика Mini App (web/): проверка, публикация, деплой на AI01.
+#
+# verify — на любом пуше и PR: dotnet build/test/format, npm lint/typecheck/test,
+#          статический экспорт, dotnet publish → артефакт server-publish.
+# deploy — только main и только когда в репозитории задана переменная
+#          DEPLOY_ENABLED=true: self-hosted runner на AI01 останавливает службу,
+#          раскладывает артефакт, запускает и проверяет /health.
+#          Переменные окружения службы задаются на сервере, не здесь (см. server/README.md).
+name: server
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**", "web/**", ".github/workflows/server.yml"]
+  pull_request:
+    paths: ["server/**", "web/**", ".github/workflows/server.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: server/global.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: dotnet restore/build/test/format
+        working-directory: server
+        run: |
+          dotnet restore
+          dotnet build --no-restore -c Release
+          dotnet test --no-build -c Release
+          dotnet format --verify-no-changes --no-restore
+
+      - name: Mini App — проверки и статический экспорт
+        working-directory: web
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build:static
+
+      - name: dotnet publish + wwwroot
+        run: |
+          dotnet publish server/src/CompDesignBot -c Release --no-build -o publish
+          mkdir -p publish/wwwroot
+          cp -r web/out/. publish/wwwroot/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-publish
+          path: publish
+          retention-days: 14
+
+  deploy:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: [self-hosted, windows, ai01]
+    environment: ai01
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-publish
+          path: artifact
+
+      - name: Раскладка и перезапуск службы
+        shell: pwsh
+        run: |
+          $dir = if ($env:DEPLOY_DIR) { $env:DEPLOY_DIR } else { 'C:\Services\CompDesignBot' }
+          $service = 'CompDesignBot'
+          if (Get-Service $service -ErrorAction SilentlyContinue) { Stop-Service $service -Force }
+          # /MIR держит папку равной артефакту; logs — данные службы, их не трогаем.
+          robocopy artifact $dir /MIR /XD logs /NFL /NDL /NJH /NJS
+          if ($LASTEXITCODE -ge 8) { throw "robocopy: $LASTEXITCODE" }
+          Start-Service $service
+          Start-Sleep -Seconds 5
+          $port = if ($env:HEALTH_PORT) { $env:HEALTH_PORT } else { '5089' }
+          $health = Invoke-WebRequest "http://127.0.0.1:$port/health" -UseBasicParsing
+          if ($health.StatusCode -ne 200) { throw "health: $($health.StatusCode)" }
+          Write-Host "OK: $($health.Content)"
+        env:
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+          HEALTH_PORT: ${{ vars.HEALTH_PORT }}
