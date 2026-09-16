@@ -1086,3 +1086,12 @@ body{
   .field input,.field textarea{transition:none}
   .btn-primary:active,.back:active,.path-copy:active,.pill:active{transform:none}
 }
+
+/* Широкое окно (Telegram Desktop, браузер): приложение телефонное, и растянутое
+   на весь экран оно разваливается — колода уезжает вправо, строки становятся
+   полотном. Держим одну колонку телефонной ширины по центру; шторка —
+   фиксированная, поэтому центрируется отдельно. */
+@media (min-width: 640px){
+  .app{width:100%;max-width:480px;margin:0 auto}
+  .sheet{left:50%;right:auto;width:100%;max-width:480px;transform:translateX(-50%)}
+}
