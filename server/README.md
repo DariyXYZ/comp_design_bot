@@ -106,10 +106,10 @@ Cloudflare quick tunnel работает: `scripts/run-dev.ps1` поднимае
 ```powershell
 # один раз
 Copy-Item server\.env.dev.example server\.env.dev   # заполнить: тестовый бот, тестовая группа, Pyrus
-# cloudflared.exe (portable) → C:\VS Code	ools\cloudflared\ — https://github.com/cloudflare/cloudflared/releases
+# cloudflared.exe (portable) → C:\VS Code\tools\cloudflared\ — https://github.com/cloudflare/cloudflared/releases
 
 # каждый запуск
-powershell -File server\scriptsun-dev.ps1          # -SkipWeb, если статика уже собрана
+powershell -File server\scripts\run-dev.ps1          # -SkipWeb, если статика уже собрана
 ```
 
 Важно: **тестовый бот, не рабочий** (`@BotFather` → `/newbot`) — у Telegram
