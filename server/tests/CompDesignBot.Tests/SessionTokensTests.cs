@@ -1,12 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
-using CompDesignBot.Features.Auth;
+using CompDesignBot.Features.Identity;
 
 namespace CompDesignBot.Tests;
 
 public sealed class SessionTokensTests
 {
-    private const string Secret = "111:secret";
+    private const string Secret = "session-secret";
+    private const string BotToken = "111:bot-token";
 
     private sealed class FakeTime(DateTimeOffset now) : TimeProvider
     {
@@ -17,7 +18,7 @@ public sealed class SessionTokensTests
 
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    /// <summary>Подписывает так же, как Python <c>webauth.login_code</c> и TS <c>issueToken</c>.</summary>
+    /// <summary>Подписывает так же, как прежний TS <c>issueToken</c>.</summary>
     private static string SignLikeOthers(string payloadJson)
     {
         var body = Base64Url(Encoding.UTF8.GetBytes(payloadJson));
@@ -28,7 +29,7 @@ public sealed class SessionTokensTests
     [Fact]
     public void Token_round_trips_viewer()
     {
-        var tokens = new SessionTokens(Secret);
+        var tokens = new SessionTokens(Secret, BotToken);
         var viewer = new Viewer(42, "Дарий Назаров", "@dariy");
         var token = tokens.IssueToken(viewer);
         Assert.Equal(viewer, tokens.ReadToken(token));
@@ -39,42 +40,16 @@ public sealed class SessionTokensTests
     {
         var exp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
         var token = SignLikeOthers($"{{\"id\":7,\"name\":\"Имя\",\"handle\":null,\"exp\":{exp}}}");
-        var viewer = new SessionTokens(Secret).ReadToken(token);
+        var viewer = new SessionTokens(Secret, BotToken).ReadToken(token);
         Assert.Equal(new Viewer(7, "Имя", null), viewer);
-    }
-
-    [Fact]
-    public void Login_code_from_python_bot_is_accepted()
-    {
-        var exp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var code = SignLikeOthers($"{{\"uid\":9,\"name\":\"Кто-то\",\"handle\":\"@x\",\"exp\":{exp},\"kind\":\"code\"}}");
-        var viewer = new SessionTokens(Secret).ReadLoginCode(code);
-        Assert.Equal(new Viewer(9, "Кто-то", "@x"), viewer);
-    }
-
-    [Fact]
-    public void Session_token_is_not_a_login_code()
-    {
-        var tokens = new SessionTokens(Secret);
-        var token = tokens.IssueToken(new Viewer(1, "a", null));
-        var error = Assert.Throws<AuthException>(() => tokens.ReadLoginCode(token));
-        Assert.Equal("это не код входа", error.Message);
-    }
-
-    [Fact]
-    public void Own_login_code_round_trips()
-    {
-        var tokens = new SessionTokens(Secret);
-        var code = tokens.IssueLoginCode(5, "Имя Фамилия", "nick");
-        Assert.Equal(new Viewer(5, "Имя Фамилия", "@nick"), tokens.ReadLoginCode(code));
     }
 
     [Fact]
     public void Tampered_signature_is_rejected()
     {
-        var tokens = new SessionTokens(Secret);
+        var tokens = new SessionTokens(Secret, BotToken);
         var token = tokens.IssueToken(new Viewer(1, "a", null));
-        var other = new SessionTokens("other").IssueToken(new Viewer(1, "a", null));
+        var other = new SessionTokens("other", BotToken).IssueToken(new Viewer(1, "a", null));
         Assert.Throws<AuthException>(() => tokens.ReadToken(other));
         Assert.Throws<AuthException>(() => tokens.ReadToken(token + "x"));
         Assert.Throws<AuthException>(() => tokens.ReadToken("garbage"));
@@ -84,7 +59,7 @@ public sealed class SessionTokensTests
     public void Expired_token_is_rejected_and_not_renewed()
     {
         var clock = new FakeTime(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero));
-        var tokens = new SessionTokens(Secret, clock);
+        var tokens = new SessionTokens(Secret, BotToken, clock);
         var token = tokens.IssueToken(new Viewer(1, "a", null));
         clock.Now = clock.Now.AddDays(31);
         Assert.Throws<AuthException>(() => tokens.ReadToken(token));
@@ -95,7 +70,7 @@ public sealed class SessionTokensTests
     public void Token_is_renewed_only_when_less_than_a_week_left()
     {
         var clock = new FakeTime(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero));
-        var tokens = new SessionTokens(Secret, clock);
+        var tokens = new SessionTokens(Secret, BotToken, clock);
         var token = tokens.IssueToken(new Viewer(1, "a", null));
         Assert.Null(tokens.RenewedToken(token));
         clock.Now = clock.Now.AddDays(24);
@@ -117,15 +92,15 @@ public sealed class SessionTokensTests
             ["user"] = user,
         };
         var checkString = string.Join('\n', pairs.Select(p => $"{p.Key}={p.Value}"));
-        var secretKey = HMACSHA256.HashData(Encoding.UTF8.GetBytes("WebAppData"), Encoding.UTF8.GetBytes(Secret));
+        var secretKey = HMACSHA256.HashData(Encoding.UTF8.GetBytes("WebAppData"), Encoding.UTF8.GetBytes(BotToken));
         var hash = Convert.ToHexString(HMACSHA256.HashData(secretKey, Encoding.UTF8.GetBytes(checkString))).ToLowerInvariant();
         var initData = $"query_id=AAH&user={Uri.EscapeDataString(user)}&auth_date={authDate}&hash={hash}";
 
-        var viewer = new SessionTokens(Secret).VerifyInitData(initData);
+        var viewer = new SessionTokens(Secret, BotToken).VerifyInitData(initData);
         Assert.Equal(new Viewer(77, "Иван Петров", "@ivan"), viewer);
 
-        Assert.Throws<AuthException>(() => new SessionTokens(Secret).VerifyInitData(initData.Replace("ivan", "eve")));
-        Assert.Throws<AuthException>(() => new SessionTokens(Secret).VerifyInitData(""));
+        Assert.Throws<AuthException>(() => new SessionTokens(Secret, BotToken).VerifyInitData(initData.Replace("ivan", "eve")));
+        Assert.Throws<AuthException>(() => new SessionTokens(Secret, BotToken).VerifyInitData(""));
     }
 
     [Fact]

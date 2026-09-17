@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using CompDesignBot.Config;
+using CompDesignBot.Hosting;
 
 namespace CompDesignBot.Infrastructure.Pyrus;
 
@@ -28,9 +28,9 @@ public sealed class PyrusClient : IPyrusClient
     private readonly ILogger<PyrusClient> _log;
     private readonly SemaphoreSlim _authLock = new(1, 1);
     private readonly SemaphoreSlim _schemaLock = new(1, 1);
+    private readonly Dictionary<long, PyrusFormSchema> _schemas = [];
     private string? _token;
     private string _api = DefaultApi;
-    private PyrusFormSchema? _schema;
 
     public PyrusClient(HttpClient http, AppOptions options, ILogger<PyrusClient> log)
     {
@@ -41,27 +41,35 @@ public sealed class PyrusClient : IPyrusClient
 
     public bool Enabled => _options.PyrusEnabled;
 
-    public async Task<PyrusFormSchema?> SchemaAsync(CancellationToken ct = default)
+    public async Task<PyrusFormSchema?> SchemaAsync(long formId, CancellationToken ct = default)
     {
         if (!Enabled)
         {
             return null;
         }
 
-        if (_schema is not null)
+        lock (_schemas)
         {
-            return _schema;
+            if (_schemas.TryGetValue(formId, out var cached))
+            {
+                return cached;
+            }
         }
 
+        // Кэш по форме: заявки и кадровый реестр — разные формы, общий кэш
+        // перетирал бы одну схему другой.
         await _schemaLock.WaitAsync(ct);
         try
         {
-            if (_schema is not null)
+            lock (_schemas)
             {
-                return _schema;
+                if (_schemas.TryGetValue(formId, out var again))
+                {
+                    return again;
+                }
             }
 
-            var body = await CallAsync(HttpMethod.Get, $"/forms/{_options.PyrusFormId}", null, ct);
+            var body = await CallAsync(HttpMethod.Get, $"/forms/{formId}", null, ct);
             if (body is null)
             {
                 return null;
@@ -107,9 +115,14 @@ public sealed class PyrusClient : IPyrusClient
                 }
             }
 
-            _schema = new PyrusFormSchema { FieldIds = ids, FieldTypes = types, Choices = choices };
-            _log.LogInformation("Pyrus: схема формы {FormId} прочитана, полей {Count}", _options.PyrusFormId, ids.Count);
-            return _schema;
+            var schema = new PyrusFormSchema { FieldIds = ids, FieldTypes = types, Choices = choices };
+            lock (_schemas)
+            {
+                _schemas[formId] = schema;
+            }
+
+            _log.LogInformation("Pyrus: схема формы {FormId} прочитана, полей {Count}", formId, ids.Count);
+            return schema;
         }
         finally
         {
@@ -117,24 +130,24 @@ public sealed class PyrusClient : IPyrusClient
         }
     }
 
-    public async Task<long?> CreateFormTaskAsync(IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
+    public async Task<long?> CreateFormTaskAsync(long formId, IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
     {
         if (!Enabled)
         {
             return null;
         }
 
-        var fields = await FieldValuesAsync(values, ct);
+        var fields = await FieldValuesAsync(formId, values, ct);
         if (fields.Count == 0)
         {
             return null;
         }
 
-        var body = await CallAsync(HttpMethod.Post, "/tasks", new { form_id = _options.PyrusFormId, fields }, ct);
+        var body = await CallAsync(HttpMethod.Post, "/tasks", new { form_id = formId, fields }, ct);
         if (body is { } b && b.TryGetProperty("task", out var task) && task.TryGetProperty("id", out var id))
         {
             var taskId = id.GetInt64();
-            _log.LogInformation("Pyrus: создана задача {TaskId} по форме {FormId}", taskId, _options.PyrusFormId);
+            _log.LogInformation("Pyrus: создана задача {TaskId} по форме {FormId}", taskId, formId);
             return taskId;
         }
 
@@ -156,7 +169,8 @@ public sealed class PyrusClient : IPyrusClient
 
         if (request.SetFields is { Count: > 0 })
         {
-            var updates = await FieldValuesAsync(request.SetFields, ct);
+            var formId = request.FormId ?? throw new ArgumentException("Для field_updates нужен FormId", nameof(request));
+            var updates = await FieldValuesAsync(formId, request.SetFields, ct);
             if (updates.Count > 0)
             {
                 payload["field_updates"] = updates;
@@ -197,14 +211,14 @@ public sealed class PyrusClient : IPyrusClient
         return task.Deserialize<PyrusTask>(Json);
     }
 
-    public async Task<IReadOnlyList<PyrusTask>> RegisterAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<PyrusTask>> RegisterAsync(long formId, CancellationToken ct = default)
     {
         if (!Enabled)
         {
             return [];
         }
 
-        var body = await CallAsync(HttpMethod.Post, $"/forms/{_options.PyrusFormId}/register", new { include_archived = true }, ct);
+        var body = await CallAsync(HttpMethod.Post, $"/forms/{formId}/register", new { include_archived = true }, ct);
         if (body is not { } b || !b.TryGetProperty("tasks", out var tasks))
         {
             return [];
@@ -294,9 +308,9 @@ public sealed class PyrusClient : IPyrusClient
     /// задачи и для field_updates: пустое не отправляется, поле выбора получает
     /// choice_id, справочник — item_id, чужое название уходит в лог.
     /// </summary>
-    private async Task<List<object>> FieldValuesAsync(IReadOnlyDictionary<string, object?> values, CancellationToken ct)
+    private async Task<List<object>> FieldValuesAsync(long formId, IReadOnlyDictionary<string, object?> values, CancellationToken ct)
     {
-        var schema = await SchemaAsync(ct);
+        var schema = await SchemaAsync(formId, ct);
         var result = new List<object>();
         if (schema is null)
         {

@@ -1,4 +1,5 @@
 using CompDesignBot.Features.Requests;
+using CompDesignBot.Hosting;
 using CompDesignBot.Infrastructure.Pyrus;
 
 namespace CompDesignBot.Features.Feed;
@@ -29,13 +30,15 @@ public sealed class FeedService
     private const int ExcerptLimit = 140;
 
     private readonly IPyrusClient _pyrus;
+    private readonly long _formId;
     private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private Snapshot? _cache;
 
-    public FeedService(IPyrusClient pyrus, TimeProvider? clock = null)
+    public FeedService(IPyrusClient pyrus, AppOptions options, TimeProvider? clock = null)
     {
         _pyrus = pyrus;
+        _formId = options.PyrusFormId ?? 0;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -55,7 +58,7 @@ public sealed class FeedService
                 return again.Tasks;
             }
 
-            var register = await _pyrus.RegisterAsync(ct);
+            var register = _formId > 0 ? await _pyrus.RegisterAsync(_formId, ct) : [];
             // Отклонённые в ленту не идут: это доска сделанного, а не корзина.
             var closed = register
                 .Where(task => task.Closed)
@@ -118,7 +121,7 @@ public sealed class FeedService
             task.Id,
             Get(Field.Topic),
             Get(Field.Project),
-            RequestCard.Excerpt(Get(Field.Description), ExcerptLimit),
+            RequestText.Excerpt(Get(Field.Description), ExcerptLimit),
             Get(Field.Status),
             task.Closed,
             task.CreateDate,

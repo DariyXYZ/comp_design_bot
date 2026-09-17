@@ -2,8 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CompDesignBot.Endpoints;
+using CompDesignBot.Channels.Telegram;
 using CompDesignBot.Features.Requests;
+using CompDesignBot.Hosting;
 using CompDesignBot.Tests.Fakes;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Telegram.Bot.Requests;
@@ -83,19 +84,60 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
-    public async Task Redeem_and_exchange_issue_tokens()
+    public async Task Exchange_rejects_missing_init_data()
     {
-        var code = _app.Tokens.IssueLoginCode(5, "Имя", "nick");
-        var redeemed = await Json(await _client.PostAsJsonAsync("/api/auth/redeem/", new { code }));
-        Assert.Equal(5, redeemed.GetProperty("user").GetProperty("id").GetInt64());
-        Assert.Equal("@nick", redeemed.GetProperty("user").GetProperty("handle").GetString());
-        Assert.Equal(5, _app.Tokens.ReadToken(redeemed.GetProperty("token").GetString()!).Id);
-
-        var bad = await _client.PostAsJsonAsync("/api/auth/redeem/", new { code = "nope" });
-        Assert.Equal(HttpStatusCode.Unauthorized, bad.StatusCode);
-
         var exchange = await _client.PostAsync("/api/auth/exchange/", null);
         Assert.Equal(HttpStatusCode.Unauthorized, exchange.StatusCode);
+        Assert.Equal("данные запуска пусты", (await Json(exchange)).GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Submit_creates_task_and_posts_card_to_dept()
+    {
+        var body = new
+        {
+            @case = "curved",
+            description = "Фасад с кривизной",
+            project = "1-19-2026 БЦ",
+            project_id = "1",
+            origin = "Модуль X",
+            origin_path = @"X:\Library\x",
+            deadline = "2026-10-01",
+            expected = "Скрипт",
+            photos = new[] { "g1", "g2" },
+        };
+        var response = await _client.SendAsync(Authed(HttpMethod.Post, "/api/requests/", body: body));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await Json(response);
+        Assert.True(result.GetProperty("delivered").GetBoolean());
+
+        var task = Assert.Single(_app.Pyrus.Tasks.Values);
+        Assert.Equal(task.Id, result.GetProperty("taskId").GetInt64());
+        Assert.Equal("Форма здания криволинейная", task[Field.Topic]);
+        Assert.Equal("Проект: 1-19-2026 БЦ\nОснова: Модуль X\nСрок: 2026-10-01\nКартинки: 2 — приложены в задаче Pyrus\n\nФасад с кривизной", task[Field.Description]);
+        Assert.Equal("Скрипт", task[Field.Expected]);
+        Assert.Equal(@"X:\Library\x", task[Field.Source]);
+        Assert.Equal("77", task[Field.TelegramId]);
+        Assert.Equal("Тест Тестов (@tester)", task[Field.Author]);
+        Assert.Equal(BoardStatus.New, task[Field.Status]);
+        Assert.NotNull(task[Field.ChatMessage]);
+
+        var attach = _app.Pyrus.Comments.Single(c => c.Request.AttachmentGuids is not null);
+        Assert.Equal(["g1", "g2"], attach.Request.AttachmentGuids!);
+
+        var card = Assert.Single(_app.Bot.Sent<SendMessageRequest>());
+        Assert.Equal(AppFactory.DeptChatId, card.ChatId.Identifier);
+        Assert.Equal(AppFactory.DeptThreadId, card.MessageThreadId);
+        Assert.Contains($"Заявка №{task.Id}</a> · Форма здания криволинейная", card.Text);
+        Assert.Contains("🎯 Ожидаемый результат: Скрипт", card.Text);
+        var buttons = Assert.IsType<Telegram.Bot.Types.ReplyMarkups.InlineKeyboardMarkup>(card.ReplyMarkup);
+        Assert.Equal($"st:{task.Id}:new", buttons.InlineKeyboard.First().First().CallbackData);
+
+        var bad = await _client.SendAsync(Authed(HttpMethod.Post, "/api/requests/", body: new { @case = "nope", description = "x" }));
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        var empty = await _client.SendAsync(Authed(HttpMethod.Post, "/api/requests/", body: new { @case = "curved" }));
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/requests/", body)).StatusCode);
     }
 
     [Fact]
@@ -224,8 +266,8 @@ public sealed class ApiTests : IDisposable
     [Fact]
     public async Task Expiring_token_is_renewed_in_header()
     {
-        var soon = new CompDesignBot.Features.Auth.SessionTokens(AppFactory.BotToken, new ShiftedClock(TimeSpan.FromDays(-25)))
-            .IssueToken(new CompDesignBot.Features.Auth.Viewer(77, "a", null));
+        var soon = new CompDesignBot.Features.Identity.SessionTokens(AppFactory.SessionSecret, AppFactory.BotToken, new ShiftedClock(TimeSpan.FromDays(-25)))
+            .IssueToken(new CompDesignBot.Features.Identity.Viewer(77, "a", null));
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/requests/");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", soon);
         var response = await _client.SendAsync(request);
@@ -238,7 +280,7 @@ public sealed class ApiTests : IDisposable
     [Fact]
     public async Task Webhook_checks_secret_and_queues_update()
     {
-        var update = """{"update_id":1,"message":{"message_id":1,"date":0,"chat":{"id":77,"type":"private"},"from":{"id":77,"is_bot":false,"first_name":"Иван"},"text":"/info"}}""";
+        var update = """{"update_id":1,"message":{"message_id":1,"date":0,"chat":{"id":77,"type":"private"},"from":{"id":77,"is_bot":false,"first_name":"Иван"},"text":"привет"}}""";
         var forbidden = await _client.PostAsync("/telegram/webhook", new StringContent(update, System.Text.Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
 
@@ -258,7 +300,7 @@ public sealed class ApiTests : IDisposable
 
         var sent = Assert.Single(_app.Bot.Sent<SendMessageRequest>());
         Assert.Equal(77, sent.ChatId.Identifier);
-        Assert.StartsWith("Как это работает:", sent.Text);
+        Assert.Equal(Texts.UseApp, sent.Text);
     }
 
     private sealed class ShiftedClock(TimeSpan shift) : TimeProvider

@@ -1,5 +1,5 @@
-using CompDesignBot.Features.Auth;
-using CompDesignBot.Features.Bot;
+using CompDesignBot.Channels.Telegram;
+using CompDesignBot.Features.Identity;
 using CompDesignBot.Infrastructure.Pyrus;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -14,6 +14,7 @@ namespace CompDesignBot.Tests.Fakes;
 public sealed class AppFactory : WebApplicationFactory<Program>
 {
     public const string BotToken = "123456:TEST-TOKEN";
+    public const string SessionSecret = "session-secret";
     public const long DeptChatId = -1003204218879;
     public const int DeptThreadId = 5011;
     public const string WebhookSecret = "hook-secret";
@@ -22,7 +23,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>
 
     public FakeBotClient Bot { get; } = new();
 
-    public SessionTokens Tokens { get; } = new(BotToken);
+    public SessionTokens Tokens { get; } = new(SessionSecret, BotToken);
 
     /// <summary>Заглушка статического экспорта: три файла, чтобы проверить раздачу.</summary>
     public string WebRoot { get; } = Path.Combine(Path.GetTempPath(), "comp-design-bot-wwwroot-" + Guid.NewGuid().ToString("N"));
@@ -38,6 +39,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>
         // assets), и заглушка выше проигрывает ему.
         builder.UseEnvironment("Testing");
         builder.UseSetting("TELEGRAM_TOKEN", BotToken);
+        builder.UseSetting("SESSION_SECRET", SessionSecret);
         builder.UseSetting("TELEGRAM_WEBHOOK_SECRET", WebhookSecret);
         builder.UseSetting("WEBAPP_URL", "https://bot.example.test/");
         builder.UseSetting("DEPT_CHAT_ID", DeptChatId.ToString());

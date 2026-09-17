@@ -41,7 +41,7 @@ public sealed class FakePyrusClient : IPyrusClient
         return task;
     }
 
-    public Task<PyrusFormSchema?> SchemaAsync(CancellationToken ct = default)
+    public Task<PyrusFormSchema?> SchemaAsync(long formId, CancellationToken ct = default)
     {
         var ids = FieldNames.Select((name, i) => (name, id: i + 1)).ToDictionary(p => p.name, p => p.id);
         var types = FieldNames.ToDictionary(n => n, _ => "text");
@@ -59,7 +59,7 @@ public sealed class FakePyrusClient : IPyrusClient
         return Task.FromResult<PyrusFormSchema?>(new PyrusFormSchema { FieldIds = ids, FieldTypes = types, Choices = choices });
     }
 
-    public Task<long?> CreateFormTaskAsync(IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
+    public Task<long?> CreateFormTaskAsync(long formId, IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
     {
         var task = new FakeTask { Id = _nextTaskId++ };
         foreach (var (name, value) in values)
@@ -101,7 +101,7 @@ public sealed class FakePyrusClient : IPyrusClient
     public Task<PyrusTask?> GetTaskAsync(long taskId, CancellationToken ct = default) =>
         Task.FromResult(Tasks.TryGetValue(taskId, out var task) ? task.ToPyrusTask() : null);
 
-    public Task<IReadOnlyList<PyrusTask>> RegisterAsync(CancellationToken ct = default) =>
+    public Task<IReadOnlyList<PyrusTask>> RegisterAsync(long formId, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<PyrusTask>>(Tasks.Values.Select(t => t.ToPyrusTask(withDetails: false)).ToList());
 
     public Task<string?> UploadFileAsync(string fileName, Stream content, string contentType, CancellationToken ct = default)

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using CompDesignBot.Features.Bot.Handlers;
+using CompDesignBot.Channels.Telegram;
 using CompDesignBot.Features.Feed;
 using CompDesignBot.Features.Requests;
 using CompDesignBot.Infrastructure.Pyrus;
@@ -37,18 +37,18 @@ public sealed class RequestCardTests
     public void Excerpt_skips_mini_app_header_lines()
     {
         var description = "Проект: 1-19-2026\nОснова: модуль\nСрок: 2026-10-01\n\nСделать раскладку панелей по фасаду с учётом кривизны и стыков";
-        Assert.Equal("Сделать раскладку панелей по фасаду с учётом кривизны и стыков", RequestCard.Excerpt(description));
-        Assert.Equal("", RequestCard.Excerpt("Проект: x"));
+        Assert.Equal("Сделать раскладку панелей по фасаду с учётом кривизны и стыков", RequestText.Excerpt(description));
+        Assert.Equal("", RequestText.Excerpt("Проект: x"));
         var longText = new string('а', 100);
-        Assert.Equal(70, RequestCard.Excerpt(longText).Length);
-        Assert.EndsWith("…", RequestCard.Excerpt(longText));
+        Assert.Equal(70, RequestText.Excerpt(longText).Length);
+        Assert.EndsWith("…", RequestText.Excerpt(longText));
     }
 
     [Fact]
     public void Author_line_has_handle_when_known()
     {
-        Assert.Equal("Иван Петров (@ivan)", RequestCard.AuthorLine("Иван Петров", "ivan"));
-        Assert.Equal("—", RequestCard.AuthorLine("", null));
+        Assert.Equal("Иван Петров (@ivan)", RequestText.AuthorLine("Иван Петров", "ivan"));
+        Assert.Equal("—", RequestText.AuthorLine("", null));
     }
 }
 
@@ -175,29 +175,21 @@ public sealed class RequestParserTests
     }
 }
 
-public sealed class WebAppPayloadTests
+public sealed class RequestTextTests
 {
-    private static JsonElement Parse(string json) => JsonDocument.Parse(json).RootElement.Clone();
-
     [Fact]
     public void Description_gets_header_from_form_fields()
     {
-        var data = Parse("""{"case":"curved","description":" Суть ","project":"1-19-2026 БЦ","origin":"Модуль","deadline":"2026-10-01","photos":"a,b"}""");
-        Assert.Equal("Проект: 1-19-2026 БЦ\nОснова: Модуль\nСрок: 2026-10-01\nКартинки: 2 — приложены в задаче Pyrus\n\nСуть", CreateHandler.WebAppDescription(data));
-        Assert.Equal(["a", "b"], CreateHandler.WebAppPhotoGuids(data));
+        var text = RequestText.ComposeDescription("Суть", "1-19-2026 БЦ", "Модуль", "2026-10-01", 2);
+        Assert.Equal("Проект: 1-19-2026 БЦ\nОснова: Модуль\nСрок: 2026-10-01\nКартинки: 2 — приложены в задаче Pyrus\n\nСуть", text);
+        Assert.Equal("Суть", RequestText.ComposeDescription("Суть", null, null, null, 0));
     }
 
     [Fact]
-    public void Missing_description_means_chat_dialog()
+    public void Clean_trims_and_cuts_to_limit()
     {
-        Assert.Null(CreateHandler.WebAppDescription(Parse("""{"case":"curved"}""")));
-        Assert.Null(CreateHandler.WebAppDescription(Parse("""{"case":"curved","description":123}""")));
-    }
-
-    [Fact]
-    public void Photo_guids_are_capped_at_six()
-    {
-        var data = Parse("""{"photos":"1,2,3,4,5,6,7,8"}""");
-        Assert.Equal(6, CreateHandler.WebAppPhotoGuids(data).Count);
+        Assert.Null(RequestText.Clean("  ", 10));
+        Assert.Equal("abc", RequestText.Clean(" abc ", 10));
+        Assert.Equal("abcde", RequestText.Clean("abcdefgh", 5));
     }
 }

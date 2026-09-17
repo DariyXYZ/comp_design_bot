@@ -8,14 +8,14 @@ namespace CompDesignBot.Infrastructure.Pyrus;
 /// </summary>
 public interface IPyrusClient
 {
-    /// <summary>Интеграция настроена (логин, ключ, форма). Иначе каждый метод — no-op.</summary>
+    /// <summary>Интеграция настроена (логин и ключ). Иначе каждый метод — no-op.</summary>
     bool Enabled { get; }
 
-    /// <summary>Схема формы заявок: поля по названию, типы, варианты выбора. Кэшируется на время жизни процесса.</summary>
-    Task<PyrusFormSchema?> SchemaAsync(CancellationToken ct = default);
+    /// <summary>Схема формы: поля по названию, типы, варианты выбора. Кэш по форме на время жизни процесса.</summary>
+    Task<PyrusFormSchema?> SchemaAsync(long formId, CancellationToken ct = default);
 
     /// <summary>Создаёт задачу по форме. <paramref name="values"/> — {название поля: значение}. Возвращает id задачи.</summary>
-    Task<long?> CreateFormTaskAsync(IReadOnlyDictionary<string, object?> values, CancellationToken ct = default);
+    Task<long?> CreateFormTaskAsync(long formId, IReadOnlyDictionary<string, object?> values, CancellationToken ct = default);
 
     /// <summary>
     /// Комментарий к задаче — единственный способ её изменить: текст, вложения по guid,
@@ -26,7 +26,7 @@ public interface IPyrusClient
     Task<PyrusTask?> GetTaskAsync(long taskId, CancellationToken ct = default);
 
     /// <summary>Весь реестр формы, включая закрытые задачи. Реестр не отдаёт вложений и комментариев.</summary>
-    Task<IReadOnlyList<PyrusTask>> RegisterAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<PyrusTask>> RegisterAsync(long formId, CancellationToken ct = default);
 
     /// <summary>Загружает файл; возвращает guid, который можно приложить к задаче один раз.</summary>
     Task<string?> UploadFileAsync(string fileName, Stream content, string contentType, CancellationToken ct = default);
@@ -41,7 +41,9 @@ public interface IPyrusClient
 public sealed record PyrusCommentRequest
 {
     public string Text { get; init; } = "";
+    /// <summary>Поля задачи по названию; форма нужна, чтобы найти их id и варианты.</summary>
     public IReadOnlyDictionary<string, object?>? SetFields { get; init; }
+    public long? FormId { get; init; }
     public string? Action { get; init; }
     public IReadOnlyList<string>? AttachmentGuids { get; init; }
 }

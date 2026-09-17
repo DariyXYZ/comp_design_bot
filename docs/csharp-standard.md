@@ -8,7 +8,7 @@
 ## 1. Базовые настройки
 
 - Актуальный **LTS .NET** (сейчас .NET 10), версия SDK закреплена в `global.json`.
-- Одно решение `.sln`; проекты в `src/`, тесты в `tests/`.
+- Одно решение `.slnx` (формат `dotnet new sln` в SDK 10); проекты в `src/`, тесты в `tests/`.
 - Общие настройки компиляции — в `Directory.Build.props`: `Nullable`,
   `ImplicitUsings`, `TreatWarningsAsErrors`, `LangVersion latest`.
 - Версии пакетов — централизованно в `Directory.Packages.props`
@@ -20,17 +20,18 @@
 
 ```
 service-name/
-├── ServiceName.sln
+├── ServiceName.slnx
 ├── global.json
 ├── Directory.Build.props
 ├── Directory.Packages.props
 ├── .editorconfig
 ├── src/ServiceName/
-│   ├── Program.cs               # композиция: конфиг, DI, конвейер, маршруты
-│   ├── Config/                  # options из переменных окружения, валидация
-│   ├── Endpoints/               # HTTP-вход: группы minimal API, webhook
-│   ├── Features/<domain>/       # предметная логика: сервисы, модели, тексты
-│   ├── Infrastructure/<system>/ # клиенты внешних систем: HTTP, БД, очереди
+│   ├── Program.cs               # запуск: логи, хост, подключение частей
+│   ├── Hosting/                 # options из env, DI, middleware, общее для HTTP
+│   ├── Features/<domain>/       # модуль предметной области: сервис, модели,
+│   │                            # контракты к внешним системам и его endpoints
+│   ├── Channels/<channel>/      # каналы вне HTTP (Telegram): webhook, кнопки, тексты
+│   ├── Infrastructure/<system>/ # адаптеры внешних систем: HTTP-клиент, mapping, БД
 │   ├── Assets/                  # файлы, нужные в рантайме (копируются в output)
 │   └── wwwroot/                 # статика, если сервис её раздаёт
 ├── tests/ServiceName.Tests/
@@ -38,40 +39,49 @@ service-name/
 └── README.md
 ```
 
-Папки создаются по мере необходимости. Пустые `Features/`, `Assets/`,
-`wwwroot/` заранее не заводятся.
+Папки создаются по мере необходимости. Пустые `Channels/`, `Assets/`,
+`wwwroot/` заранее не заводятся. Схема согласована с `docs/ARCHITECTURE.md`
+(модульный монолит): при расхождении главнее документ архитектуры проекта.
 
 ## 3. Ответственность слоёв
 
-**`Endpoints/`** — принять запрос, проверить вход, вызвать один сервис,
-отдать ответ. Никакой предметной логики: если в обработчике появилось
-условие «а если статус такой-то» — это уже `Features/`.
+**`Hosting/`** — как приложение собирается и запускается: options из
+переменных окружения с проверкой на старте, регистрация зависимостей
+(`ServiceRegistration`), общие middleware и фильтры (ошибки API, статика).
+Сервисы получают options, а не `IConfiguration`.
 
-**`Features/<domain>/`** — сценарии предметной области: что такое заявка, как
-она рендерится, что происходит при смене статуса. Здесь тексты для людей,
-правила, модели. Не знает про HTTP и не парсит JSON внешних систем.
+**`Features/<domain>/`** — законченный модуль: что такое заявка, как она
+меняется, кто её видит. Внутри — прикладной сервис, модели, тексты правил и
+**endpoints этого модуля** (`<Domain>Endpoints.cs` с `Map<Domain>()`).
+Endpoint тонкий: разобрать вход, вызвать сервис, отдать ответ. Контракты к
+внешним системам (`IRequestRegistry`, `IEmployeeDirectory`) принадлежат
+модулю, который их использует, а не инфраструктуре.
 
-**`Infrastructure/<system>/`** — один клиент на внешнюю систему (`PyrusClient`,
-`TelegramNotifier`). Авторизация, сериализация, повторы, таймауты. Без
-предметной логики; наружу отдаёт свои типы, а не сырой JSON.
+**`Channels/<channel>/`** — поведение канала, который не HTTP (Telegram-бот):
+webhook, кнопки, тексты, состояние диалога. Канал вызывает те же прикладные
+сервисы из `Features/`, что и HTTP-endpoints, и не повторяет правил.
+Реализации контрактов «отправить в чат», «уведомить» живут здесь.
 
-**`Config/`** — типизированные options, привязанные к переменным окружения и
-проверенные на старте (`ValidateOnStart`). Сервисы получают options, а не
-`IConfiguration`.
+**`Infrastructure/<system>/`** — адаптер к внешней системе: HTTP-клиент,
+сериализация, повторы, mapping полей, реализация контракта модуля
+(`PyrusRequestRegistry : IRequestRegistry`). Без предметной логики; наружу —
+свои типы, не сырой JSON.
 
 ## 4. Направление зависимостей
 
 ```
-Endpoints → Features → Infrastructure → BCL
+Hosting → Features, Channels, Infrastructure   (только композиция)
+Channels → Features
+Features → Infrastructure (типы адаптера) и контракты своего модуля
+Infrastructure → Features (только контракты и модели, которые реализует)
 ```
 
-Разрешено: `Endpoints → Features`, `Endpoints → Infrastructure` (только
-чтобы передать зависимость), `Features → Infrastructure`. Запрещено:
-`Infrastructure → Features`, `Features → Endpoints`. `Config` доступен всем.
+Запрещено: `Infrastructure → Channels`, `Features → Channels`,
+`Features → Hosting`, циклы между модулями `Features/`. Прикладной сервис не
+принимает `HttpContext`, `Telegram.Update`, сырые JSON-поля внешней системы.
 
 Признак нарушения: клиент внешней системы знает названия статусов заявки —
-значит, эти знания должны жить в `Features/`, а клиент принимать их
-параметром.
+значит, эти знания должны жить в `Features/`, а клиент принимать их параметром.
 
 ## 5. Конфигурация и секреты
 
@@ -87,8 +97,8 @@ Endpoints → Features → Infrastructure → BCL
 
 ## 6. HTTP и внешние системы
 
-- Minimal API; маршруты одной области — в одном файле `Endpoints/<Area>Endpoints.cs`
-  с методом расширения `Map<Area>()`.
+- Minimal API; маршруты модуля — в файле модуля `Features/<Domain>/<Domain>Endpoints.cs`
+  с методом расширения `Map<Domain>()`.
 - Ответы — JSON в camelCase, ошибки — `{ "error": "..." }` со статусом
   4xx/5xx. Формат согласуется с клиентом и не меняется молча.
 - Клиенты внешних систем — typed `HttpClient` через `IHttpClientFactory`,
@@ -113,9 +123,10 @@ Endpoints → Features → Infrastructure → BCL
   модуля (`Texts.cs`), не разбросаны по обработчикам.
 - Нет мёртвого и закомментированного кода. Изменил сигнатуру — проверил всех
   вызывающих.
-- Исключения внешних систем ловятся на границе `Infrastructure`, наружу —
-  `null`/результат с ошибкой и запись в лог; в `Features` не пишут `try/catch`
-  вокруг каждого вызова.
+- Сбой внешней системы — одно типизированное исключение адаптера
+  (`PyrusException`). Прикладной сервис решает, что критично (запись — бросить
+  дальше), а что нет (уведомление — в лог); HTTP превращает исключение в 502
+  одним фильтром, канал — в сообщение человеку.
 
 ## 8. Тесты
 
@@ -156,7 +167,7 @@ dotnet publish src/<Service> -c Release -o publish
 ## 12. Чек-лист нового сервиса
 
 1. `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`.
-2. `src/<Service>` + `tests/<Service>.Tests`, оба в `.sln`.
+2. `src/<Service>` + `tests/<Service>.Tests`, оба в `.slnx`.
 3. Options из env с валидацией на старте; таблица переменных в README.
 4. `/health`; логирование в файл или журнал стенда.
 5. Workflow с `build/test/format`; деплой отдельно.
