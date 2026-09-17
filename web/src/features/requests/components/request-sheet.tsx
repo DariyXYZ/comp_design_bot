@@ -10,7 +10,7 @@ import { useRequestDraft } from "../draft-store";
 import { uploadPhoto, type UploadedPhoto } from "../photos";
 import { PhotoLightbox } from "./photo-lightbox";
 import { ProjectField } from "./project-field";
-import { submitRequest } from "../submit";
+import { submitRequest, submitRequestViaApi, submitsViaApi } from "../submit";
 
 /**
  * Заявка как шторка над колодой.
@@ -55,6 +55,9 @@ export function RequestSheet() {
   const [zoomed, setZoomed] = useState<{ photo: UploadedPhoto; from: DOMRect } | null>(null);
 
   const [problem, setProblem] = useState<string | null>(null);
+  // Подтверждение после отправки через API: приложение не закрывается, как
+  // после sendData, и человеку нужно увидеть, что заявка ушла и под каким номером.
+  const [sent, setSent] = useState<string | null>(null);
   const [uploading, setUploading] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -115,8 +118,29 @@ export function RequestSheet() {
     }
   }
 
+  async function sendViaApi(draft: Parameters<typeof submitRequestViaApi>[0]) {
+    setProblem(null);
+    const result = await submitRequestViaApi(draft);
+    if (!result.ok) {
+      setProblem(
+        result.reason === "no-session"
+          ? `Вход не подтверждён — откройте приложение из Telegram ещё раз. ${RESTART_HINT}`
+          : `Не получилось отправить. Попробуйте ещё раз через минуту. ${RESTART_HINT}`,
+      );
+      return;
+    }
+    // Разрешение на сообщения спрашиваем после первой заявки, а не при
+    // открытии: человек уже понимает, зачем боту писать ему.
+    window.Telegram?.WebApp?.requestWriteAccess?.();
+    window.Telegram?.WebApp?.disableClosingConfirmation?.();
+    reset();
+    setSnap("peek");
+    setSent(`Заявка №${result.taskId} отправлена в отдел`);
+  }
+
   function send() {
-    const result = submitRequest({
+    setSent(null);
+    const draft = {
       topic: topicKey,
       origin: origin.label,
       originPath: origin.path,
@@ -127,7 +151,12 @@ export function RequestSheet() {
       source: fields.source,
       deadline: fields.deadline,
       photoGuids: photos.map((photo) => photo.guid),
-    });
+    };
+    if (submitsViaApi()) {
+      void sendViaApi(draft);
+      return;
+    }
+    const result = submitRequest(draft);
     if (result === "sent") {
       // Приложение закрывается само — но если человек вернётся, он не должен
       // увидеть уже отправленный черновик.
@@ -226,12 +255,18 @@ export function RequestSheet() {
       // Пусто — значит пусто: пустая обёртка добавила бы флексу лишний зазор
       // над кнопкой, которого нет в замере сложенной высоты.
       footAside={
-        problem || note ? (
+        problem || sent || note ? (
           <>
             {problem ? (
               <div className="banner">
                 <strong>Не отправлено</strong>
                 <span>{problem}</span>
+              </div>
+            ) : null}
+            {sent ? (
+              <div className="banner banner-quiet">
+                <strong>Отправлено</strong>
+                <span>{sent}. Статус — в «Задачах», уведомления придут в чат бота.</span>
               </div>
             ) : null}
             {/* В сложенном виде подписи нет: кнопка называет действие сама, а

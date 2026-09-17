@@ -1,4 +1,14 @@
+import { createRequest, type CreateRequestResult } from "@/lib/client/api";
 import { sendToBot, haptic, type SendResult } from "@/lib/client/telegram";
+
+/**
+ * Переключатель на время переезда: `NEXT_PUBLIC_SUBMIT_VIA_API=1` — заявка
+ * уходит в `POST /api/requests` C#-сервера, иначе через `sendData` боту (Vercel +
+ * Python-бот). После переключения webhook остаётся только путь через API.
+ */
+export function submitsViaApi(): boolean {
+  return process.env.NEXT_PUBLIC_SUBMIT_VIA_API === "1";
+}
 
 /**
  * Отправка заявки боту.
@@ -70,7 +80,19 @@ export function buildRequestPayload(draft: RequestDraft): Record<string, string>
   return payload;
 }
 
-/** Отправляет заявку и отзывается тактильно: успех и отказ различимы на ощупь. */
+/**
+ * Отправка через API C#-сервера. Картинки идут массивом guid, а не строкой:
+ * лимита `sendData` тут нет, и серверу проще принять список.
+ */
+export async function submitRequestViaApi(draft: RequestDraft): Promise<CreateRequestResult> {
+  const payload: Record<string, unknown> = buildRequestPayload(draft);
+  payload.photos = (draft.photoGuids ?? []).filter(Boolean);
+  const result = await createRequest(payload);
+  haptic(result.ok ? "success" : "error");
+  return result;
+}
+
+/** Отправляет заявку боту и отзывается тактильно: успех и отказ различимы на ощупь. */
 export function submitRequest(draft: RequestDraft): SendResult {
   const result = sendToBot(buildRequestPayload(draft));
   haptic(result === "sent" ? "success" : "error");

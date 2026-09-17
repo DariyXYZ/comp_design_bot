@@ -95,6 +95,30 @@ dotnet run --project src/CompDesignBot
 подав обновление в `POST /telegram/webhook` руками или через тесты
 (`tests/…/BotFlowTests.cs` — сценарии на фейковых Telegram и Pyrus).
 
+### Стенд с публичным адресом (проверка из Telegram)
+
+Telegram не откроет Mini App и не пришлёт webhook на localhost, поэтому для
+живой проверки нужен публичный https. ngrok с этой машины заблокирован,
+Cloudflare quick tunnel работает: `scripts/run-dev.ps1` поднимает туннель,
+подставляет его адрес в `PUBLIC_URL`/`WEBAPP_URL`, собирает статику Mini App
+(с `NEXT_PUBLIC_SUBMIT_VIA_API=1` — заявка через API) и запускает сервер.
+
+```powershell
+# один раз
+Copy-Item server\.env.dev.example server\.env.dev   # заполнить: тестовый бот, тестовая группа, Pyrus
+# cloudflared.exe (portable) → C:\VS Code	ools\cloudflared\ — https://github.com/cloudflare/cloudflared/releases
+
+# каждый запуск
+powershell -File server\scriptsun-dev.ps1          # -SkipWeb, если статика уже собрана
+```
+
+Важно: **тестовый бот, не рабочий** (`@BotFather` → `/newbot`) — у Telegram
+один получатель обновлений на токен, а рабочий бот продолжает работать на
+Python. Адрес туннеля новый при каждом запуске: скрипт печатает его, и его
+нужно вписать в BotFather → тестовый бот → Bot Settings → Configure Mini App,
+иначе прямая ссылка `t.me/<тестовый_бот>/app` не откроется. Кнопка в `/start`
+подхватывает адрес сама. Задачи при этом создаются на настоящей доске Pyrus.
+
 Статика Mini App для локального просмотра:
 
 ```powershell

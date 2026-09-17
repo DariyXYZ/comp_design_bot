@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 const result = spawnSync("npx", ["next", "build"], {
   stdio: "inherit",
   shell: true,
-  env: { ...process.env, NEXT_OUTPUT: "export" },
+  // Экспорт живёт только на C#-сервере, поэтому заявка там всегда через API.
+  env: { ...process.env, NEXT_OUTPUT: "export", NEXT_PUBLIC_SUBMIT_VIA_API: "1" },
 });
 process.exit(result.status ?? 1);

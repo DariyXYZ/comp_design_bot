@@ -294,6 +294,27 @@ async function withSession<T>(path: string, init: RequestInit = {}): Promise<T |
   return null;
 }
 
+/** Итог создания заявки через API. */
+export type CreateRequestResult =
+  | { ok: true; taskId: number; delivered: boolean }
+  | { ok: false; reason: "no-session" | "failed" };
+
+/**
+ * Создаёт заявку на сервере (`POST /api/requests`). Путь для C#-сервера:
+ * заявка не идёт через бота, поэтому лимит `sendData` и запуск только из
+ * кнопки клавиатуры здесь не действуют.
+ */
+export async function createRequest(payload: Record<string, unknown>): Promise<CreateRequestResult> {
+  if (!(await sessionToken())) return { ok: false, reason: "no-session" };
+  const body = await withSession<{ taskId?: number; delivered?: boolean }>("/api/requests/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!body?.taskId) return { ok: false, reason: "failed" };
+  return { ok: true, taskId: body.taskId, delivered: Boolean(body.delivered) };
+}
+
 /** Заявки этого человека. `null` — вход не подтверждён или API недоступен. */
 export async function fetchMyRequests(): Promise<PyrusRequest[] | null> {
   const body = await withSession<{ requests?: PyrusRequest[] }>("/api/requests/");
